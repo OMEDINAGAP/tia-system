@@ -1,0 +1,32 @@
+<h1>Panel Admin</h1>
+<input id="pin" placeholder="PIN">
+<button onclick="load()">Ver</button>
+
+<table border="1">
+<thead>
+<tr>
+<th>Nombre</th><th>Video</th><th>Examen</th>
+</tr>
+</thead>
+<tbody id="data"></tbody>
+</table>
+
+<script>
+async function load(){
+  const pin = document.getElementById("pin").value;
+
+  const res = await fetch(`/admin-data?pin=${pin}`);
+  const data = await res.json();
+
+  let html = "";
+  data.forEach(u=>{
+    html += `<tr>
+      <td>${u.name}</td>
+      <td>${u.video}%</td>
+      <td>${u.exam ?? "No"}</td>
+    </tr>`;
+  });
+
+  document.getElementById("data").innerHTML = html;
+}
+</script>

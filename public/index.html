@@ -1,0 +1,30 @@
+<h2>Acceso</h2>
+<input id="pass" placeholder="Contraseña">
+<input id="name" placeholder="Nombre">
+<button onclick="login()">Entrar</button>
+
+<script>
+const API = "";
+
+async function login(){
+  const pass = document.getElementById("pass").value;
+  const name = document.getElementById("name").value;
+
+  const res = await fetch(`/validate?pass=${pass}`);
+  const data = await res.json();
+
+  if(data.ok){
+    const u = await fetch("/log-login", {
+      method:"POST",
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name})
+    });
+    const user = await u.json();
+
+    localStorage.setItem("userId", user.id);
+    alert("Acceso correcto");
+  }else{
+    alert("Incorrecto");
+  }
+}
+</script>
