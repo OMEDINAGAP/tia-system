@@ -1,132 +1,95 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Documentos TIA</title>
+  <title>Documentación TIA</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<h1>📄 Subida de Documentos</h1>
+<h1>📄 Documentación requerida</h1>
 
-<p>Sube todos los documentos requeridos. Solo podrás enviar cuando estén completos.</p>
+<p>Descarga los formatos necesarios y reúne los documentos para entregarlos físicamente en el módulo TIA.</p>
 
-<table border="1" width="100%" id="tabla">
+<table class="tabla">
+
 <tr>
   <th>Documento</th>
-  <th>Archivo</th>
+  <th>Acción</th>
   <th>Estado</th>
 </tr>
 
 <tr>
+  <td>Formato solicitud TIA (guía de llenado)</td>
+  <td><a href="/docs/guia_tia.pdf" download>⬇ Descargar</a></td>
+  <td>🟢 Disponible</td>
+</tr>
+
+<tr>
+  <td>Recibo de nómina / Oficio</td>
+  <td><a href="/docs/oficio_nomina.pdf" download>⬇ Descargar</a></td>
+  <td>🟢 Disponible</td>
+</tr>
+
+<tr>
+  <td>Carta de antecedentes no penales</td>
+  <td>No aplica descarga</td>
+  <td>🔴 Tramitar por cuenta propia</td>
+</tr>
+
+<tr>
+  <td>Oficio solicitud TIA</td>
+  <td><a href="/docs/oficio_tia.pdf" download>⬇ Descargar</a></td>
+  <td>🟢 Disponible</td>
+</tr>
+
+<tr>
   <td>Identificación oficial</td>
-  <td><input type="file" onchange="checkFile(this,0)"></td>
-  <td id="s0">🔴 Pendiente</td>
+  <td>No aplica descarga</td>
+  <td>🔴 Presentar copia</td>
 </tr>
 
 <tr>
-  <td>Carta laboral</td>
-  <td><input type="file" onchange="checkFile(this,1)"></td>
-  <td id="s1">🔴 Pendiente</td>
+  <td>Carta responsiva (Art. 22)</td>
+  <td><a href="/docs/carta_responsiva.pdf" download>⬇ Descargar</a></td>
+  <td>🟢 Disponible</td>
 </tr>
 
 <tr>
-  <td>Antecedentes no penales</td>
-  <td><input type="file" onchange="checkFile(this,2)"></td>
-  <td id="s2">🔴 Pendiente</td>
+  <td>Constancia y descripción de puesto</td>
+  <td><a href="/docs/constancia_puesto.pdf" download>⬇ Descargar</a></td>
+  <td>🟢 Disponible</td>
 </tr>
 
 <tr>
-  <td>Alta IMSS</td>
-  <td><input type="file" onchange="checkFile(this,3)"></td>
-  <td id="s3">🔴 Pendiente</td>
+  <td>Alta IMSS / vigencia</td>
+  <td>No aplica descarga</td>
+  <td>🔴 Tramitar</td>
 </tr>
 
 <tr>
-  <td>Comprobante de pago</td>
-  <td><input type="file" onchange="checkFile(this,4)"></td>
-  <td id="s4">🔴 Pendiente</td>
+  <td>Constancias de cursos</td>
+  <td>Se generan en el sistema</td>
+  <td>🟡 Pendiente</td>
+</tr>
+
+<tr>
+  <td>Factura de pago</td>
+  <td>No aplica descarga</td>
+  <td>🔴 Obligatorio</td>
 </tr>
 
 </table>
 
 <br>
 
-<button onclick="enviar()" id="btnEnviar" disabled>Enviar documentos</button>
 <button onclick="regresar()">⬅ Regresar</button>
 
-<p id="msg"></p>
+</body>
 
 <script>
-const userId = localStorage.getItem("userId");
-
-console.log("USER ID:", userId);
-
-if(!userId){
-  alert("Sesión no válida, inicia sesión nuevamente");
-  window.location.href = "/";
-}
-
-let files = [null,null,null,null,null];
-
-function checkFile(input, index){
-  if(input.files.length > 0){
-    files[index] = input.files[0];
-    document.getElementById("s"+index).innerText = "🟢 Subido";
-  }
-
-  validar();
-}
-
-function validar(){
-  const completos = files.every(f => f !== null);
-  document.getElementById("btnEnviar").disabled = !completos;
-}
-
-async function enviar(){
-
-  const userId = localStorage.getItem("userId");
-
-  if(!userId){
-    alert("Sesión no válida");
-    window.location.href = "/";
-    return;
-  }
-
-  const formData = new FormData();
-
-  files.forEach(f => formData.append("docs", f));
-  formData.append("userId", userId);
-
-  try {
-
-    const res = await fetch("/upload-docs", {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await res.json();
-
-    console.log(data);
-
-    if(data.ok){
-      document.getElementById("msg").innerText = "✔ Documentos enviados";
-    }else{
-      document.getElementById("msg").innerText = "❌ " + data.error;
-    }
-
-  } catch(err){
-    console.error(err);
-    document.getElementById("msg").innerText = "❌ Error conexión";
-  }
-}
-
-
-
 function regresar(){
   window.location.href = "/portal.html";
 }
-
 </script>
 
-</body>
 </html>

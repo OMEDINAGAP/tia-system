@@ -128,3 +128,24 @@ button:disabled {
   background: gray;
 }
 
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.tabla th, .tabla td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.tabla tr:hover {
+  background: #f5f7fa;
+}
+
+a {
+  text-decoration: none;
+  color: #0a1f44;
+  font-weight: bold;
+}
+
