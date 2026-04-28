@@ -97,3 +97,14 @@ app.get("/admin-data", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Running"));
+
+app.get("/validate", (req, res) => {
+  const pass = req.query.pass;
+  const current = generatePassword();
+
+  console.log("PASS USER:", pass);
+  console.log("PASS SERVER:", current);
+
+  res.json({ ok: pass === current });
+});
+
