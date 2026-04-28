@@ -85,6 +85,28 @@ Este sistema registra la actividad del usuario para fines de validación.
   </p>
 </div>
 
+<h2>📊 Tu progreso</h2>
+
+<div class="progress-container">
+
+  <div class="progress-step" id="step-docs">
+    📄 Documentos
+    <span class="status">Pendiente</span>
+  </div>
+
+  <div class="progress-step" id="step-video">
+    🎥 Curso
+    <span class="status">Pendiente</span>
+  </div>
+
+  <div class="progress-step" id="step-exam">
+    🧠 Evaluación
+    <span class="status">Bloqueado</span>
+  </div>
+
+</div>
+
+
 <script>
 function goDocs(){
   window.location.href = "/documentos.html";
@@ -93,6 +115,57 @@ function goDocs(){
 function goCurso(){
   window.location.href = "/curso.html";
 }
+</script>
+
+<script>
+async function loadProgress(){
+
+  const userId = localStorage.getItem("userId");
+
+  // Traer datos del usuario
+  const res = await fetch(`/admin-data?pin=9472`);
+  const users = await res.json();
+
+  const user = users.find(u => u.id == userId);
+
+  if(!user) return;
+
+  // DOCUMENTOS (simulación)
+  if(user.docs){
+    setStatus("step-docs","completed","Completado");
+  } else {
+    setStatus("step-docs","pending","Pendiente");
+  }
+
+  // VIDEO
+  if(user.video >= 90){
+    setStatus("step-video","completed","Completado");
+  } else if(user.video > 0){
+    setStatus("step-video","in-progress","En proceso");
+  } else {
+    setStatus("step-video","pending","Pendiente");
+  }
+
+  // EXAMEN
+  if(user.video >= 90){
+    if(user.exam !== null){
+      setStatus("step-exam","completed","Completado");
+    } else {
+      setStatus("step-exam","in-progress","Disponible");
+    }
+  } else {
+    setStatus("step-exam","locked","Bloqueado");
+  }
+
+}
+
+function setStatus(id, className, text){
+  const el = document.getElementById(id);
+  el.className = "progress-step " + className;
+  el.querySelector(".status").innerText = text;
+}
+
+loadProgress();
 </script>
 
 </body>

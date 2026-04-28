@@ -23,4 +23,18 @@ video.addEventListener("timeupdate", async () => {
 video.addEventListener("ended", () => {
   document.getElementById("status").innerText = "Curso completado ✔";
 });
+
+let maxTime = 0;
+
+video.addEventListener("timeupdate", () => {
+  if(video.currentTime > maxTime){
+    maxTime = video.currentTime;
+  }
+});
+
+video.addEventListener("seeking", () => {
+  if(video.currentTime > maxTime){
+    video.currentTime = maxTime;
+  }
+});
 </script>

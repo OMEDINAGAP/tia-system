@@ -2,13 +2,32 @@ const express = require("express");
 const cors = require("cors");
 const { Low } = require("lowdb");
 const { JSONFile } = require("lowdb/node");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const userId = req.body.userId;
+    const dir = `uploads/${userId}`;
 
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage });
 const ADMIN_PIN = process.env.ADMIN_PIN;
 const SECRET = process.env.SECRET;
 
@@ -106,3 +125,19 @@ app.get("/validate", (req, res) => {
   res.json({ ok: pass === current });
 });
 
+app.post("/upload-docs", upload.array("docs"), async (req, res) => {
+
+  const userId = req.body.userId;
+  const user = db.data.users.find(u => u.id == userId);
+
+  if (!user) return res.status(404).send("Usuario no encontrado");
+
+  // Guardar rutas de archivos
+  user.docs = req.files.map(f => f.path);
+
+  await db.write();
+
+  res.json({ ok: true, files: user.docs });
+});
+
+app.use("/uploads", express.static("uploads"));

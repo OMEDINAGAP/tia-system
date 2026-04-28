@@ -5,7 +5,10 @@
 <table border="1">
 <thead>
 <tr>
-<th>Nombre</th><th>Video</th><th>Examen</th>
+<th>Nombre</th>
+<th>Video</th>
+<th>Examen</th>
+<th>Evidencia</th>
 </tr>
 </thead>
 <tbody id="data"></tbody>
@@ -20,12 +23,19 @@ async function load(){
 
   let html = "";
   data.forEach(u=>{
-    html += `<tr>
-      <td>${u.name}</td>
-      <td>${u.video}%</td>
-      <td>${u.exam ?? "No"}</td>
-    </tr>`;
-  });
+  html += `<tr>
+    <td>${u.name}</td>
+    <td>${u.video}%</td>
+    <td>${u.exam ?? "No"}</td>
+    <td>
+      ${
+        u.docs && u.docs.length > 0
+        ? u.docs.map(d => `<a href="/${d}" target="_blank">Ver</a>`).join("<br>")
+        : "No"
+      }
+    </td>
+  </tr>`;
+});
 
   document.getElementById("data").innerHTML = html;
 }

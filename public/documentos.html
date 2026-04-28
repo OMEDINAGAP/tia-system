@@ -1,12 +1,43 @@
 <h1>Subida de Documentos</h1>
 
-<p>Adjunta tus documentos requeridos para validación.</p>
+<p>Sube tus documentos en formato PDF o imagen.</p>
 
-<input type="file" multiple>
-<button onclick="enviar()">Enviar</button>
+<input type="file" id="files" multiple>
+<button onclick="enviar()">Enviar documentos</button>
+
+<p id="msg"></p>
 
 <script>
-function enviar(){
-  alert("Documentos enviados (simulación)");
+async function enviar(){
+
+  const userId = localStorage.getItem("userId");
+  const files = document.getElementById("files").files;
+
+  if(files.length === 0){
+    alert("Selecciona al menos un archivo");
+    return;
+  }
+
+  const formData = new FormData();
+
+  for(let f of files){
+    formData.append("docs", f);
+  }
+
+  formData.append("userId", userId);
+
+  const res = await fetch("/upload-docs", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+
+  if(data.ok){
+    document.getElementById("msg").innerText = "Documentos enviados ✔";
+  } else {
+    document.getElementById("msg").innerText = "Error al subir";
+  }
+
 }
 </script>
