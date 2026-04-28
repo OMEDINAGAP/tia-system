@@ -18,3 +18,30 @@ button {
   border: none;
   cursor: pointer;
 }
+
+body {
+  font-family: Arial;
+  background: #eef2f7;
+  padding: 30px;
+}
+
+h1 {
+  color: #0a1f44;
+}
+
+.card {
+  background: white;
+  padding: 20px;
+  margin: 20px 0;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+button {
+  padding: 10px 15px;
+  background: #0a1f44;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+}

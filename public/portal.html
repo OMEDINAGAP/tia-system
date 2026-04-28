@@ -6,23 +6,47 @@
 </head>
 <body>
 
-<h1>Proceso de Tarjeta de Identificación Aeroportuaria</h1>
+<h1>Solicitud de Tarjeta de Identificación Aeroportuaria (TIA)</h1>
 
-<p>En este portal podrás completar los pasos necesarios para la obtención de tu credencial aeroportuaria.</p>
+<p>
+Bienvenido. En este portal podrás completar el proceso necesario para la obtención de tu credencial aeroportuaria.
+Lee cuidadosamente cada sección antes de continuar.
+</p>
 
+<!-- PASOS -->
 <div class="card">
-  <h2>📄 Requisitos del trámite</h2>
-  <p>
-    Aquí encontrarás toda la documentación necesaria para solicitar la TIA,
-    incluyendo identificación oficial, carta laboral, antecedentes no penales, entre otros.
-  </p>
+  <h2>🧭 Proceso del trámite</h2>
+  <ol>
+    <li>Alta de firmas por parte del representante legal</li>
+    <li>Obtención de solicitud de TIA en módulo</li>
+    <li>Entrega de documentos en ventanilla</li>
+    <li>Toma fotográfica</li>
+    <li>Validación del trámite</li>
+    <li>Entrega de credencial</li>
+  </ol>
 </div>
 
+<!-- REQUISITOS -->
+<div class="card">
+  <h2>📄 Documentos requeridos</h2>
+  <ul>
+    <li>Solicitud de TIA (llenada correctamente)</li>
+    <li>Identificación oficial vigente</li>
+    <li>Recibo de nómina (con montos ocultos)</li>
+    <li>Carta de antecedentes no penales</li>
+    <li>Alta IMSS o vigencia de derechos</li>
+    <li>Carta responsiva (Art. 22)</li>
+    <li>Constancia y descripción de puesto</li>
+    <li>Comprobante de pago</li>
+  </ul>
+</div>
+
+<!-- OPCIONES -->
 <div class="card">
   <h2>📤 Envío de documentación</h2>
   <p>
-    En esta sección podrás cargar tus documentos para validación.
-    Solo el personal autorizado podrá realizar este proceso.
+Si ya cuentas con todos los documentos, puedes enviarlos para validación.
+Este paso permite agilizar tu trámite antes de acudir al módulo.
   </p>
   <button onclick="goDocs()">Subir documentos</button>
 </div>
@@ -30,10 +54,18 @@
 <div class="card">
   <h2>🎥 Curso de seguridad obligatorio</h2>
   <p>
-    Antes de obtener tu credencial, deberás completar el curso de seguridad aeroportuaria.
-    El sistema registrará tu progreso y validará tu participación.
+Antes de obtener tu credencial, deberás completar el curso de seguridad aeroportuaria.
+El sistema registrará si el video fue visto completamente.
   </p>
   <button onclick="goCurso()">Ir al curso</button>
+</div>
+
+<div class="card">
+  <h2>ℹ️ Importante</h2>
+  <p>
+El incumplimiento de cualquiera de los requisitos o del curso obligatorio puede retrasar o impedir la emisión de la TIA.
+Este sistema registra la actividad del usuario para fines de validación.
+  </p>
 </div>
 
 <script>
