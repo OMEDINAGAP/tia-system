@@ -8,13 +8,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-const adapter = new JSONFile("db.json");
-const db = new Low(adapter);
 
 const ADMIN_PIN = process.env.ADMIN_PIN;
 const SECRET = process.env.SECRET;
 
-// INIT DB
+const adapter = new JSONFile("db.json");
+const db = new Low(adapter, { users: [] });
+
 async function init() {
   await db.read();
   db.data ||= { users: [] };
