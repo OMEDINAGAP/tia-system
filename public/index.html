@@ -22,7 +22,10 @@ async function login(){
     const user = await u.json();
 
     localStorage.setItem("userId", user.id);
-    alert("Acceso correcto");
+
+    // 🔥 AQUÍ EL CAMBIO
+    window.location.href = "/portal.html";
+
   }else{
     alert("Incorrecto");
   }
