@@ -1,0 +1,26 @@
+<h1>Curso de Seguridad</h1>
+
+<video id="video" controls width="600">
+  <source src="curso.mp4" type="video/mp4">
+</video>
+
+<p id="status">Debes completar el video</p>
+
+<script>
+const video = document.getElementById("video");
+const userId = localStorage.getItem("userId");
+
+video.addEventListener("timeupdate", async () => {
+  const progress = (video.currentTime / video.duration) * 100;
+
+  await fetch("/log-video", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, progress })
+  });
+});
+
+video.addEventListener("ended", () => {
+  document.getElementById("status").innerText = "Curso completado ✔";
+});
+</script>

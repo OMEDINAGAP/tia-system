@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Portal TIA</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<h1>Proceso de Tarjeta de Identificación Aeroportuaria</h1>
+
+<p>En este portal podrás completar los pasos necesarios para la obtención de tu credencial aeroportuaria.</p>
+
+<div class="card">
+  <h2>📄 Requisitos del trámite</h2>
+  <p>
+    Aquí encontrarás toda la documentación necesaria para solicitar la TIA,
+    incluyendo identificación oficial, carta laboral, antecedentes no penales, entre otros.
+  </p>
+</div>
+
+<div class="card">
+  <h2>📤 Envío de documentación</h2>
+  <p>
+    En esta sección podrás cargar tus documentos para validación.
+    Solo el personal autorizado podrá realizar este proceso.
+  </p>
+  <button onclick="goDocs()">Subir documentos</button>
+</div>
+
+<div class="card">
+  <h2>🎥 Curso de seguridad obligatorio</h2>
+  <p>
+    Antes de obtener tu credencial, deberás completar el curso de seguridad aeroportuaria.
+    El sistema registrará tu progreso y validará tu participación.
+  </p>
+  <button onclick="goCurso()">Ir al curso</button>
+</div>
+
+<script>
+function goDocs(){
+  window.location.href = "/documentos.html";
+}
+
+function goCurso(){
+  window.location.href = "/curso.html";
+}
+</script>
+
+</body>
+</html>
