@@ -59,6 +59,8 @@
 <script>
 const userId = localStorage.getItem("userId");
 
+console.log("USER ID:", userId);
+
 if(!userId){
   alert("Sesión no válida, inicia sesión nuevamente");
   window.location.href = "/";
@@ -82,10 +84,11 @@ function validar(){
 
 async function enviar(){
 
-  const userId = Number(req.body.userId);
+  const userId = localStorage.getItem("userId");
 
   if(!userId){
-    alert("Error: sesión no válida");
+    alert("Sesión no válida");
+    window.location.href = "/";
     return;
   }
 
@@ -103,21 +106,22 @@ async function enviar(){
 
     const data = await res.json();
 
-    console.log("RESPUESTA:", data);
+    console.log(data);
 
     if(data.ok){
       document.getElementById("msg").innerText = "✔ Documentos enviados";
     }else{
-      document.getElementById("msg").innerText = "❌ Error backend";
+      document.getElementById("msg").innerText = "❌ " + data.error;
     }
 
   } catch(err){
     console.error(err);
     document.getElementById("msg").innerText = "❌ Error conexión";
   }
-
-  console.log("USER ID:", userId);
 }
+
+
+
 function regresar(){
   window.location.href = "/portal.html";
 }

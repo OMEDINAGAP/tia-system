@@ -13,7 +13,7 @@ app.use(express.static("public"));
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const userId = req.body.userId;
+    const userId = Number(req.body.userId);
     const dir = `uploads/${userId}`;
 
     if (!fs.existsSync(dir)) {
@@ -130,11 +130,21 @@ app.post("/upload-docs", upload.array("docs"), async (req, res) => {
   console.log("FILES:", req.files);
   console.log("BODY:", req.body);
 
-  const userId = req.body.userId;
+  const userId = Number(req.body.userId);
 
-  const user = db.data.users.find(u => u.id == userId);
+  if (!userId) {
+    return res.json({ ok:false, error:"userId inválido" });
+  }
 
-  if (!user) return res.json({ ok:false, error:"Usuario no encontrado" });
+  const user = db.data.users.find(u => u.id === userId);
+
+  if (!user) {
+    return res.json({ ok:false, error:"Usuario no encontrado" });
+  }
+
+  if (!req.files || req.files.length === 0) {
+    return res.json({ ok:false, error:"No se recibieron archivos" });
+  }
 
   user.docs = req.files.map(f => f.path);
 
