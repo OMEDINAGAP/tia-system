@@ -26,10 +26,12 @@ init();
 function generatePassword() {
   const now = new Date();
 
-// Ajuste manual a hora México (UTC-7 aprox)
-now.setHours(now.getHours() - 7);
+  // FORZAR ZONA MÉXICO (UTC-7)
+  const offset = -7;
+  const local = new Date(now.getTime() + (offset * 60 * 60 * 1000));
 
-const today = now.toISOString().split("T")[0];
+  const today = local.toISOString().split("T")[0];
+
   const base = SECRET + today;
 
   let hash = 0;
@@ -41,11 +43,7 @@ const today = now.toISOString().split("T")[0];
   return "TIA#" + Math.abs(hash).toString(36).toUpperCase().slice(0,6);
 }
 
-// LOGIN
-app.get("/validate", (req, res) => {
-  const pass = req.query.pass;
-  res.json({ ok: pass === generatePassword() });
-});
+
 
 // ADMIN PASSWORD (PROTEGIDO)
 app.get("/admin-password", (req, res) => {

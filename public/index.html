@@ -10,7 +10,7 @@ async function login(){
   const pass = document.getElementById("pass").value;
   const name = document.getElementById("name").value;
 
-  const res = await fetch(`/validate?pass=${pass}`);
+  const res = await fetch(`/validate?pass=${encodeURIComponent(pass)}`)
   const data = await res.json();
 
   if(data.ok){
