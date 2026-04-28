@@ -13,42 +13,58 @@ Bienvenido. En este portal podrás completar el proceso necesario para la obtenc
 Lee cuidadosamente cada sección antes de continuar.
 </p>
 
-<!-- PASOS -->
-<div class="card">
-  <h2>🧭 Proceso del trámite</h2>
-  <ol>
-    <li>Alta de firmas por parte del representante legal</li>
-    <li>Obtención de solicitud de TIA en módulo</li>
-    <li>Entrega de documentos en ventanilla</li>
-    <li>Toma fotográfica</li>
-    <li>Validación del trámite</li>
-    <li>Entrega de credencial</li>
-  </ol>
+<div class="steps">
+
+  <div class="step">
+    <div class="icon">1️⃣</div>
+    <h3>Alta de firmas</h3>
+    <p>Tu empresa debe autorizarte.</p>
+  </div>
+
+  <div class="step">
+    <div class="icon">2️⃣</div>
+    <h3>Reúne documentos</h3>
+    <p>Identificación, carta laboral, etc.</p>
+  </div>
+
+  <div class="step">
+    <div class="icon">3️⃣</div>
+    <h3>Curso obligatorio</h3>
+    <p>Debes ver el video completo.</p>
+  </div>
+
+  <div class="step">
+    <div class="icon">4️⃣</div>
+    <h3>Entrega final</h3>
+    <p>Acude al módulo TIAS.</p>
+  </div>
+
 </div>
 
 <!-- REQUISITOS -->
 <div class="card">
   <h2>📄 Documentos requeridos</h2>
-  <ul>
-    <li>Solicitud de TIA (llenada correctamente)</li>
-    <li>Identificación oficial vigente</li>
-    <li>Recibo de nómina (con montos ocultos)</li>
-    <li>Carta de antecedentes no penales</li>
-    <li>Alta IMSS o vigencia de derechos</li>
-    <li>Carta responsiva (Art. 22)</li>
-    <li>Constancia y descripción de puesto</li>
-    <li>Comprobante de pago</li>
-  </ul>
+  
+    <div class="check">✔ Solicitud de TIA (llenada correctamente)</div>
+    <div class="check">✔ Identificación oficial vigente</div>
+    <div class="check">✔ Recibo de nómina (con montos ocultos)</div>
+    <div class="check">✔ Carta de antecedentes no penales</div>
+    <div class="check">✔ Alta IMSS o vigencia de derechos</div>
+    <div class="check">✔ Carta responsiva (Art. 22)</div>
+    <div class="check">✔ Constancia y descripción de puesto</div>
+    <div class="check">✔ Comprobante de pago</div>
+  
 </div>
 
 <!-- OPCIONES -->
+ <div class="actions"></div>
 <div class="card">
   <h2>📤 Envío de documentación</h2>
   <p>
 Si ya cuentas con todos los documentos, puedes enviarlos para validación.
 Este paso permite agilizar tu trámite antes de acudir al módulo.
   </p>
-  <button onclick="goDocs()">Subir documentos</button>
+  <button class="btn-big" onclick="goDocs()">Subir documentos</button>
 </div>
 
 <div class="card">
@@ -57,7 +73,8 @@ Este paso permite agilizar tu trámite antes de acudir al módulo.
 Antes de obtener tu credencial, deberás completar el curso de seguridad aeroportuaria.
 El sistema registrará si el video fue visto completamente.
   </p>
-  <button onclick="goCurso()">Ir al curso</button>
+  <button class="btn-big" onclick="goCurso()">Ir al curso</button>
+</div>
 </div>
 
 <div class="card">

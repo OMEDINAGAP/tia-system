@@ -45,3 +45,23 @@ button {
   cursor: pointer;
   border-radius: 6px;
 }
+
+.steps {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.step {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 220px;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.icon {
+  font-size: 30px;
+  margin-bottom: 10px;
+}
