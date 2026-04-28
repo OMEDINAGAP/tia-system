@@ -24,7 +24,12 @@ init();
 
 // PASSWORD DINÁMICA
 function generatePassword() {
-  const today = new Date().toISOString().split("T")[0];
+  const now = new Date();
+
+// Ajuste manual a hora México (UTC-7 aprox)
+now.setHours(now.getHours() - 7);
+
+const today = now.toISOString().split("T")[0];
   const base = SECRET + today;
 
   let hash = 0;
