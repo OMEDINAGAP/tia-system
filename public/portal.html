@@ -108,6 +108,10 @@ Este sistema registra la actividad del usuario para fines de validación.
 
 
 <script>
+  if(!localStorage.getItem("userId")){
+  window.location.href = "/";
+}
+
 function goDocs(){
   window.location.href = "/documentos.html";
 }

@@ -7,6 +7,10 @@
 <p id="status">Debes completar el video</p>
 
 <script>
+  if(!localStorage.getItem("userId")){
+  window.location.href = "/";
+}
+
 const video = document.getElementById("video");
 const userId = localStorage.getItem("userId");
 

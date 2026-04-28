@@ -57,6 +57,12 @@
 <p id="msg"></p>
 
 <script>
+const userId = localStorage.getItem("userId");
+
+if(!userId){
+  alert("Sesión no válida, inicia sesión nuevamente");
+  window.location.href = "/";
+}
 
 let files = [null,null,null,null,null];
 
@@ -76,7 +82,7 @@ function validar(){
 
 async function enviar(){
 
-  const userId = localStorage.getItem("userId");
+  const userId = Number(req.body.userId);
 
   if(!userId){
     alert("Error: sesión no válida");
@@ -109,6 +115,8 @@ async function enviar(){
     console.error(err);
     document.getElementById("msg").innerText = "❌ Error conexión";
   }
+
+  console.log("USER ID:", userId);
 }
 function regresar(){
   window.location.href = "/portal.html";
