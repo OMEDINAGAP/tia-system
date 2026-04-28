@@ -1,29 +1,86 @@
-<h1>Subida de Documentos</h1>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Documentos TIA</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
 
-<p>Sube tus documentos en formato PDF o imagen.</p>
+<h1>📄 Subida de Documentos</h1>
 
-<input type="file" id="files" multiple>
-<button onclick="enviar()">Enviar documentos</button>
+<p>Sube todos los documentos requeridos. Solo podrás enviar cuando estén completos.</p>
+
+<table border="1" width="100%" id="tabla">
+<tr>
+  <th>Documento</th>
+  <th>Archivo</th>
+  <th>Estado</th>
+</tr>
+
+<tr>
+  <td>Identificación oficial</td>
+  <td><input type="file" onchange="checkFile(this,0)"></td>
+  <td id="s0">🔴 Pendiente</td>
+</tr>
+
+<tr>
+  <td>Carta laboral</td>
+  <td><input type="file" onchange="checkFile(this,1)"></td>
+  <td id="s1">🔴 Pendiente</td>
+</tr>
+
+<tr>
+  <td>Antecedentes no penales</td>
+  <td><input type="file" onchange="checkFile(this,2)"></td>
+  <td id="s2">🔴 Pendiente</td>
+</tr>
+
+<tr>
+  <td>Alta IMSS</td>
+  <td><input type="file" onchange="checkFile(this,3)"></td>
+  <td id="s3">🔴 Pendiente</td>
+</tr>
+
+<tr>
+  <td>Comprobante de pago</td>
+  <td><input type="file" onchange="checkFile(this,4)"></td>
+  <td id="s4">🔴 Pendiente</td>
+</tr>
+
+</table>
+
+<br>
+
+<button onclick="enviar()" id="btnEnviar" disabled>Enviar documentos</button>
+<button onclick="regresar()">⬅ Regresar</button>
 
 <p id="msg"></p>
 
 <script>
+
+let files = [null,null,null,null,null];
+
+function checkFile(input, index){
+  if(input.files.length > 0){
+    files[index] = input.files[0];
+    document.getElementById("s"+index).innerText = "🟢 Subido";
+  }
+
+  validar();
+}
+
+function validar(){
+  const completos = files.every(f => f !== null);
+  document.getElementById("btnEnviar").disabled = !completos;
+}
+
 async function enviar(){
 
   const userId = localStorage.getItem("userId");
-  const files = document.getElementById("files").files;
-
-  if(files.length === 0){
-    alert("Selecciona al menos un archivo");
-    return;
-  }
 
   const formData = new FormData();
 
-  for(let f of files){
-    formData.append("docs", f);
-  }
-
+  files.forEach(f => formData.append("docs", f));
   formData.append("userId", userId);
 
   const res = await fetch("/upload-docs", {
@@ -34,10 +91,17 @@ async function enviar(){
   const data = await res.json();
 
   if(data.ok){
-    document.getElementById("msg").innerText = "Documentos enviados ✔";
-  } else {
-    document.getElementById("msg").innerText = "Error al subir";
+    document.getElementById("msg").innerText = "✔ Todos los documentos enviados correctamente";
+  }else{
+    document.getElementById("msg").innerText = "❌ Error al subir";
   }
-
 }
+
+function regresar(){
+  window.location.href = "/portal.html";
+}
+
 </script>
+
+</body>
+</html>

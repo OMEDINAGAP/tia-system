@@ -105,3 +105,26 @@ button {
   background: #999;
   color: white;
 }
+
+table {
+  border-collapse: collapse;
+  background: white;
+}
+
+th, td {
+  padding: 10px;
+}
+
+button {
+  padding: 10px 15px;
+  margin: 5px;
+  background: #0a1f44;
+  color: white;
+  border: none;
+  border-radius: 6px;
+}
+
+button:disabled {
+  background: gray;
+}
+
