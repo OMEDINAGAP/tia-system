@@ -127,17 +127,20 @@ app.get("/validate", (req, res) => {
 
 app.post("/upload-docs", upload.array("docs"), async (req, res) => {
 
+  console.log("FILES:", req.files);
+  console.log("BODY:", req.body);
+
   const userId = req.body.userId;
+
   const user = db.data.users.find(u => u.id == userId);
 
-  if (!user) return res.status(404).send("Usuario no encontrado");
+  if (!user) return res.json({ ok:false, error:"Usuario no encontrado" });
 
-  // Guardar rutas de archivos
   user.docs = req.files.map(f => f.path);
 
   await db.write();
 
-  res.json({ ok: true, files: user.docs });
+  res.json({ ok: true });
 });
 
 app.use("/uploads", express.static("uploads"));
