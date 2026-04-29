@@ -166,24 +166,36 @@ let DATA = [];
 async function login(){
   const pin = document.getElementById("pin").value;
 
-  const res = await fetch(`/admin-data?pin=${pin}`);
+  const res = await fetch("/admin-login", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ pin })
+  });
 
-  if(res.status !== 200){
+  const data = await res.json();
+
+  if(!data.ok){
     alert("PIN incorrecto");
     return;
   }
 
-  DATA = await res.json();
+  // 🔐 guardar token REAL
+  localStorage.setItem("token", data.token);
 
-  // 🔐 GUARDAR TOKEN (simulado)
-  localStorage.setItem("token", pin);
+  // 🔥 cargar admin data correctamente
+  const r = await fetch("/admin-data", {
+    headers:{
+      "Authorization": data.token
+    }
+  });
+
+  DATA = await r.json();
 
   document.getElementById("login").style.display="none";
   document.getElementById("dashboard").style.display="block";
 
   render();
 }
-
 // RENDER
 function render(){
   const tbody = document.getElementById("tbody");
