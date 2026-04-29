@@ -25,7 +25,6 @@ const SECRET = process.env.SECRET;
 
 
 // arriba
-const crypto = require("crypto");
 const sessions = new Map(); // token -> userId
 
 function createSession(userId){
