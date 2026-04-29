@@ -28,24 +28,45 @@ const SECRET = process.env.SECRET;
 const sessions = new Map(); // token -> userId
 
 // 👇 AQUÍ VA EL MIDDLEWARE
-function auth(req, res, next){
-  const header = req.headers.authorization;
+async function auth(req, res, next){
+  try {
+    const header = req.headers.authorization;
 
-  if(!header){
-    return res.status(401).json({ ok:false, error:"Sin token" });
+    if(!header){
+      return res.status(401).json({ ok:false });
+    }
+
+    const token = header.startsWith("Bearer ")
+      ? header.split(" ")[1]
+      : header;
+
+    const [rows] = await db.query(
+      "SELECT * FROM sessions WHERE token=?",
+      [token]
+    );
+
+    const session = rows[0];
+
+    if(!session){
+      return res.status(401).json({ ok:false });
+    }
+
+    if(session.expires < Date.now()){
+      return res.status(401).json({ ok:false });
+    }
+
+    // 🔥 IMPORTANTE
+    req.userId = session.userId;
+
+    // 🔥 AQUÍ ESTÁ LA CLAVE
+    req.isAdmin = String(session.userId).startsWith("admin-");
+
+    next();
+
+  } catch(err){
+    console.error(err);
+    res.status(500).json({ ok:false });
   }
-
-  // Soporta "Bearer TOKEN" o solo "TOKEN"
-  const token = header.startsWith("Bearer ")
-    ? header.split(" ")[1]
-    : header;
-
-  if(!sessions.has(token)){
-    return res.status(401).json({ ok:false, error:"Token inválido" });
-  }
-
-  req.userId = sessions.get(token);
-  next();
 }
 
 function createSession(userId){
@@ -82,9 +103,34 @@ function generatePassword() {
 
 
 // ADMIN PASSWORD (PROTEGIDO)
-app.get("/admin-password", (req, res) => {
-  if (req.query.pin !== ADMIN_PIN) return res.status(403).send("No autorizado");
-  res.send(generatePassword());
+app.post("/admin-login", async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    const [rows] = await db.query(
+      "SELECT * FROM admins WHERE pin=?",
+      [pin]
+    );
+
+    const admin = rows[0];
+
+    if(!admin){
+      return res.status(401).json({ ok:false });
+    }
+
+    // 🔥 crear sesión como usuario
+    const token = await createSession("admin-" + admin.id);
+
+    res.json({
+      ok:true,
+      token,
+      name: admin.name
+    });
+
+  } catch(err){
+    console.error(err);
+    res.status(500).json({ ok:false });
+  }
 });
 
 // LOG LOGIN
@@ -204,6 +250,11 @@ app.post("/log-exam", auth, async (req, res) => {
 // ADMIN DATA
 app.get("/admin-data", auth, async (req, res) => {
   try {
+
+    // 🔐 SOLO ADMIN
+    if(!req.isAdmin){
+      return res.status(403).json({ ok:false, error:"Acceso denegado" });
+    }
 
     const [rows] = await db.query(
       "SELECT * FROM users ORDER BY loginTime DESC"
