@@ -7,11 +7,11 @@ const QRCode = require("qrcode");
 console.log("DB_HOST:", process.env.DB_HOST);
 
 const db = mysql.createPool({
-  host: process.env.DB_HOST || "mysql.hostinger.com",
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
+  host: process.env.MYSQLHOST,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
+  port: process.env.MYSQLPORT,
 });
 
 const app = express();
