@@ -3,67 +3,138 @@
 <head>
   <title>Curso de Seguridad</title>
   <link rel="stylesheet" href="styles.css">
+
+  <style>
+    .progress-bar {
+      width: 100%;
+      height: 10px;
+      background: #ddd;
+      border-radius: 5px;
+      margin-top: 15px;
+      overflow: hidden;
+    }
+
+    #progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #0a1f44;
+      transition: 0.3s;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .status.red { color: #ef4444; }
+    .status.green { color: #22c55e; }
+
+    button {
+      margin-top: 20px;
+    }
+  </style>
 </head>
+
 <body>
 
 <div class="container">
 
   <h1>🎥 Curso de Seguridad Aeroportuaria</h1>
 
-  <p class="subtitle">
-    Debes completar el video para continuar con tu trámite.
-  </p>
+  <p>Debes completar el video para continuar.</p>
 
-  <div class="card">
+  <!-- VIDEO -->
+  <div id="player"></div>
 
-    <!-- VIDEO -->
-    <video id="video" width="100%" controls controlsList="nodownload">
-      <source src="/video/curso.mp4" type="video/mp4">
-    </video>
-
-    <!-- PROGRESO -->
-    <div class="progress-bar">
-      <div id="progress-fill"></div>
-    </div>
-
-    <p id="progress-text">Progreso: 0%</p>
-
-    <!-- ESTADO -->
-    <div id="status" class="status red">Pendiente</div>
-
+  <!-- PROGRESO -->
+  <div class="progress-bar">
+    <div id="progress-fill"></div>
   </div>
 
-  <!-- BLOQUEO -->
+  <p id="progress">Progreso: 0%</p>
+  <p id="status" class="status red">Pendiente</p>
+
+  <button id="btnExam" disabled onclick="goExam()">Ir al examen</button>
+
   <div class="alert">
-    ⚠️ No puedes adelantar el video. Debes verlo completo.
+    ⚠️ No puedes adelantar el video ni cambiar de pestaña.
   </div>
-
-  <!-- ACCIÓN -->
-  <button id="btnExam" disabled onclick="goExam()">
-    🧠 Realizar evaluación
-  </button>
 
 </div>
 
+<script src="https://www.youtube.com/iframe_api"></script>
+
 <script>
 
-const video = document.getElementById("video");
-const fill = document.getElementById("progress-fill");
-const text = document.getElementById("progress-text");
-const status = document.getElementById("status");
-const btn = document.getElementById("btnExam");
+if(!localStorage.getItem("userId")){
+  window.location.href = "/";
+}
 
+let player;
+let duration = 0;
 let maxTime = 0;
+let active = true;
+let lastUpdate = Date.now();
 
-// PROGRESO
-video.addEventListener("timeupdate", () => {
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player('player', {
+    height: '400',
+    width: '100%',
+    videoId: 'mFnukhtcY2c', // 👈 CAMBIA ESTO
+    playerVars: {
+      controls: 1,
+      rel: 0,
+      modestbranding: 1
+    },
+    events: {
+      'onReady': onReady
+    }
+  });
+}
 
-  const percent = (video.currentTime / video.duration) * 100;
+function onReady() {
+  duration = player.getDuration();
+  setInterval(track, 1000);
+}
 
-  fill.style.width = percent + "%";
-  text.innerText = "Progreso: " + Math.floor(percent) + "%";
+// DETECTAR CAMBIO DE PESTAÑA
+document.addEventListener("visibilitychange", () => {
+  if(document.hidden){
+    active = false;
+  } else {
+    active = true;
+  }
+});
 
-  // guardar progreso
+function track(){
+
+  if(!player || typeof player.getCurrentTime !== "function") return;
+
+  const current = player.getCurrentTime();
+
+  // BLOQUEO SI NO ESTÁ ACTIVO
+  if(!active){
+    player.pauseVideo();
+    return;
+  }
+
+  // BLOQUEO ANTI ADELANTO
+  if(current > maxTime + 2){
+    player.seekTo(maxTime);
+  } else {
+    maxTime = current;
+  }
+
+  const percent = (maxTime / duration) * 100;
+
+  // UI
+  document.getElementById("progress").innerText =
+    "Progreso: " + Math.floor(percent) + "%";
+
+  document.getElementById("progress-fill").style.width =
+    percent + "%";
+
+  // REGISTRO TIEMPO REAL
   const userId = localStorage.getItem("userId");
 
   fetch("/log-video", {
@@ -71,35 +142,30 @@ video.addEventListener("timeupdate", () => {
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
       userId,
-      progress: percent
+      progress: percent,
+      seconds: maxTime
     })
   });
 
-  // marcar avance máximo
-  if(video.currentTime > maxTime){
-    maxTime = video.currentTime;
-  }
-
   // COMPLETADO
   if(percent >= 90){
-    status.className = "status green";
-    status.innerText = "Completado";
-    btn.disabled = false;
+    document.getElementById("status").className = "status green";
+    document.getElementById("status").innerText = "✔ Completado";
+
+    document.getElementById("btnExam").disabled = false;
+
+    // REDIRECCIÓN AUTOMÁTICA
+    setTimeout(()=>{
+      window.location.href = "/examen.html";
+    }, 2000);
+
   } else {
-    status.className = "status red";
-    status.innerText = "En proceso";
+    document.getElementById("status").className = "status red";
+    document.getElementById("status").innerText = "En proceso";
   }
 
-});
+}
 
-// BLOQUEO DE ADELANTAR
-video.addEventListener("seeking", () => {
-  if(video.currentTime > maxTime){
-    video.currentTime = maxTime;
-  }
-});
-
-// IR A EXAMEN
 function goExam(){
   window.location.href = "/examen.html";
 }
