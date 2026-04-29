@@ -1,42 +1,206 @@
-<h1>Panel Admin</h1>
-<input id="pin" placeholder="PIN">
-<button onclick="load()">Ver</button>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin TIA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
 
-<table border="1">
-<thead>
-<tr>
-<th>Nombre</th>
-<th>Video</th>
-<th>Examen</th>
-<th>Evidencia</th>
-</tr>
-</thead>
-<tbody id="data"></tbody>
+body{
+  font-family: Arial;
+  background:#0f172a;
+  color:white;
+  padding:20px;
+}
+
+h1{
+  margin-bottom:10px;
+}
+
+.top{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
+}
+
+input{
+  padding:10px;
+  border-radius:8px;
+  border:none;
+}
+
+button{
+  padding:10px 15px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.btn{
+  background:#22c55e;
+  color:white;
+}
+
+.btn-export{
+  background:#3b82f6;
+  color:white;
+}
+
+.table{
+  width:100%;
+  border-collapse: collapse;
+  background:#1e293b;
+  border-radius:10px;
+  overflow:hidden;
+}
+
+.table th, .table td{
+  padding:12px;
+  text-align:left;
+}
+
+.table th{
+  background:#334155;
+}
+
+.row{
+  border-bottom:1px solid #334155;
+}
+
+.badge{
+  padding:5px 10px;
+  border-radius:20px;
+  font-size:12px;
+}
+
+.ok{ background:#16a34a; }
+.fail{ background:#dc2626; }
+.pending{ background:#f59e0b; }
+.lock{ background:#64748b; }
+
+.search{
+  margin-left:auto;
+}
+
+.qr{
+  width:60px;
+  cursor:pointer;
+}
+
+  </style>
+</head>
+
+<body>
+
+<h1>🛫 Panel Admin TIA</h1>
+
+<div class="top">
+  <input id="pin" placeholder="PIN Admin">
+  <button class="btn" onclick="load()">Ver</button>
+
+  <input id="search" class="search" placeholder="Buscar usuario..." onkeyup="render()">
+
+  <button class="btn-export" onclick="exportExcel()">Exportar Excel</button>
+</div>
+
+<table class="table" id="table">
+  <thead>
+    <tr>
+      <th>Nombre</th>
+      <th>Video</th>
+      <th>Examen</th>
+      <th>Intentos</th>
+      <th>Estatus</th>
+      <th>Folio</th>
+      <th>QR</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
 </table>
 
 <script>
+
+let DATA = [];
+
 async function load(){
   const pin = document.getElementById("pin").value;
 
   const res = await fetch(`/admin-data?pin=${pin}`);
   const data = await res.json();
 
-  let html = "";
-  data.forEach(u=>{
-  html += `<tr>
-    <td>${u.name}</td>
-    <td>${u.video}%</td>
-    <td>${u.exam ?? "No"}</td>
-    <td>
-      ${
-        u.docs && u.docs.length > 0
-        ? u.docs.map(d => `<a href="/${d}" target="_blank">Ver</a>`).join("<br>")
-        : "No"
-      }
-    </td>
-  </tr>`;
-});
-
-  document.getElementById("data").innerHTML = html;
+  DATA = data;
+  render();
 }
+
+function render(){
+  const tbody = document.querySelector("#table tbody");
+  tbody.innerHTML = "";
+
+  const search = document.getElementById("search").value.toLowerCase();
+
+  DATA
+  .filter(u => u.name.toLowerCase().includes(search))
+  .forEach(u => {
+
+    const tr = document.createElement("tr");
+    tr.className = "row";
+
+    const videoStatus =
+      u.video >= 90 ? `<span class="badge ok">Completado</span>` :
+      u.video > 0 ? `<span class="badge pending">En proceso</span>` :
+      `<span class="badge lock">No iniciado</span>`;
+
+    const examStatus =
+      u.exam === null ? `<span class="badge lock">No presentado</span>` :
+      u.exam >= 80 ? `<span class="badge ok">${u.exam}%</span>` :
+      `<span class="badge fail">${u.exam}%</span>`;
+
+    const aprobado =
+      u.aprobado ? `<span class="badge ok">Aprobado</span>` :
+      u.exam === null ? `<span class="badge lock">-</span>` :
+      `<span class="badge fail">No aprobado</span>`;
+
+    const qr = u.qr
+      ? `<img src="${u.qr}" class="qr" onclick="verQR('${u.qr}')">`
+      : "-";
+
+    tr.innerHTML = `
+      <td>${u.name}</td>
+      <td>${videoStatus}</td>
+      <td>${examStatus}</td>
+      <td>${u.intentos || 0}</td>
+      <td>${aprobado}</td>
+      <td>${u.folio || "-"}</td>
+      <td>${qr}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+function verQR(src){
+  const w = window.open("");
+  w.document.write(`<img src="${src}" style="width:300px">`);
+}
+
+// EXPORTAR EXCEL
+function exportExcel(){
+
+  let csv = "Nombre,Video,Examen,Intentos,Aprobado,Folio\n";
+
+  DATA.forEach(u=>{
+    csv += `${u.name},${u.video},${u.exam},${u.intentos},${u.aprobado},${u.folio}\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "reporte_tia.csv";
+  a.click();
+}
+
 </script>
+
+</body>
+</html>
