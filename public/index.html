@@ -93,7 +93,10 @@ async function login(){
   const pass = document.getElementById("pass").value;
   const name = document.getElementById("name").value;
 
-  const res = await fetch(`/validate?pass=${encodeURIComponent(pass)}`)
+  const res = await fetch(`/validate?pass=${encodeURIComponent(pass)}&t=${Date.now()}`, {
+    cache: "no-store"
+  });
+
   const data = await res.json();
 
   if(data.ok){
@@ -102,9 +105,11 @@ async function login(){
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({name})
     });
+
     const user = await u.json();
 
-    localStorage.setItem("userId", user.id);
+    // 🔥 CAMBIO IMPORTANTE
+    localStorage.setItem("token", user.token);
 
     window.location.href = "/portal.html";
 
@@ -112,7 +117,6 @@ async function login(){
     alert("Incorrecto");
   }
 }
-
 document.addEventListener("keydown", function(e){
   if(e.key === "Enter"){
     login();

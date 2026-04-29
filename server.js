@@ -27,20 +27,34 @@ const SECRET = process.env.SECRET;
 // arriba
 const sessions = new Map(); // token -> userId
 
+// 👇 AQUÍ VA EL MIDDLEWARE
+function auth(req, res, next){
+  const header = req.headers.authorization;
+
+  if(!header){
+    return res.status(401).json({ ok:false, error:"Sin token" });
+  }
+
+  // Soporta "Bearer TOKEN" o solo "TOKEN"
+  const token = header.startsWith("Bearer ")
+    ? header.split(" ")[1]
+    : header;
+
+  if(!sessions.has(token)){
+    return res.status(401).json({ ok:false, error:"Token inválido" });
+  }
+
+  req.userId = sessions.get(token);
+  next();
+}
+
 function createSession(userId){
   const token = crypto.randomBytes(24).toString("hex");
   sessions.set(token, userId);
   return token;
 }
 
-function auth(req, res, next){
-  const token = req.headers["authorization"];
-  if(!token || !sessions.has(token)){
-    return res.status(401).json({ok:false});
-  }
-  req.userId = sessions.get(token);
-  next();
-}
+
 
 
 
@@ -76,41 +90,38 @@ app.get("/admin-password", (req, res) => {
 // LOG LOGIN
 app.post("/log-login", async (req, res) => {
   try {
-    app.post("/log-login", async (req, res) => {
+    const id = Date.now();
 
-  const id = Date.now();
+    await db.query(
+      "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
+      [id, req.body.name]
+    );
 
-  await db.query(
-    "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
-    [id, req.body.name]
-  );
+    const token = createSession(id);
 
-  const token = createSession(id);
-
-  res.json({ id, token });
-});
+    res.json({ id, token });
 
   } catch (err) {
     console.error("DB ERROR:", err);
     res.status(500).json({ ok:false, error:"DB error" });
   }
 });
-
 // LOG VIDEO
-app.post("/log-video", async (req, res) => {
-try {
-  await db.query(
-    "UPDATE users SET video=? WHERE id=?",
-    [req.body.progress, req.body.userId]
-  );
+app.post("/log-video", auth, async (req, res) => {
+  try {
+    const userId = req.userId; // 🔐 del token
 
-  res.json({ ok: true });
+    await db.query(
+      "UPDATE users SET video=? WHERE id=?",
+      [req.body.progress, userId]
+    );
+
+    res.json({ ok: true });
+
   } catch (err) {
     console.error("DB ERROR:", err);
     res.status(500).json({ ok:false, error:"DB error" });
   }
-  
-
 });
 
 // LOG EXAM SEGURO
@@ -191,20 +202,19 @@ app.post("/log-exam", auth, async (req, res) => {
 });
 
 // ADMIN DATA
-app.get("/admin-data", async (req, res) => {
-try {
-  if (req.query.pin !== process.env.ADMIN_PIN)
-    return res.status(403).send("No autorizado");
+app.get("/admin-data", auth, async (req, res) => {
+  try {
 
-  const [rows] = await db.query("SELECT * FROM users ORDER BY loginTime DESC");
+    const [rows] = await db.query(
+      "SELECT * FROM users ORDER BY loginTime DESC"
+    );
 
-  res.json(rows);
-} catch (err) {
+    res.json(rows);
+
+  } catch (err) {
     console.error("DB ERROR:", err);
     res.status(500).json({ ok:false, error:"DB error" });
   }
-  
-
 });
 
 
