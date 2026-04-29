@@ -7,116 +7,112 @@
 <style>
 body{
   font-family: 'Segoe UI', sans-serif;
-  background:#f8fafc;
-  color:#0f172a;
+  background:#f4f6f9;
   margin:0;
 }
 
 /* HEADER */
 .header{
   background:white;
-  padding:15px 25px;
+  padding:10px 15px;
   display:flex;
   justify-content:space-between;
   align-items:center;
-  box-shadow:0 2px 10px rgba(0,0,0,0.05);
+  border-bottom:1px solid #e5e7eb;
 }
 
-.header b{
-  font-size:18px;
-}
-
+/* CONTENEDOR */
 .container{
-  padding:20px;
+  padding:15px;
+  display:grid;
+  grid-template-columns: 2fr 1fr;
+  gap:15px;
 }
 
-/* LOGIN */
-.login{
-  max-width:320px;
-  margin:100px auto;
-  text-align:center;
-}
-
-input{
-  width:100%;
-  padding:12px;
-  border-radius:10px;
-  border:1px solid #cbd5e1;
-  margin-bottom:10px;
-}
-
-/* BOTONES */
-button{
-  padding:10px;
-  border:none;
-  border-radius:8px;
-  background:#3b82f6;
-  color:white;
-  cursor:pointer;
-}
-
-button:hover{
-  background:#2563eb;
-}
-
-/* KPI */
+/* KPI COMPACTO */
 .kpis{
   display:flex;
-  gap:15px;
-  margin-bottom:20px;
+  gap:10px;
 }
 
 .kpi{
   flex:1;
   background:white;
-  padding:20px;
-  border-radius:12px;
+  padding:10px;
+  border-radius:8px;
+  font-size:12px;
   text-align:center;
-  box-shadow:0 4px 10px rgba(0,0,0,0.05);
+  box-shadow:0 2px 5px rgba(0,0,0,0.05);
+}
+
+.kpi b{
+  font-size:16px;
 }
 
 /* TABLA */
 .table{
   width:100%;
   background:white;
-  border-radius:12px;
-  overflow:hidden;
-  margin-top:15px;
+  border-radius:8px;
+  font-size:13px;
 }
 
 .table th{
-  background:#e2e8f0;
+  background:#eef2f7;
 }
 
 .table td, .table th{
-  padding:12px;
+  padding:8px;
+}
+
+/* INPUT */
+input{
+  width:100%;
+  padding:8px;
+  border-radius:6px;
+  border:1px solid #cbd5e1;
+  margin:8px 0;
+}
+
+/* CARDS */
+.card{
+  background:white;
+  padding:10px;
+  border-radius:8px;
+  font-size:13px;
+  box-shadow:0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* BOTONES */
+button{
+  padding:6px 10px;
+  border:none;
+  border-radius:6px;
+  background:#3b82f6;
+  color:white;
+  cursor:pointer;
+  font-size:12px;
 }
 
 /* BADGES */
 .badge{
-  padding:5px 10px;
-  border-radius:20px;
+  padding:3px 8px;
+  border-radius:12px;
+  font-size:11px;
   color:white;
 }
 
 .ok{background:#22c55e;}
 .fail{background:#ef4444;}
 
-/* CARDS */
-.card{
-  background:white;
-  padding:20px;
-  border-radius:12px;
-  margin-top:20px;
-  box-shadow:0 4px 10px rgba(0,0,0,0.05);
-}
-
+/* VIDEO */
 video{
   width:100%;
-  max-width:350px;
-  border-radius:10px;
+  border-radius:8px;
 }
 </style>
+
+
 </head>
 
 <body>
@@ -129,61 +125,58 @@ video{
 </div>
 
 <!-- DASHBOARD -->
-<div id="dashboard" style="display:none;">
-
 <div class="header">
-  <b>🛫 Panel TIA PRO</b>
-  <div>
-    <span id="adminName"></span>
-    <button onclick="logout()">Salir</button>
-  </div>
+  <b>🛫 TIA PRO</b>
+  <button onclick="logout()">Salir</button>
 </div>
 
 <div class="container">
 
-<div class="kpis">
-  <div class="kpi">Usuarios<br><b id="total">0</b></div>
-  <div class="kpi">Aprobados<br><b id="aprobados">0</b></div>
-  <div class="kpi">Reprobados<br><b id="reprobados">0</b></div>
-</div>
+  <!-- IZQUIERDA -->
+  <div>
 
-<input id="search" placeholder="Buscar..." onkeyup="render()">
+    <div class="kpis">
+      <div class="kpi">Usuarios<br><b id="total">0</b></div>
+      <div class="kpi">Aprobados<br><b id="aprobados">0</b></div>
+      <div class="kpi">Reprobados<br><b id="reprobados">0</b></div>
+    </div>
 
-<table class="table">
-<thead>
-<tr>
-<th>Nombre</th>
-<th>Video</th>
-<th>Examen</th>
-<th>Status</th>
-<th>QR</th>
-</tr>
-</thead>
-<tbody id="tbody"></tbody>
-</table>
+    <input id="search" placeholder="Buscar..." onkeyup="render()">
 
-<!-- VALIDAR QR -->
-<div class="card">
-<h3>📂 Validar QR (imagen)</h3>
-<input type="file" id="qrInput">
-<button onclick="scanQR()">Escanear</button>
-<div id="result"></div>
-</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Video</th>
+          <th>Examen</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
 
-<!-- CÁMARA -->
-<div class="card">
-<h3>📷 Escaneo en vivo</h3>
-<video id="video" autoplay muted playsinline></video>
+  </div>
 
-<div style="margin-top:10px;">
-<button onclick="startCamera()">Iniciar</button>
-<button onclick="stopCamera()">Detener</button>
-</div>
+  <!-- DERECHA -->
+  <div>
 
-<div id="scanResult"></div>
-</div>
+    <div class="card">
+      <b>📂 Validar QR</b>
+      <input type="file" id="qrInput">
+      <button onclick="scanQR()">Escanear</button>
+      <div id="result"></div>
+    </div>
 
-</div>
+    <div class="card" style="margin-top:10px;">
+      <b>📷 Escaneo</b>
+      <video id="video" autoplay muted playsinline></video>
+      <button onclick="startCamera()">Iniciar</button>
+      <button onclick="stopCamera()">Detener</button>
+      <div id="scanResult"></div>
+    </div>
+
+  </div>
+
 </div>
 
 <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
