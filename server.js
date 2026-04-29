@@ -4,7 +4,6 @@ const mysql = require("mysql2/promise");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
 
-console.log("DB_HOST:", process.env.DB_HOST);
 
 const db = mysql.createPool({
   host: process.env.MYSQLHOST,
