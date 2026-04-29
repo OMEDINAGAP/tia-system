@@ -269,3 +269,51 @@ ul li {
 .highlight {
   border: 2px solid #0a1f44;
 }
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.info-item {
+  display: flex;
+  gap: 12px;
+  background: #f9fafb;
+  padding: 15px;
+  border-radius: 10px;
+  align-items: flex-start;
+  transition: 0.2s;
+}
+
+.info-item:hover {
+  background: #eef4ff;
+}
+
+.icon {
+  font-size: 22px;
+}
+
+.info-item strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #0a1f44;
+}
+
+.info-item p {
+  font-size: 13px;
+  color: #555;
+}
+
+.info-item a {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+/* resaltar pago */
+.highlight {
+  border: 2px solid #0a1f44;
+  background: #eef4ff;
+}
