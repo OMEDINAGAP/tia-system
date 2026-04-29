@@ -1,19 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Admin TIA</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
+<title>Admin TIA PRO</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
 
 body{
   font-family: Arial;
-  background:#0f172a;
+  background:#0b1220;
   color:white;
   padding:20px;
 }
 
-h1{
-  margin-bottom:10px;
+/* LOGIN */
+.login{
+  max-width:300px;
+  margin:auto;
+  margin-top:100px;
+  text-align:center;
+}
+
+input{
+  width:100%;
+  padding:10px;
+  margin:10px 0;
+  border-radius:8px;
+  border:none;
+}
+
+button{
+  width:100%;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  background:#22c55e;
+  color:white;
+  cursor:pointer;
+}
+
+/* DASHBOARD */
+.dashboard{
+  display:none;
 }
 
 .top{
@@ -22,48 +50,37 @@ h1{
   margin-bottom:20px;
 }
 
-input{
-  padding:10px;
-  border-radius:8px;
-  border:none;
+.card{
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
 }
 
-button{
-  padding:10px 15px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
+.kpis{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
 }
 
-.btn{
-  background:#22c55e;
-  color:white;
-}
-
-.btn-export{
-  background:#3b82f6;
-  color:white;
+.kpi{
+  flex:1;
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+  text-align:center;
 }
 
 .table{
   width:100%;
   border-collapse: collapse;
-  background:#1e293b;
-  border-radius:10px;
-  overflow:hidden;
-}
-
-.table th, .table td{
-  padding:12px;
-  text-align:left;
 }
 
 .table th{
   background:#334155;
 }
 
-.row{
-  border-bottom:1px solid #334155;
+.table td, .table th{
+  padding:10px;
 }
 
 .badge{
@@ -72,131 +89,136 @@ button{
   font-size:12px;
 }
 
-.ok{ background:#16a34a; }
-.fail{ background:#dc2626; }
-.pending{ background:#f59e0b; }
-.lock{ background:#64748b; }
-
-.search{
-  margin-left:auto;
-}
+.ok{background:#16a34a;}
+.fail{background:#dc2626;}
+.pending{background:#f59e0b;}
 
 .qr{
-  width:60px;
+  width:50px;
   cursor:pointer;
 }
 
-  </style>
+</style>
 </head>
 
 <body>
 
-<h1>🛫 Panel Admin TIA</h1>
-
-<div class="top">
-  <input id="pin" placeholder="PIN Admin">
-  <button class="btn" onclick="load()">Ver</button>
-
-  <input id="search" class="search" placeholder="Buscar usuario..." onkeyup="render()">
-
-  <button class="btn-export" onclick="exportExcel()">Exportar Excel</button>
+<!-- LOGIN -->
+<div class="login" id="login">
+  <h2>🔐 Admin Login</h2>
+  <input id="pin" placeholder="PIN">
+  <button onclick="login()">Entrar</button>
 </div>
 
-<table class="table" id="table">
-  <thead>
-    <tr>
-      <th>Nombre</th>
-      <th>Video</th>
-      <th>Examen</th>
-      <th>Intentos</th>
-      <th>Estatus</th>
-      <th>Folio</th>
-      <th>QR</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+
+<h1>🛫 Panel TIA PRO</h1>
+
+<div class="kpis">
+  <div class="kpi">Usuarios<br><b id="total">0</b></div>
+  <div class="kpi">Aprobados<br><b id="aprobados">0</b></div>
+  <div class="kpi">Reprobados<br><b id="reprobados">0</b></div>
+</div>
+
+<div class="top">
+  <input id="search" placeholder="Buscar..." onkeyup="render()">
+  <button onclick="exportExcel()">Exportar</button>
+</div>
+
+<table class="table">
+<thead>
+<tr>
+<th>Nombre</th>
+<th>Video</th>
+<th>Examen</th>
+<th>Intentos</th>
+<th>Status</th>
+<th>Certificado</th>
+<th>QR</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
 </table>
+
+</div>
 
 <script>
 
 let DATA = [];
 
-async function load(){
+async function login(){
   const pin = document.getElementById("pin").value;
 
   const res = await fetch(`/admin-data?pin=${pin}`);
-  const data = await res.json();
 
-  DATA = data;
+  if(res.status !== 200){
+    alert("PIN incorrecto");
+    return;
+  }
+
+  DATA = await res.json();
+
+  document.getElementById("login").style.display="none";
+  document.getElementById("dashboard").style.display="block";
+
   render();
 }
 
 function render(){
-  const tbody = document.querySelector("#table tbody");
-  tbody.innerHTML = "";
+
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML="";
+
+  let total=0, aprobados=0, reprobados=0;
 
   const search = document.getElementById("search").value.toLowerCase();
 
-  DATA
-  .filter(u => u.name.toLowerCase().includes(search))
-  .forEach(u => {
+  DATA.filter(u=>u.name.toLowerCase().includes(search))
+  .forEach(u=>{
+
+    total++;
+
+    if(u.aprobado) aprobados++;
+    else if(u.exam!==null) reprobados++;
 
     const tr = document.createElement("tr");
-    tr.className = "row";
-
-    const videoStatus =
-      u.video >= 90 ? `<span class="badge ok">Completado</span>` :
-      u.video > 0 ? `<span class="badge pending">En proceso</span>` :
-      `<span class="badge lock">No iniciado</span>`;
-
-    const examStatus =
-      u.exam === null ? `<span class="badge lock">No presentado</span>` :
-      u.exam >= 80 ? `<span class="badge ok">${u.exam}%</span>` :
-      `<span class="badge fail">${u.exam}%</span>`;
-
-    const aprobado =
-      u.aprobado ? `<span class="badge ok">Aprobado</span>` :
-      u.exam === null ? `<span class="badge lock">-</span>` :
-      `<span class="badge fail">No aprobado</span>`;
-
-    const qr = u.qr
-      ? `<img src="${u.qr}" class="qr" onclick="verQR('${u.qr}')">`
-      : "-";
 
     tr.innerHTML = `
       <td>${u.name}</td>
-      <td>${videoStatus}</td>
-      <td>${examStatus}</td>
-      <td>${u.intentos || 0}</td>
-      <td>${aprobado}</td>
-      <td>${u.folio || "-"}</td>
-      <td>${qr}</td>
+      <td>${u.video}%</td>
+      <td>${u.exam ?? "-"}</td>
+      <td>${u.intentos}</td>
+      <td>${u.aprobado ? '<span class="badge ok">Aprobado</span>' : '<span class="badge fail">No</span>'}</td>
+      <td>${u.folio ? `<button onclick="verCert('${u.id}')">Ver</button>` : "-"}</td>
+      <td>${u.qr ? `<img src="${u.qr}" class="qr">` : "-"}</td>
     `;
 
     tbody.appendChild(tr);
+
   });
+
+  document.getElementById("total").innerText = total;
+  document.getElementById("aprobados").innerText = aprobados;
+  document.getElementById("reprobados").innerText = reprobados;
 }
 
-function verQR(src){
-  const w = window.open("");
-  w.document.write(`<img src="${src}" style="width:300px">`);
+function verCert(id){
+  window.open(`/certificado.html?id=${id}`);
 }
 
-// EXPORTAR EXCEL
 function exportExcel(){
-
-  let csv = "Nombre,Video,Examen,Intentos,Aprobado,Folio\n";
-
+  let csv="Nombre,Examen,Aprobado\n";
   DATA.forEach(u=>{
-    csv += `${u.name},${u.video},${u.exam},${u.intentos},${u.aprobado},${u.folio}\n`;
+    csv+=`${u.name},${u.exam},${u.aprobado}\n`;
   });
 
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = window.URL.createObjectURL(blob);
+  const blob = new Blob([csv]);
+  const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
-  a.href = url;
-  a.download = "reporte_tia.csv";
+  a.href=url;
+  a.download="reporte.csv";
   a.click();
 }
 

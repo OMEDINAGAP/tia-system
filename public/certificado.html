@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Certificado TIA</title>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js"></script>
+
+<style>
+
+body{
+  font-family: Georgia;
+  background:#e5e7eb;
+}
+
+.cert{
+  width:800px;
+  margin:auto;
+  background:white;
+  padding:40px;
+  border:8px solid #1e3a8a;
+  text-align:center;
+}
+
+h1{
+  color:#1e3a8a;
+}
+
+.logo{
+  font-size:30px;
+  margin-bottom:10px;
+}
+
+.qr{
+  width:120px;
+  margin-top:20px;
+}
+
+.footer{
+  margin-top:40px;
+  font-size:12px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="cert" id="cert">
+
+<div class="logo">✈️ AEROPUERTO INTERNACIONAL</div>
+
+<h1>CONSTANCIA DE ACREDITACIÓN</h1>
+
+<p>Se certifica que:</p>
+
+<h2 id="nombre">---</h2>
+
+<p>Ha completado satisfactoriamente el</p>
+
+<b>CURSO DE SEGURIDAD AEROPORTUARIA</b>
+
+<p>cumpliendo con los lineamientos de seguridad establecidos.</p>
+
+<p><b>Folio:</b> <span id="folio"></span></p>
+<p><b>Fecha:</b> <span id="fecha"></span></p>
+
+<img id="qr" class="qr">
+
+<div class="footer">
+Documento válido únicamente con código QR verificable.
+</div>
+
+</div>
+
+<button onclick="descargar()">Descargar PDF</button>
+
+<script>
+
+async function load(){
+
+  const id = new URLSearchParams(window.location.search).get("id");
+
+  const res = await fetch(`/admin-data?pin=9472`);
+  const data = await res.json();
+
+  const user = data.find(u=>u.id==id);
+
+  document.getElementById("nombre").innerText = user.name;
+  document.getElementById("folio").innerText = user.folio;
+  document.getElementById("fecha").innerText = new Date(user.fecha).toLocaleDateString();
+  document.getElementById("qr").src = user.qr;
+}
+
+function descargar(){
+  html2pdf().from(document.getElementById("cert")).save();
+}
+
+load();
+
+</script>
+
+</body>
+</html>
