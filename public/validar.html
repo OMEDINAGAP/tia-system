@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Validación</title>
+
+<style>
+body{
+  margin:0;
+  font-family:sans-serif;
+  background:#0f172a;
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+
+.card{
+  background:#1e293b;
+  padding:40px;
+  border-radius:12px;
+  text-align:center;
+  width:350px;
+}
+
+.ok{
+  color:#22c55e;
+}
+
+.bad{
+  color:#ef4444;
+}
+
+h1{
+  margin-bottom:20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card" id="card">
+  <h1>Validando...</h1>
+</div>
+
+<script>
+function getData(){
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("data");
+  return raw ? JSON.parse(decodeURIComponent(raw)) : null;
+}
+
+async function validar(){
+  const d = getData();
+
+  if(!d){
+    render(false);
+    return;
+  }
+
+  const res = await fetch("/validate-cert", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(d)
+  });
+
+  const data = await res.json();
+
+  render(data.ok, d);
+}
+
+function render(ok, d, user){
+  const card = document.getElementById("card");
+
+  if(ok){
+    card.innerHTML = `
+      <h1 class="ok">✔ Certificado válido</h1>
+
+      <p><b>Nombre:</b> ${user.nombre}</p>
+      <p><b>Folio:</b> ${user.folio}</p>
+      <p><b>Fecha:</b> ${new Date(user.fecha).toLocaleString()}</p>
+      <p><b>Resultado:</b> ${user.aprobado ? "APROBADO ✅" : "NO APROBADO ❌"}</p>
+      <p><b>Puntaje:</b> ${user.score}</p>
+
+      <hr>
+
+      <small>Validación oficial del sistema TIA</small>
+    `;
+  }else{
+    card.innerHTML = `
+      <h1 class="bad">✖ Certificado inválido</h1>
+      <p>${d?.reason || "Documento no válido"}</p>
+    `;
+  }
+}
+validar();
+</script>
+
+</body>
+</html>

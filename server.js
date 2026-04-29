@@ -260,3 +260,52 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (err) => {
   console.error("UNHANDLED PROMISE:", err);
 });
+
+app.post("/validate-cert", async (req, res) => {
+  try {
+    const { folio, nombre, fecha, firma } = req.body;
+
+    // 🔐 1. Validar firma
+    const base = `${folio}|${nombre}|${fecha}`;
+    const expected = crypto
+      .createHmac("sha256", process.env.QR_SECRET || "TIA_SECRET")
+      .update(base)
+      .digest("hex");
+
+    if(expected !== firma){
+      return res.json({ ok:false, reason:"Firma inválida" });
+    }
+
+    // 🗄 2. Validar existencia en BD
+    const [rows] = await db.query(
+      "SELECT * FROM users WHERE folio=?",
+      [folio]
+    );
+
+    const user = rows[0];
+
+    if(!user){
+      return res.json({ ok:false, reason:"No existe en BD" });
+    }
+
+    // 🔍 3. Validar consistencia
+    if(user.name !== nombre){
+      return res.json({ ok:false, reason:"Nombre no coincide" });
+    }
+
+    res.json({
+      ok:true,
+      user: {
+        nombre: user.name,
+        folio: user.folio,
+        fecha: user.fecha,
+        aprobado: user.aprobado,
+        score: user.exam
+      }
+    });
+
+  } catch(err){
+    console.error(err);
+    res.status(500).json({ ok:false });
+  }
+});
