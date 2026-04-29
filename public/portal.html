@@ -6,91 +6,89 @@
 </head>
 <body>
 
-<h1>Solicitud de Tarjeta de Identificación Aeroportuaria (TIA)</h1>
+<div class="container">
+
+<h1>🛫 Solicitud de Tarjeta de Identificación Aeroportuaria (TIA)</h1>
 
 <p>
-Bienvenido. En este portal podrás completar el proceso necesario para la obtención de tu credencial aeroportuaria.
-Lee cuidadosamente cada sección antes de continuar.
+Sigue los pasos indicados para completar tu trámite correctamente.
+Este sistema te guiará durante todo el proceso.
 </p>
+
+<!-- PASOS -->
+<div class="card">
+<h2>📌 Proceso del trámite</h2>
 
 <div class="steps">
 
   <div class="step">
     <div class="icon">1️⃣</div>
-    <h3>Alta de firmas</h3>
-    <p>Tu empresa debe autorizarte.</p>
+    <h3>Autorización</h3>
+    <p>Tu empresa debe darte de alta como solicitante.</p>
   </div>
 
   <div class="step">
     <div class="icon">2️⃣</div>
-    <h3>Reúne documentos</h3>
-    <p>Identificación, carta laboral, etc.</p>
+    <h3>Requisitos</h3>
+    <p>Consulta y descarga los documentos necesarios.</p>
   </div>
 
   <div class="step">
     <div class="icon">3️⃣</div>
     <h3>Curso obligatorio</h3>
-    <p>Debes ver el video completo.</p>
+    <p>Debes completar el curso de seguridad.</p>
   </div>
 
   <div class="step">
     <div class="icon">4️⃣</div>
-    <h3>Entrega final</h3>
-    <p>Acude al módulo TIAS con la documentacion Original.</p>
+    <h3>Entrega presencial</h3>
+    <p>Acude al módulo TIAS con documentos originales.</p>
   </div>
 
 </div>
-
-<!-- REQUISITOS -->
-<div class="card">
-  <h2>📄 Documentos requeridos</h2>
-  
-    <div class="check">✔ Solicitud de TIA (llenada correctamente)</div>
-    <div class="check">✔ Identificación oficial vigente</div>
-    <div class="check">✔ Recibo de nómina (con montos ocultos)</div>
-    <div class="check">✔ Carta de antecedentes no penales</div>
-    <div class="check">✔ Alta IMSS o vigencia de derechos</div>
-    <div class="check">✔ Carta responsiva (Art. 22)</div>
-    <div class="check">✔ Constancia y descripción de puesto</div>
-    <div class="check">✔ Comprobante de pago</div>
-  
 </div>
 
-<!-- OPCIONES -->
- <div class="actions"></div>
+<!-- DOCUMENTOS -->
 <div class="card">
-  <h2>📤 Envío de documentación</h2>
+  <h2>📄 Requisitos y formatos</h2>
+
   <p>
-Si ya cuentas con todos los documentos, puedes enviarlos para validación.
-Este paso permite agilizar tu trámite antes de acudir al módulo.
+Consulta la lista completa de documentos, descarga formatos y verifica qué debes presentar.
   </p>
-  <button class="btn-big" onclick="goDocs()">Subir documentos</button>
+
+  <button class="btn-big" onclick="goDocs()">Ver requisitos y descargar</button>
 </div>
 
+<!-- CURSO -->
 <div class="card">
   <h2>🎥 Curso de seguridad obligatorio</h2>
+
   <p>
-Antes de obtener tu credencial, deberás completar el curso de seguridad aeroportuaria.
-El sistema registrará si el video fue visto completamente.
+Debes completar el curso para continuar con tu trámite.
+El sistema registrará tu progreso.
   </p>
+
   <button class="btn-big" onclick="goCurso()">Ir al curso</button>
 </div>
+
+<!-- IMPORTANTE -->
+<div class="alert">
+  <h2>⚠️ Información importante</h2>
+  <ul>
+    <li>Debes completar todos los requisitos antes de acudir al módulo.</li>
+    <li>El curso es obligatorio.</li>
+    <li>El proceso tiene un límite de tiempo.</li>
+  </ul>
 </div>
 
+<!-- PROGRESO -->
 <div class="card">
-  <h2>ℹ️ Importante</h2>
-  <p>
-El incumplimiento de cualquiera de los requisitos o del curso obligatorio puede retrasar o impedir la emisión de la TIA.
-Este sistema registra la actividad del usuario para fines de validación.
-  </p>
-</div>
-
 <h2>📊 Tu progreso</h2>
 
 <div class="progress-container">
 
   <div class="progress-step" id="step-docs">
-    📄 Documentos
+    📄 Requisitos
     <span class="status">Pendiente</span>
   </div>
 
@@ -105,10 +103,12 @@ Este sistema registra la actividad del usuario para fines de validación.
   </div>
 
 </div>
+</div>
 
+</div>
 
 <script>
-  if(!localStorage.getItem("userId")){
+if(!localStorage.getItem("userId")){
   window.location.href = "/";
 }
 
@@ -126,7 +126,6 @@ async function loadProgress(){
 
   const userId = localStorage.getItem("userId");
 
-  // Traer datos del usuario
   const res = await fetch(`/admin-data?pin=9472`);
   const users = await res.json();
 
@@ -134,9 +133,9 @@ async function loadProgress(){
 
   if(!user) return;
 
-  // DOCUMENTOS (simulación)
+  // REQUISITOS (manual por ahora)
   if(user.docs){
-    setStatus("step-docs","completed","Completado");
+    setStatus("step-docs","completed","Revisado");
   } else {
     setStatus("step-docs","pending","Pendiente");
   }
@@ -153,7 +152,7 @@ async function loadProgress(){
   // EXAMEN
   if(user.video >= 90){
     if(user.exam !== null){
-      setStatus("step-exam","completed","Completado");
+      setStatus("step-exam","completed","Aprobado");
     } else {
       setStatus("step-exam","in-progress","Disponible");
     }
