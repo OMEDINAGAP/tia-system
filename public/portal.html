@@ -17,35 +17,43 @@ Este sistema te guiará durante todo el proceso.
 
 <!-- PASOS -->
 <div class="card">
-<h2>📌 Proceso del trámite</h2>
+  <h2>📌 Sigue estos pasos</h2>
 
-<div class="steps">
+  <div class="steps-pro">
 
-  <div class="step">
-    <div class="icon">1️⃣</div>
-    <h3>Autorización</h3>
-    <p>Tu empresa debe darte de alta como solicitante.</p>
+    <!-- PASO 1 -->
+    <div class="step-card">
+      <div class="step-number">1</div>
+      <h3>Autorización</h3>
+      <p>Tu empresa debe darte de alta como solicitante.</p>
+      <div class="step-status red">Pendiente</div>
+    </div>
+
+    <!-- PASO 2 -->
+    <div class="step-card highlight">
+      <div class="step-number">2</div>
+      <h3>Requisitos</h3>
+      <p>Descarga formatos y revisa lo que debes llevar.</p>
+      <button onclick="goDocs()">Ver requisitos</button>
+    </div>
+
+    <!-- PASO 3 -->
+    <div class="step-card">
+      <div class="step-number">3</div>
+      <h3>Curso</h3>
+      <p>Completa el curso obligatorio de seguridad.</p>
+      <button onclick="goCurso()">Ir al curso</button>
+    </div>
+
+    <!-- PASO 4 -->
+    <div class="step-card">
+      <div class="step-number">4</div>
+      <h3>Entrega</h3>
+      <p>Acude al módulo TIAS con tus documentos.</p>
+      <div class="step-status yellow">Final</div>
+    </div>
+
   </div>
-
-  <div class="step">
-    <div class="icon">2️⃣</div>
-    <h3>Requisitos</h3>
-    <p>Consulta y descarga los documentos necesarios.</p>
-  </div>
-
-  <div class="step">
-    <div class="icon">3️⃣</div>
-    <h3>Curso obligatorio</h3>
-    <p>Debes completar el curso de seguridad.</p>
-  </div>
-
-  <div class="step">
-    <div class="icon">4️⃣</div>
-    <h3>Entrega presencial</h3>
-    <p>Acude al módulo TIAS con documentos originales.</p>
-  </div>
-
-</div>
 </div>
 
 <!-- DOCUMENTOS -->
