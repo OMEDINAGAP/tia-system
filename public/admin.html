@@ -211,7 +211,7 @@
     <div class="logout" onclick="logout()">Salir</div>
   </div>
 
-  
+
     <div class="container">
 
       <!-- IZQUIERDA -->
@@ -273,7 +273,7 @@
   <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 
   <script>
-    const color = u.video > 80 ? "#22c55e" : u.video > 40 ? "#f59e0b" : "#ef4444";
+    
 
     let DATA = [];
 
@@ -342,7 +342,7 @@
 
       DATA.forEach(u => {
         total++;
-
+        const color = u.video > 80 ? "#22c55e" : u.video > 40 ? "#f59e0b" : "#ef4444";
         if (u.aprobado) aprobados++;
         else if (u.exam !== null) reprobados++;
 
