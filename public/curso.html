@@ -1,44 +1,110 @@
-<h1>Curso de Seguridad</h1>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Curso de Seguridad</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
 
-<video id="video" controls width="600">
-  <source src="curso.mp4" type="video/mp4">
-</video>
+<div class="container">
 
-<p id="status">Debes completar el video</p>
+  <h1>🎥 Curso de Seguridad Aeroportuaria</h1>
+
+  <p class="subtitle">
+    Debes completar el video para continuar con tu trámite.
+  </p>
+
+  <div class="card">
+
+    <!-- VIDEO -->
+    <video id="video" width="100%" controls controlsList="nodownload">
+      <source src="/video/curso.mp4" type="video/mp4">
+    </video>
+
+    <!-- PROGRESO -->
+    <div class="progress-bar">
+      <div id="progress-fill"></div>
+    </div>
+
+    <p id="progress-text">Progreso: 0%</p>
+
+    <!-- ESTADO -->
+    <div id="status" class="status red">Pendiente</div>
+
+  </div>
+
+  <!-- BLOQUEO -->
+  <div class="alert">
+    ⚠️ No puedes adelantar el video. Debes verlo completo.
+  </div>
+
+  <!-- ACCIÓN -->
+  <button id="btnExam" disabled onclick="goExam()">
+    🧠 Realizar evaluación
+  </button>
+
+</div>
 
 <script>
-  if(!localStorage.getItem("userId")){
-  window.location.href = "/";
-}
 
 const video = document.getElementById("video");
-const userId = localStorage.getItem("userId");
-
-video.addEventListener("timeupdate", async () => {
-  const progress = (video.currentTime / video.duration) * 100;
-
-  await fetch("/log-video", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, progress })
-  });
-});
-
-video.addEventListener("ended", () => {
-  document.getElementById("status").innerText = "Curso completado ✔";
-});
+const fill = document.getElementById("progress-fill");
+const text = document.getElementById("progress-text");
+const status = document.getElementById("status");
+const btn = document.getElementById("btnExam");
 
 let maxTime = 0;
 
+// PROGRESO
 video.addEventListener("timeupdate", () => {
+
+  const percent = (video.currentTime / video.duration) * 100;
+
+  fill.style.width = percent + "%";
+  text.innerText = "Progreso: " + Math.floor(percent) + "%";
+
+  // guardar progreso
+  const userId = localStorage.getItem("userId");
+
+  fetch("/log-video", {
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      userId,
+      progress: percent
+    })
+  });
+
+  // marcar avance máximo
   if(video.currentTime > maxTime){
     maxTime = video.currentTime;
   }
+
+  // COMPLETADO
+  if(percent >= 90){
+    status.className = "status green";
+    status.innerText = "Completado";
+    btn.disabled = false;
+  } else {
+    status.className = "status red";
+    status.innerText = "En proceso";
+  }
+
 });
 
+// BLOQUEO DE ADELANTAR
 video.addEventListener("seeking", () => {
   if(video.currentTime > maxTime){
     video.currentTime = maxTime;
   }
 });
+
+// IR A EXAMEN
+function goExam(){
+  window.location.href = "/examen.html";
+}
+
 </script>
+
+</body>
+</html>

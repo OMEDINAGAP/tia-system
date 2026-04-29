@@ -317,3 +317,41 @@ ul li {
   border: 2px solid #0a1f44;
   background: #eef4ff;
 }
+
+.subtitle {
+  margin-bottom: 20px;
+  color: #555;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 5px;
+  margin-top: 15px;
+  overflow: hidden;
+}
+
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #0a1f44;
+  transition: 0.2s;
+}
+
+.status {
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.status.red {
+  color: #ef4444;
+}
+
+.status.green {
+  color: #22c55e;
+}
+
+button:disabled {
+  background: gray;
+}
