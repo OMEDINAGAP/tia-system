@@ -14,121 +14,85 @@
 
     /* HEADER */
     .header {
-      background: white;
-      padding: 10px 15px;
+      background: #111827;
+      color: white;
+      padding: 12px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #e5e7eb;
-      font-size: 14px;
     }
 
-    /* CONTENEDOR */
-    .container {
-      padding: 12px;
-      display: grid;
-      grid-template-columns: 2.2fr 1fr;
-      gap: 12px;
-      height: calc(100vh - 60px);
+    .logout {
+      background: #ef4444;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
     }
 
-    /* IZQUIERDA */
-    .left {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    /* KPIs */
+    /* KPI */
     .kpis {
       display: flex;
-      gap: 8px;
+      gap: 15px;
+      padding: 15px;
     }
 
     .kpi {
       flex: 1;
-      background: white;
-      padding: 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      text-align: center;
+      padding: 15px;
+      border-radius: 10px;
+      color: white;
+      font-size: 14px;
     }
 
-    .kpi b {
-      font-size: 15px;
+    .kpi1 {
+      background: linear-gradient(45deg, #34d399, #059669);
     }
 
-    /* TABLA CONTENEDOR */
-    .table-container {
-      background: white;
-      border-radius: 8px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      flex: 1;
+    .kpi2 {
+      background: linear-gradient(45deg, #60a5fa, #2563eb);
     }
 
-    .table-container input {
-      margin: 0;
-      border-radius: 0;
-      border: none;
-      border-bottom: 1px solid #e5e7eb;
+    .kpi3 {
+      background: linear-gradient(45deg, #f87171, #dc2626);
     }
 
     /* TABLA */
     .table {
       width: 100%;
-      font-size: 12px;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
     }
 
     .table th {
-      background: #eef2f7;
-      position: sticky;
-      top: 0;
+      background: #e5e7eb;
     }
 
     .table td,
     .table th {
-      padding: 7px;
-    }
-
-    /* SCROLL */
-    .table-body {
-      overflow: auto;
-      max-height: 100%;
-    }
-
-    /* DERECHA */
-    .right {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    /* CARDS */
-    .card {
-      background: white;
       padding: 10px;
-      border-radius: 8px;
-      font-size: 12px;
     }
 
-    /* BOTONES */
-    button {
-      padding: 5px 8px;
-      border: none;
-      border-radius: 6px;
+    /* BARRA */
+    .bar {
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
       background: #3b82f6;
-      color: white;
-      font-size: 11px;
     }
 
     /* BADGES */
     .badge {
-      padding: 3px 6px;
-      border-radius: 10px;
-      font-size: 10px;
+      padding: 5px 10px;
+      border-radius: 20px;
       color: white;
+      font-size: 12px;
     }
 
     .ok {
@@ -139,22 +103,15 @@
       background: #ef4444;
     }
 
-    /* RESULTADOS */
-    .result-ok {
-      color: #16a34a;
-      font-weight: bold;
-    }
-
-    .result-bad {
-      color: #dc2626;
-      font-weight: bold;
-    }
-
-    /* VIDEO */
-    video {
-      width: 100%;
+    /* BOTONES */
+    .btn {
+      background: #3b82f6;
+      color: white;
+      padding: 6px 10px;
       border-radius: 6px;
-      margin-top: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: none;
     }
   </style>
 
@@ -163,17 +120,92 @@
 
 <body>
 
-  <!-- LOGIN -->
-  <div class="login" id="login">
-    <h2>🔐 Admin Login</h2>
-    <input id="pin" placeholder="PIN">
-    <button onclick="login()">Entrar</button>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      background: linear-gradient(135deg, #3b0764, #1e3a8a, #0f172a);
+    }
+
+    /* TARJETA */
+    .login-card {
+      width: 300px;
+      padding: 30px;
+      border-radius: 20px;
+      backdrop-filter: blur(15px);
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      color: white;
+    }
+
+    /* ICONO */
+    .avatar {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      margin: 0 auto 20px;
+    }
+
+    /* INPUTS */
+    .input-group {
+      position: relative;
+      margin: 15px 0;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 10px 10px;
+      border: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+      background: transparent;
+      color: white;
+      outline: none;
+    }
+
+    /* BOTÓN */
+    .login-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #ef4444, #3b82f6);
+      color: white;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+
+    .login-btn:hover {
+      opacity: 0.9;
+    }
+  </style>
+
+  <div id="login" class="login-card">
+
+    <div class="avatar">
+  <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" width="70">
+</div>
+
+    <h3>Admin Login</h3>
+
+    <div class="input-group">
+      <input id="pin" placeholder="PIN">
+    </div>
+
+    <button class="login-btn" onclick="login()">ENTRAR</button>
+
   </div>
 
-  <!-- DASHBOARD -->
   <div class="header">
-    <b>🛫 TIA PRO</b>
-    <button onclick="logout()">Salir</button>
+    <b>✈️ TIA Dashboard</b>
+    <div class="logout" onclick="logout()">Salir</div>
   </div>
 
   <div id="dashboard" style="display:none;">
@@ -183,9 +215,9 @@
       <div class="left">
 
         <div class="kpis">
-          <div class="kpi">Usuarios<br><b id="total">0</b></div>
-          <div class="kpi">Aprobados<br><b id="aprobados">0</b></div>
-          <div class="kpi">Reprobados<br><b id="reprobados">0</b></div>
+          <div class="kpi kpi1">Usuarios<br><b id="total">0</b></div>
+          <div class="kpi kpi2">Aprobados<br><b id="aprobados">0</b></div>
+          <div class="kpi kpi3">Reprobados<br><b id="reprobados">0</b></div>
         </div>
 
         <div class="table-container">
@@ -238,6 +270,7 @@
   <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 
   <script>
+    const color = u.video > 80 ? "#22c55e" : u.video > 40 ? "#f59e0b" : "#ef4444";
 
     let DATA = [];
 
@@ -303,24 +336,40 @@
       tbody.innerHTML = "";
 
       let total = 0, aprobados = 0, reprobados = 0;
-      const search = document.getElementById("search").value.toLowerCase();
 
-      DATA.filter(u => u.name.toLowerCase().includes(search))
-        .forEach(u => {
-          total++;
-          if (u.aprobado) aprobados++;
-          else if (u.exam !== null) reprobados++;
+      DATA.forEach(u => {
+        total++;
 
-          tbody.innerHTML += `
+        if (u.aprobado) aprobados++;
+        else if (u.exam !== null) reprobados++;
+
+        tbody.innerHTML += `
       <tr>
         <td>${u.name}</td>
-        <td>${u.video}%</td>
+
+        <td>
+          ${u.video || 0}%
+          <div class="bar">
+            <span style="width:${u.video}%; background:${color}"></span>
+          </div>
+        </td>
+
         <td>${u.exam ?? "-"}</td>
-        <td>${u.aprobado ? '<span class="badge ok">Aprobado</span>' : '<span class="badge fail">No</span>'}</td>
-        <td>${u.qr ? `<img src="${u.qr}" width="40">` : "-"}</td>
+
+        <td>
+          ${u.aprobado
+            ? '<span class="badge ok">Aprobado</span>'
+            : '<span class="badge fail">No</span>'}
+        </td>
+
+        <td>
+          ${u.qr
+            ? `<a class="btn" href="${u.qr}" download="constancia.png">Descargar</a>`
+            : "-"}
+        </td>
       </tr>
     `;
-        });
+      });
 
       document.getElementById("total").innerText = total;
       document.getElementById("aprobados").innerText = aprobados;
