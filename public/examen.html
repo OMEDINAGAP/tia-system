@@ -2,22 +2,47 @@
 <html>
 <head>
   <title>Examen TIA</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
-    .question {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: white;
-      border-radius: 10px;
+    body{
+      font-family: Arial;
+      background:#0f172a;
+      color:white;
+      padding:20px;
     }
 
-    h3 {
-      margin-bottom: 10px;
+    .container{
+      max-width:900px;
+      margin:auto;
     }
 
-    button {
-      margin-top: 20px;
+    .question{
+      background:#1e293b;
+      padding:15px;
+      border-radius:10px;
+      margin-bottom:15px;
+    }
+
+    button{
+      padding:12px 20px;
+      border:none;
+      border-radius:10px;
+      background:#22c55e;
+      color:white;
+      cursor:pointer;
+      margin-top:20px;
+    }
+
+    #resultado{
+      margin-top:20px;
+      font-size:20px;
+      font-weight:bold;
+    }
+
+    .qr{
+      margin-top:20px;
+      width:150px;
     }
   </style>
 </head>
@@ -27,191 +52,93 @@
 <div class="container">
 
 <h1>🧠 Evaluación de Seguridad Aeroportuaria</h1>
-
-<p>Selecciona la respuesta correcta en cada pregunta.</p>
+<p>Responde correctamente todas las preguntas.</p>
 
 <form id="quiz"></form>
 
-<button onclick="calificar()">Finalizar examen</button>
+<button id="btnEnviar" onclick="calificar()">Finalizar examen</button>
 
-<h2 id="resultado"></h2>
+<div id="resultado"></div>
+<img id="qr" class="qr" style="display:none;">
+
+<br>
+<button id="btnCert" style="display:none;" onclick="verCert()">Ver certificado</button>
 
 </div>
 
 <script>
 
-if(!localStorage.getItem("userId")){
-  window.location.href = "/";
+// 🔐 TOKEN
+const token = localStorage.getItem("token");
+
+if(!token){
+  location.href = "/";
 }
 
+// 🔒 VALIDAR ACCESO
+async function validar(){
+
+  const res = await fetch("/me", {
+    headers:{ Authorization: token }
+  });
+
+  if(res.status !== 200){
+    location.href = "/";
+    return;
+  }
+
+  const user = await res.json();
+
+  if(user.video < 90){
+    alert("Debes completar el curso");
+    location.href = "/curso.html";
+  }
+
+}
+
+validar();
+
+
+// 🧠 PREGUNTAS
 const preguntas = [
-
-{
-q: "¿Qué significa TIA?",
-o: [
-"Tarjeta para Instalaciones Aeroportuarias",
-"Tarjeta de Información Aérea",
-"Tarjeta de Identificación Aeroportuaria"
-],
-a: 2
-},
-
-{
-q: "¿Cuál es el objetivo del plan de seguridad?",
-o: [
-"Que conozcan el Aeropuerto",
-"Implementar medidas para prevenir Actos de Interferencia Ilícita",
-"Dar seguridad a los comercios",
-"Todas las anteriores"
-],
-a: 1
-},
-
-{
-q: "¿Qué hacer en caso de extravío de TIA?",
-o: [
-"Comunicar inmediatamente al módulo TIAS",
-"Laborar normalmente",
-"Comunicar a seguridad privada"
-],
-a: 0
-},
-
-{
-q: "Para ingresar a zona restringida debo:",
-o: [
-"Tener TIA vigente",
-"TIA autorizada",
-"Pasar revisión",
-"Todas las anteriores"
-],
-a: 3
-},
-
-{
-q: "¿Qué situaciones se deben notificar?",
-o: [
-"Persona sin TIA",
-"Objeto abandonado",
-"Actos vandálicos",
-"Todas las anteriores"
-],
-a: 3
-},
-
-// CAPITULO 2
-
-{
-q: "¿Qué es Seguridad?",
-o: [
-"Combinación de medidas para proteger la aviación",
-"Evitar entrada de pasajeros",
-"Leyes laborales"
-],
-a: 0
-},
-
-{
-q: "¿Qué es un acto de interferencia ilícita?",
-o: [
-"Medidas de operación",
-"Reglas de abordaje",
-"Actos que comprometen la seguridad aérea"
-],
-a: 2
-},
-
-{
-q: "Objetivo del plan de contingencia:",
-o: [
-"Desalojar aeropuerto",
-"Usar extintor",
-"Prevenir actos ilícitos"
-],
-a: 2
-},
-
-{
-q: "¿Quién define el nivel de contingencia?",
-o: [
-"Administrador del aeropuerto",
-"AFAC",
-"Aerolíneas"
-],
-a: 0
-},
-
-{
-q: "¿A quién avisar ante amenaza?",
-o: [
-"Aerolíneas",
-"Limpieza",
-"Administración / seguridad"
-],
-a: 2
-},
-
-{
-q: "Normatividad aplicable:",
-o: [
-"Nacional e internacional",
-"Municipal",
-"Mundial"
-],
-a: 0
-},
-
-{
-q: "Áreas de seguridad:",
-o: [
-"Seguridad y operacional",
-"Judicial",
-"Laboral"
-],
-a: 0
-},
-
-{
-q: "¿Qué significa TIAV?",
-o: [
-"Aerovehicular",
-"Aeroportuaria Vehicular",
-"Vehicular"
-],
-a: 1
-},
-
-{
-q: "Niveles de contingencia:",
-o: [
-"3 niveles",
-"5 niveles",
-"4 niveles"
-],
-a: 0
-}
-
+{q:"¿Qué significa TIA?",o:["Tarjeta para Instalaciones Aeroportuarias","Tarjeta de Información Aérea","Tarjeta de Identificación Aeroportuaria"],a:2},
+{q:"Objetivo del plan de seguridad:",o:["Conocer aeropuerto","Prevenir actos ilícitos","Seguridad comercio","Todas"],a:1},
+{q:"Extravío de TIA:",o:["Reportar módulo TIAS","Ignorar","Seguridad privada"],a:0},
+{q:"Zona restringida:",o:["TIA vigente","Autorizada","Revisión","Todas"],a:3},
+{q:"Qué reportar:",o:["Persona sin TIA","Objeto abandonado","Vandalismo","Todas"],a:3},
+{q:"Qué es seguridad:",o:["Medidas de protección","Evitar pasajeros","Ley laboral"],a:0},
+{q:"Acto ilícito:",o:["Operación","Reglas","Compromete seguridad"],a:2},
+{q:"Contingencia:",o:["Evacuar","Extintor","Prevenir"],a:2},
+{q:"Nivel contingencia:",o:["Administrador","AFAC","Aerolínea"],a:0},
+{q:"Amenaza:",o:["Aerolínea","Limpieza","Seguridad"],a:2},
+{q:"Normas:",o:["Nacional e internacional","Municipal","Global"],a:0},
+{q:"Áreas:",o:["Seguridad y operacional","Judicial","Laboral"],a:0},
+{q:"TIAV:",o:["Aerovehicular","Aeroportuaria vehicular","Vehicular"],a:1},
+{q:"Niveles:",o:["3","5","4"],a:0}
 ];
 
 const form = document.getElementById("quiz");
 
+// RENDER
 preguntas.forEach((p,i)=>{
-  let html = `<div class="question">
-    <h3>${i+1}. ${p.q}</h3>`;
-  
+  let html = `<div class="question"><h3>${i+1}. ${p.q}</h3>`;
   p.o.forEach((op,j)=>{
-    html += `
-      <label>
-        <input type="radio" name="q${i}" value="${j}">
-        ${op}
-      </label><br>`;
+    html += `<label>
+      <input type="radio" name="q${i}" value="${j}"> ${op}
+    </label><br>`;
   });
-
-  html += `</div>`;
+  html += "</div>";
   form.innerHTML += html;
 });
 
-function calificar(){
+
+// 🧠 CALIFICAR
+let enviado = false;
+
+async function calificar(){
+
+  if(enviado) return;
+  enviado = true;
 
   let score = 0;
 
@@ -220,6 +147,7 @@ function calificar(){
     
     if(!sel){
       alert("Responde todas las preguntas");
+      enviado = false;
       return;
     }
 
@@ -233,25 +161,46 @@ function calificar(){
   document.getElementById("resultado").innerText =
     `Resultado: ${porcentaje}%`;
 
-  // GUARDAR RESULTADO
-  const userId = localStorage.getItem("userId");
-
-  fetch("/log-exam", {
+  // 📡 ENVIAR
+  const res = await fetch("/log-exam", {
     method:"POST",
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization": token
+    },
     body: JSON.stringify({
-      userId,
       score: porcentaje
     })
   });
 
+  const data = await res.json();
+
   if(porcentaje >= 80){
+
     alert("Aprobado");
-  } else {
-    alert("No aprobado, intenta nuevamente");
+
+    // mostrar QR
+    if(data.qr){
+      const qr = document.getElementById("qr");
+      qr.src = data.qr;
+      qr.style.display = "block";
+    }
+
+    // botón certificado
+    document.getElementById("btnCert").style.display = "inline-block";
+
+  }else{
+    alert("No aprobado");
   }
 
 }
+
+
+// 🎓 CERTIFICADO
+function verCert(){
+  window.location.href = "/certificado.html";
+}
+
 </script>
 
 </body>

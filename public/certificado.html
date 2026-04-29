@@ -79,7 +79,9 @@ async function load(){
 
   const id = new URLSearchParams(window.location.search).get("id");
 
-  const res = await fetch(`/admin-data?pin=9472`);
+  const res = await fetch("/me", {
+  headers:{ Authorization: localStorage.getItem("token") }
+});
   const data = await res.json();
 
   const user = data.find(u=>u.id==id);

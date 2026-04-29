@@ -24,6 +24,26 @@ const ADMIN_PIN = process.env.ADMIN_PIN;
 const SECRET = process.env.SECRET;
 
 
+// arriba
+const crypto = require("crypto");
+const sessions = new Map(); // token -> userId
+
+function createSession(userId){
+  const token = crypto.randomBytes(24).toString("hex");
+  sessions.set(token, userId);
+  return token;
+}
+
+function auth(req, res, next){
+  const token = req.headers["authorization"];
+  if(!token || !sessions.has(token)){
+    return res.status(401).json({ok:false});
+  }
+  req.userId = sessions.get(token);
+  next();
+}
+
+
 
 // PASSWORD DINÁMICA
 function generatePassword() {
@@ -57,14 +77,19 @@ app.get("/admin-password", (req, res) => {
 // LOG LOGIN
 app.post("/log-login", async (req, res) => {
   try {
-    const id = Date.now();
+    app.post("/log-login", async (req, res) => {
 
-    await db.query(
-      "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
-      [id, req.body.name]
-    );
+  const id = Date.now();
 
-    res.json({ id, name: req.body.name });
+  await db.query(
+    "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
+    [id, req.body.name]
+  );
+
+  const token = createSession(id);
+
+  res.json({ id, token });
+});
 
   } catch (err) {
     console.error("DB ERROR:", err);
@@ -89,47 +114,80 @@ try {
 
 });
 
-// LOG EXAM
-app.post("/log-exam", async (req, res) => {
-try {
-  const userId = req.body.userId;
-  const score = req.body.score;
+// LOG EXAM SEGURO
+app.post("/log-exam", auth, async (req, res) => {
 
-  const [rows] = await db.query("SELECT * FROM users WHERE id=?", [userId]);
-  const user = rows[0];
+  try {
 
-  if (!user) return res.json({ ok:false });
+    const userId = req.userId; // 🔐 viene del token
+    const score = req.body.score;
 
-  const folio = generarFolio();
-  const fecha = new Date();
+    // VALIDACIÓN BÁSICA
+    if(score === undefined){
+      return res.json({ ok:false, error:"Score requerido" });
+    }
 
-  const base = `${folio}|${user.name}|${fecha.toISOString()}`;
-  const firma = generarFirma(base);
+    const [rows] = await db.query(
+      "SELECT * FROM users WHERE id=?",
+      [userId]
+    );
 
-  const payload = encodeURIComponent(JSON.stringify({
-    folio,
-    nombre: user.name,
-    fecha,
-    firma
-  }));
+    const user = rows[0];
 
-  const urlValidacion = `${process.env.BASE_URL}/validar.html?data=${payload}`;
-  const qr = await QRCode.toDataURL(urlValidacion);
+    if (!user) return res.json({ ok:false });
 
-  await db.query(`
-    UPDATE users 
-    SET exam=?, folio=?, fecha=?, qr=?, intentos=intentos+1, aprobado=? 
-    WHERE id=?`,
-    [score, folio, fecha, qr, score>=80, userId]
-  );
+    // 🔒 BLOQUEO POR INTENTOS
+    if(user.intentos >= 3){
+      return res.json({ ok:false, error:"Intentos agotados" });
+    }
 
-  res.json({ ok:true, folio, qr });
- } catch (err) {
-    console.error("DB ERROR:", err);
-    res.status(500).json({ ok:false, error:"DB error" });
+    // 🔒 BLOQUEO: no permitir examen si no terminó video
+    if(user.video < 90){
+      return res.json({ ok:false, error:"Curso no completado" });
+    }
+
+    const folio = generarFolio();
+    const fecha = new Date();
+
+    // 🔐 FIRMA (como ya lo haces)
+    const base = `${folio}|${user.name}|${fecha.toISOString()}`;
+    const firma = generarFirma(base);
+
+    const payload = encodeURIComponent(JSON.stringify({
+      folio,
+      nombre: user.name,
+      fecha,
+      firma
+    }));
+
+    const urlValidacion = `${process.env.BASE_URL}/validar.html?data=${payload}`;
+
+    const QRCode = require("qrcode");
+    const qr = await QRCode.toDataURL(urlValidacion);
+
+    // 💾 GUARDAR TODO
+    await db.query(`
+      UPDATE users 
+      SET exam=?, 
+          intentos=intentos+1, 
+          aprobado=?, 
+          folio=?, 
+          fecha=?, 
+          qr=? 
+      WHERE id=?`,
+      [score, score >= 80, folio, fecha, qr, userId]
+    );
+
+    res.json({
+      ok:true,
+      folio,
+      qr
+    });
+
+  } catch(err){
+    console.error("LOG-EXAM ERROR:", err);
+    res.status(500).json({ ok:false });
   }
-  
-  
 
 });
 
@@ -149,6 +207,15 @@ try {
   
 
 });
+
+
+app.get("/me", auth, async (req, res) => {
+  const [rows] = await db.query("SELECT * FROM users WHERE id=?", [req.userId]);
+  res.json(rows[0]);
+});
+
+
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Running"));
