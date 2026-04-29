@@ -4,8 +4,10 @@ const mysql = require("mysql2/promise");
 const crypto = require("crypto");
 const QRCode = require("qrcode");
 
+console.log("DB_HOST:", process.env.DB_HOST);
+
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
+  host: process.env.DB_HOST || "mysql.hostinger.com",
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
@@ -55,33 +57,42 @@ app.get("/admin-password", (req, res) => {
 
 // LOG LOGIN
 app.post("/log-login", async (req, res) => {
+  try {
+    const id = Date.now();
 
-  const id = Date.now();
+    await db.query(
+      "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
+      [id, req.body.name]
+    );
 
-  await db.query(
-    "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
-    [id, req.body.name]
-  );
+    res.json({ id, name: req.body.name });
 
-  res.json({ id, name: req.body.name });
-
+  } catch (err) {
+    console.error("DB ERROR:", err);
+    res.status(500).json({ ok:false, error:"DB error" });
+  }
 });
 
 // LOG VIDEO
 app.post("/log-video", async (req, res) => {
-
+try {
   await db.query(
     "UPDATE users SET video=? WHERE id=?",
     [req.body.progress, req.body.userId]
   );
 
   res.json({ ok: true });
+  } catch (err) {
+    console.error("DB ERROR:", err);
+    res.status(500).json({ ok:false, error:"DB error" });
+  }
+  
 
 });
 
 // LOG EXAM
 app.post("/log-exam", async (req, res) => {
-
+try {
   const userId = req.body.userId;
   const score = req.body.score;
 
@@ -114,18 +125,29 @@ app.post("/log-exam", async (req, res) => {
   );
 
   res.json({ ok:true, folio, qr });
+ } catch (err) {
+    console.error("DB ERROR:", err);
+    res.status(500).json({ ok:false, error:"DB error" });
+  }
+  
+  
 
 });
 
 // ADMIN DATA
 app.get("/admin-data", async (req, res) => {
-
+try {
   if (req.query.pin !== process.env.ADMIN_PIN)
     return res.status(403).send("No autorizado");
 
   const [rows] = await db.query("SELECT * FROM users ORDER BY loginTime DESC");
 
   res.json(rows);
+} catch (err) {
+    console.error("DB ERROR:", err);
+    res.status(500).json({ ok:false, error:"DB error" });
+  }
+  
 
 });
 
@@ -155,3 +177,11 @@ function generarFirma(data){
     .update(data)
     .digest("hex");
 }
+
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED PROMISE:", err);
+});
