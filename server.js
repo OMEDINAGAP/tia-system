@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
+const crypto = require("crypto");
+const QRCode = require("qrcode");
 
 const db = mysql.createPool({
   host: process.env.DB_HOST,
@@ -10,44 +12,17 @@ const db = mysql.createPool({
   port: process.env.DB_PORT || 3306,
 });
 
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const userId = Number(req.body.userId);
-    const dir = `uploads/${userId}`;
 
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
 
-    cb(null, dir);
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage });
 const ADMIN_PIN = process.env.ADMIN_PIN;
 const SECRET = process.env.SECRET;
 
-const adapter = new JSONFile("db.json");
-const db = new Low(adapter, { users: [] });
 
-async function init() {
-  await db.read();
-  db.data ||= { users: [] };
-  await db.write();
-}
-init();
 
 // PASSWORD DINÁMICA
 function generatePassword() {
@@ -167,32 +142,16 @@ app.get("/validate", (req, res) => {
   res.json({ ok: pass === current });
 });
 
-app.post("/upload-docs", upload.array("docs"), async (req, res) => {
 
-  console.log("FILES:", req.files);
-  console.log("BODY:", req.body);
 
-  const userId = Number(req.body.userId);
 
-  if (!userId) {
-    return res.json({ ok:false, error:"userId inválido" });
-  }
+function generarFolio(){
+  return "TIA-" + Math.random().toString(36).substring(2,8).toUpperCase();
+}
 
-  const user = db.data.users.find(u => u.id === userId);
-
-  if (!user) {
-    return res.json({ ok:false, error:"Usuario no encontrado" });
-  }
-
-  if (!req.files || req.files.length === 0) {
-    return res.json({ ok:false, error:"No se recibieron archivos" });
-  }
-
-  user.docs = req.files.map(f => f.path);
-
-  await db.write();
-
-  res.json({ ok: true });
-});
-
-app.use("/uploads", express.static("uploads"));
+function generarFirma(data){
+  return crypto
+    .createHmac("sha256", process.env.QR_SECRET || "TIA_SECRET")
+    .update(data)
+    .digest("hex");
+}
