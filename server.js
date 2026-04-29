@@ -69,9 +69,16 @@ async function auth(req, res, next){
   }
 }
 
-function createSession(userId){
+async function createSession(userId){
   const token = crypto.randomBytes(24).toString("hex");
-  sessions.set(token, userId);
+
+  const expires = Date.now() + (1000 * 60 * 60);
+
+  await db.query(
+    "INSERT INTO sessions (token, userId, expires) VALUES (?, ?, ?)",
+    [token, userId, expires]
+  );
+
   return token;
 }
 
