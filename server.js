@@ -261,7 +261,7 @@ process.on("unhandledRejection", (err) => {
   console.error("UNHANDLED PROMISE:", err);
 });
 
-app.post("/validate-cert", async (req, res) => {
+app.post("/validate-cert", auth, async (req, res) => {
   try {
     const { folio, nombre, fecha, firma } = req.body;
 

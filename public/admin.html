@@ -141,7 +141,27 @@ button{
 <tbody id="tbody"></tbody>
 </table>
 
+<h2>Validar QR</h2>
+
+<input type="file" id="qrInput" accept="image/*">
+<br><br>
+
+<button onclick="scanQR()">Escanear</button>
+
+<div id="result"></div>
+
 </div>
+
+<h2>Escaneo QR en vivo</h2>
+
+<video id="video" width="300" style="border-radius:10px;"></video>
+
+<br><br>
+
+<button onclick="startCamera()">Iniciar cámara</button>
+<button onclick="stopCamera()">Detener</button>
+
+<div id="scanResult"></div>
 
 <script>
 
@@ -223,6 +243,189 @@ function exportExcel(){
 }
 
 </script>
+<script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+<script>
+  async function scanQR(){
+  const file = document.getElementById("qrInput").files[0];
 
+  if(!file){
+    alert("Selecciona una imagen");
+    return;
+  }
+
+  const img = new Image();
+  const reader = new FileReader();
+
+  reader.onload = function(e){
+    img.src = e.target.result;
+  };
+
+  img.onload = async function(){
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = img.width;
+    canvas.height = img.height;
+
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+    if(!code){
+      document.getElementById("result").innerHTML = "❌ No se pudo leer el QR";
+      return;
+    }
+
+    // 🔥 EXTRAER DATA DEL LINK
+    const url = new URL(code.data);
+    const raw = url.searchParams.get("data");
+
+    if(!raw){
+      document.getElementById("result").innerHTML = "❌ QR inválido";
+      return;
+    }
+
+    const decoded = JSON.parse(decodeURIComponent(raw));
+
+    // 🔐 VALIDAR CONTRA BACKEND
+    const res = await fetch("/validate-cert", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization": localStorage.getItem("token")
+      },
+      body: JSON.stringify(decoded)
+    });
+
+    const data = await res.json();
+
+    if(data.ok){
+      document.getElementById("result").innerHTML = `
+        <h3 style="color:green;">✔ VÁLIDO</h3>
+        <p><b>Nombre:</b> ${data.user.nombre}</p>
+        <p><b>Folio:</b> ${data.user.folio}</p>
+        <p><b>Resultado:</b> ${data.user.aprobado ? "APROBADO" : "NO APROBADO"}</p>
+      `;
+    }else{
+      document.getElementById("result").innerHTML = `
+        <h3 style="color:red;">✖ INVÁLIDO</h3>
+        <p>${data.reason || ""}</p>
+      `;
+    }
+  };
+
+  reader.readAsDataURL(file);
+}
+</script>
+<script>
+  let stream;
+let scanning = false;
+
+async function startCamera(){
+  const video = document.getElementById("video");
+
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" }
+  });
+
+  video.srcObject = stream;
+  video.setAttribute("playsinline", true);
+  video.play();
+
+  scanning = true;
+  scanFrame();
+}
+
+function stopCamera(){
+  scanning = false;
+
+  if(stream){
+    stream.getTracks().forEach(track => track.stop());
+  }
+}
+
+function scanFrame(){
+  if(!scanning) return;
+
+  const video = document.getElementById("video");
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+  if(code){
+    scanning = false;
+    stopCamera();
+    procesarQR(code.data);
+    return;
+  }
+
+  requestAnimationFrame(scanFrame);
+}
+</script>
+<script>
+  async function procesarQR(data){
+  try{
+    const url = new URL(data);
+    const raw = url.searchParams.get("data");
+
+    if(!raw){
+      renderScan(false);
+      return;
+    }
+
+    const decoded = JSON.parse(decodeURIComponent(raw));
+
+    const res = await fetch("/validate-cert", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization": localStorage.getItem("token")
+      },
+      body: JSON.stringify(decoded)
+    });
+
+    const result = await res.json();
+
+    renderScan(result.ok, result.user, result.reason);
+
+  }catch(e){
+    console.error(e);
+    renderScan(false);
+  }
+}
+
+</script>
+<script>
+  function renderScan(ok, user, reason){
+  const div = document.getElementById("scanResult");
+
+  if(ok){
+    div.innerHTML = `
+      <h3 style="color:green;">✔ CERTIFICADO VÁLIDO</h3>
+      <p><b>Nombre:</b> ${user.nombre}</p>
+      <p><b>Folio:</b> ${user.folio}</p>
+      <p><b>Resultado:</b> ${user.aprobado ? "APROBADO" : "NO APROBADO"}</p>
+      <button onclick="startCamera()">Escanear otro</button>
+    `;
+  }else{
+    div.innerHTML = `
+      <h3 style="color:red;">✖ INVÁLIDO</h3>
+      <p>${reason || "Error en validación"}</p>
+      <button onclick="startCamera()">Intentar de nuevo</button>
+    `;
+  }
+}
+</script>
+<script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 </body>
 </html>
