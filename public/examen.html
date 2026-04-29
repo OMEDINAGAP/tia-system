@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Examen TIA</title>
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    .question {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 10px;
+    }
+
+    h3 {
+      margin-bottom: 10px;
+    }
+
+    button {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🧠 Evaluación de Seguridad Aeroportuaria</h1>
+
+<p>Selecciona la respuesta correcta en cada pregunta.</p>
+
+<form id="quiz"></form>
+
+<button onclick="calificar()">Finalizar examen</button>
+
+<h2 id="resultado"></h2>
+
+</div>
+
+<script>
+
+if(!localStorage.getItem("userId")){
+  window.location.href = "/";
+}
+
+const preguntas = [
+
+{
+q: "¿Qué significa TIA?",
+o: [
+"Tarjeta para Instalaciones Aeroportuarias",
+"Tarjeta de Información Aérea",
+"Tarjeta de Identificación Aeroportuaria"
+],
+a: 2
+},
+
+{
+q: "¿Cuál es el objetivo del plan de seguridad?",
+o: [
+"Que conozcan el Aeropuerto",
+"Implementar medidas para prevenir Actos de Interferencia Ilícita",
+"Dar seguridad a los comercios",
+"Todas las anteriores"
+],
+a: 1
+},
+
+{
+q: "¿Qué hacer en caso de extravío de TIA?",
+o: [
+"Comunicar inmediatamente al módulo TIAS",
+"Laborar normalmente",
+"Comunicar a seguridad privada"
+],
+a: 0
+},
+
+{
+q: "Para ingresar a zona restringida debo:",
+o: [
+"Tener TIA vigente",
+"TIA autorizada",
+"Pasar revisión",
+"Todas las anteriores"
+],
+a: 3
+},
+
+{
+q: "¿Qué situaciones se deben notificar?",
+o: [
+"Persona sin TIA",
+"Objeto abandonado",
+"Actos vandálicos",
+"Todas las anteriores"
+],
+a: 3
+},
+
+// CAPITULO 2
+
+{
+q: "¿Qué es Seguridad?",
+o: [
+"Combinación de medidas para proteger la aviación",
+"Evitar entrada de pasajeros",
+"Leyes laborales"
+],
+a: 0
+},
+
+{
+q: "¿Qué es un acto de interferencia ilícita?",
+o: [
+"Medidas de operación",
+"Reglas de abordaje",
+"Actos que comprometen la seguridad aérea"
+],
+a: 2
+},
+
+{
+q: "Objetivo del plan de contingencia:",
+o: [
+"Desalojar aeropuerto",
+"Usar extintor",
+"Prevenir actos ilícitos"
+],
+a: 2
+},
+
+{
+q: "¿Quién define el nivel de contingencia?",
+o: [
+"Administrador del aeropuerto",
+"AFAC",
+"Aerolíneas"
+],
+a: 0
+},
+
+{
+q: "¿A quién avisar ante amenaza?",
+o: [
+"Aerolíneas",
+"Limpieza",
+"Administración / seguridad"
+],
+a: 2
+},
+
+{
+q: "Normatividad aplicable:",
+o: [
+"Nacional e internacional",
+"Municipal",
+"Mundial"
+],
+a: 0
+},
+
+{
+q: "Áreas de seguridad:",
+o: [
+"Seguridad y operacional",
+"Judicial",
+"Laboral"
+],
+a: 0
+},
+
+{
+q: "¿Qué significa TIAV?",
+o: [
+"Aerovehicular",
+"Aeroportuaria Vehicular",
+"Vehicular"
+],
+a: 1
+},
+
+{
+q: "Niveles de contingencia:",
+o: [
+"3 niveles",
+"5 niveles",
+"4 niveles"
+],
+a: 0
+}
+
+];
+
+const form = document.getElementById("quiz");
+
+preguntas.forEach((p,i)=>{
+  let html = `<div class="question">
+    <h3>${i+1}. ${p.q}</h3>`;
+  
+  p.o.forEach((op,j)=>{
+    html += `
+      <label>
+        <input type="radio" name="q${i}" value="${j}">
+        ${op}
+      </label><br>`;
+  });
+
+  html += `</div>`;
+  form.innerHTML += html;
+});
+
+function calificar(){
+
+  let score = 0;
+
+  for(let i=0;i<preguntas.length;i++){
+    const sel = document.querySelector(`input[name="q${i}"]:checked`);
+    
+    if(!sel){
+      alert("Responde todas las preguntas");
+      return;
+    }
+
+    if(Number(sel.value) === preguntas[i].a){
+      score++;
+    }
+  }
+
+  const porcentaje = Math.round((score / preguntas.length) * 100);
+
+  document.getElementById("resultado").innerText =
+    `Resultado: ${porcentaje}%`;
+
+  // GUARDAR RESULTADO
+  const userId = localStorage.getItem("userId");
+
+  fetch("/log-exam", {
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      userId,
+      score: porcentaje
+    })
+  });
+
+  if(porcentaje >= 80){
+    alert("Aprobado");
+  } else {
+    alert("No aprobado, intenta nuevamente");
+  }
+
+}
+</script>
+
+</body>
+</html>
