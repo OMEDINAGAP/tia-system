@@ -1,7 +1,15 @@
 const express = require("express");
 const cors = require("cors");
-const { Low } = require("lowdb");
-const { JSONFile } = require("lowdb/node");
+const mysql = require("mysql2/promise");
+
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306,
+});
+
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -72,44 +80,78 @@ app.get("/admin-password", (req, res) => {
 
 // LOG LOGIN
 app.post("/log-login", async (req, res) => {
-  const user = {
-    id: Date.now(),
-    name: req.body.name,
-    loginTime: new Date(),
-    video: 0,
-    exam: null
-  };
 
-  db.data.users.push(user);
-  await db.write();
+  const id = Date.now();
 
-  res.json(user);
+  await db.query(
+    "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
+    [id, req.body.name]
+  );
+
+  res.json({ id, name: req.body.name });
+
 });
 
 // LOG VIDEO
 app.post("/log-video", async (req, res) => {
-  const user = db.data.users.find(u => u.id == req.body.userId);
-  if (user) {
-    user.video = req.body.progress;
-    await db.write();
-  }
+
+  await db.query(
+    "UPDATE users SET video=? WHERE id=?",
+    [req.body.progress, req.body.userId]
+  );
+
   res.json({ ok: true });
+
 });
 
 // LOG EXAM
 app.post("/log-exam", async (req, res) => {
-  const user = db.data.users.find(u => u.id == req.body.userId);
-  if (user) {
-    user.exam = req.body.score;
-    await db.write();
-  }
-  res.json({ ok: true });
+
+  const userId = req.body.userId;
+  const score = req.body.score;
+
+  const [rows] = await db.query("SELECT * FROM users WHERE id=?", [userId]);
+  const user = rows[0];
+
+  if (!user) return res.json({ ok:false });
+
+  const folio = generarFolio();
+  const fecha = new Date();
+
+  const base = `${folio}|${user.name}|${fecha.toISOString()}`;
+  const firma = generarFirma(base);
+
+  const payload = encodeURIComponent(JSON.stringify({
+    folio,
+    nombre: user.name,
+    fecha,
+    firma
+  }));
+
+  const urlValidacion = `${process.env.BASE_URL}/validar.html?data=${payload}`;
+  const qr = await QRCode.toDataURL(urlValidacion);
+
+  await db.query(`
+    UPDATE users 
+    SET exam=?, folio=?, fecha=?, qr=?, intentos=intentos+1, aprobado=? 
+    WHERE id=?`,
+    [score, folio, fecha, qr, score>=80, userId]
+  );
+
+  res.json({ ok:true, folio, qr });
+
 });
 
 // ADMIN DATA
-app.get("/admin-data", (req, res) => {
-  if (req.query.pin !== ADMIN_PIN) return res.status(403).send("No autorizado");
-  res.json(db.data.users);
+app.get("/admin-data", async (req, res) => {
+
+  if (req.query.pin !== process.env.ADMIN_PIN)
+    return res.status(403).send("No autorizado");
+
+  const [rows] = await db.query("SELECT * FROM users ORDER BY loginTime DESC");
+
+  res.json(rows);
+
 });
 
 const PORT = process.env.PORT || 3000;
