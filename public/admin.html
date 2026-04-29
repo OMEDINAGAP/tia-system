@@ -1,297 +1,317 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-<title>Admin TIA PRO</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin TIA PRO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-body{
-  font-family: 'Segoe UI', sans-serif;
-  background:#f1f5f9;
-  margin:0;
-}
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+    }
 
-/* HEADER */
-.header{
-  background:white;
-  padding:10px 15px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  border-bottom:1px solid #e5e7eb;
-  font-size:14px;
-}
+    /* HEADER */
+    .header {
+      background: white;
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
 
-/* CONTENEDOR */
-.container{
-  padding:12px;
-  display:grid;
-  grid-template-columns: 2.2fr 1fr;
-  gap:12px;
-  height:calc(100vh - 60px);
-}
+    /* CONTENEDOR */
+    .container {
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 2.2fr 1fr;
+      gap: 12px;
+      height: calc(100vh - 60px);
+    }
 
-/* IZQUIERDA */
-.left{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
+    /* IZQUIERDA */
+    .left {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
 
-/* KPIs */
-.kpis{
-  display:flex;
-  gap:8px;
-}
+    /* KPIs */
+    .kpis {
+      display: flex;
+      gap: 8px;
+    }
 
-.kpi{
-  flex:1;
-  background:white;
-  padding:8px;
-  border-radius:6px;
-  font-size:11px;
-  text-align:center;
-}
+    .kpi {
+      flex: 1;
+      background: white;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      text-align: center;
+    }
 
-.kpi b{
-  font-size:15px;
-}
+    .kpi b {
+      font-size: 15px;
+    }
 
-/* TABLA CONTENEDOR */
-.table-container{
-  background:white;
-  border-radius:8px;
-  overflow:hidden;
-  display:flex;
-  flex-direction:column;
-  flex:1;
-}
+    /* TABLA CONTENEDOR */
+    .table-container {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
 
-.table-container input{
-  margin:0;
-  border-radius:0;
-  border:none;
-  border-bottom:1px solid #e5e7eb;
-}
+    .table-container input {
+      margin: 0;
+      border-radius: 0;
+      border: none;
+      border-bottom: 1px solid #e5e7eb;
+    }
 
-/* TABLA */
-.table{
-  width:100%;
-  font-size:12px;
-}
+    /* TABLA */
+    .table {
+      width: 100%;
+      font-size: 12px;
+    }
 
-.table th{
-  background:#eef2f7;
-  position:sticky;
-  top:0;
-}
+    .table th {
+      background: #eef2f7;
+      position: sticky;
+      top: 0;
+    }
 
-.table td, .table th{
-  padding:7px;
-}
+    .table td,
+    .table th {
+      padding: 7px;
+    }
 
-/* SCROLL */
-.table-body{
-  overflow:auto;
-  max-height:100%;
-}
+    /* SCROLL */
+    .table-body {
+      overflow: auto;
+      max-height: 100%;
+    }
 
-/* DERECHA */
-.right{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
+    /* DERECHA */
+    .right {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
 
-/* CARDS */
-.card{
-  background:white;
-  padding:10px;
-  border-radius:8px;
-  font-size:12px;
-}
+    /* CARDS */
+    .card {
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
 
-/* BOTONES */
-button{
-  padding:5px 8px;
-  border:none;
-  border-radius:6px;
-  background:#3b82f6;
-  color:white;
-  font-size:11px;
-}
+    /* BOTONES */
+    button {
+      padding: 5px 8px;
+      border: none;
+      border-radius: 6px;
+      background: #3b82f6;
+      color: white;
+      font-size: 11px;
+    }
 
-/* BADGES */
-.badge{
-  padding:3px 6px;
-  border-radius:10px;
-  font-size:10px;
-  color:white;
-}
+    /* BADGES */
+    .badge {
+      padding: 3px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      color: white;
+    }
 
-.ok{background:#22c55e;}
-.fail{background:#ef4444;}
+    .ok {
+      background: #22c55e;
+    }
 
-/* RESULTADOS */
-.result-ok{
-  color:#16a34a;
-  font-weight:bold;
-}
+    .fail {
+      background: #ef4444;
+    }
 
-.result-bad{
-  color:#dc2626;
-  font-weight:bold;
-}
+    /* RESULTADOS */
+    .result-ok {
+      color: #16a34a;
+      font-weight: bold;
+    }
 
-/* VIDEO */
-video{
-  width:100%;
-  border-radius:6px;
-  margin-top:5px;
-}
-</style>
+    .result-bad {
+      color: #dc2626;
+      font-weight: bold;
+    }
+
+    /* VIDEO */
+    video {
+      width: 100%;
+      border-radius: 6px;
+      margin-top: 5px;
+    }
+  </style>
 
 
 </head>
 
 <body>
 
-<!-- LOGIN -->
-<div class="login" id="login">
-  <h2>🔐 Admin Login</h2>
-  <input id="pin" placeholder="PIN">
-  <button onclick="login()">Entrar</button>
-</div>
-
-<!-- DASHBOARD -->
-<div class="header">
-  <b>🛫 TIA PRO</b>
-  <button onclick="logout()">Salir</button>
-</div>
-
-<div class="container">
-
-  <!-- IZQUIERDA -->
-  <div class="left">
-
-    <div class="kpis">
-      <div class="kpi">Usuarios<br><b id="total">0</b></div>
-      <div class="kpi">Aprobados<br><b id="aprobados">0</b></div>
-      <div class="kpi">Reprobados<br><b id="reprobados">0</b></div>
-    </div>
-
-    <div class="table-container">
-      <input id="search" placeholder="Buscar..." onkeyup="render()">
-
-      <div class="table-body">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Video</th>
-              <th>Examen</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
-    </div>
-
+  <!-- LOGIN -->
+  <div class="login" id="login">
+    <h2>🔐 Admin Login</h2>
+    <input id="pin" placeholder="PIN">
+    <button onclick="login()">Entrar</button>
   </div>
 
-  <!-- DERECHA -->
-  <div class="right">
-
-    <div class="card">
-      <b>📂 Validar QR</b>
-      <input type="file" id="qrInput">
-      <button onclick="scanQR()">Escanear</button>
-      <div id="result"></div>
-    </div>
-
-    <div class="card">
-      <b>📷 Escaneo en vivo</b>
-      <video id="video" autoplay muted playsinline></video>
-
-      <div style="margin-top:5px;">
-        <button onclick="startCamera()">Iniciar</button>
-        <button onclick="stopCamera()">Detener</button>
-      </div>
-
-      <div id="scanResult"></div>
-    </div>
-
+  <!-- DASHBOARD -->
+  <div class="header">
+    <b>🛫 TIA PRO</b>
+    <button onclick="logout()">Salir</button>
   </div>
 
-</div>
+  <div id="dashboard" style="display:none;">
+    <div class="container">
 
-<script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+      <!-- IZQUIERDA -->
+      <div class="left">
 
-<script>
+        <div class="kpis">
+          <div class="kpi">Usuarios<br><b id="total">0</b></div>
+          <div class="kpi">Aprobados<br><b id="aprobados">0</b></div>
+          <div class="kpi">Reprobados<br><b id="reprobados">0</b></div>
+        </div>
 
-let DATA = [];
+        <div class="table-container">
+          <input id="search" placeholder="Buscar..." onkeyup="render()">
 
-async function login(){
-  const pin = document.getElementById("pin").value;
+          <div class="table-body">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Video</th>
+                  <th>Examen</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
 
-  const res = await fetch("/admin-login", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ pin })
-  });
+      </div>
 
-  const data = await res.json();
+      <!-- DERECHA -->
+      <div class="right">
 
-  if(!data.ok){
-    alert("PIN incorrecto");
-    return;
-  }
+        <div class="card">
+          <b>📂 Validar QR</b>
+          <input type="file" id="qrInput">
+          <button onclick="scanQR()">Escanear</button>
+          <div id="result"></div>
+        </div>
 
-  localStorage.setItem("token", data.token);
-  localStorage.setItem("adminName", data.name);
+        <div class="card">
+          <b>📷 Escaneo en vivo</b>
+          <video id="video" autoplay muted playsinline></video>
 
-  initDashboard();
-}
+          <div style="margin-top:5px;">
+            <button onclick="startCamera()">Iniciar</button>
+            <button onclick="stopCamera()">Detener</button>
+          </div>
 
-async function initDashboard(){
-  const token = localStorage.getItem("token");
+          <div id="scanResult"></div>
+        </div>
 
-  if(!token) return;
+      </div>
 
-  const res = await fetch("/admin-data", {
-    headers:{ "Authorization": token }
-  });
+    </div>
+  </div>
 
-  DATA = await res.json();
+  <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 
-  document.getElementById("login").style.display="none";
-  document.getElementById("dashboard").style.display="block";
+  <script>
 
-  document.getElementById("adminName").innerText = localStorage.getItem("adminName");
+    let DATA = [];
 
-  render();
-}
+    async function login() {
+      const pin = document.getElementById("pin").value;
 
-function logout(){
-  localStorage.clear();
-  location.reload();
-}
+      const res = await fetch("/admin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin })
+      });
 
-function render(){
-  const tbody = document.getElementById("tbody");
-  tbody.innerHTML="";
+      const data = await res.json();
 
-  let total=0, aprobados=0, reprobados=0;
-  const search = document.getElementById("search").value.toLowerCase();
+      if (!data.ok) {
+        alert("PIN incorrecto");
+        return;
+      }
 
-  DATA.filter(u=>u.name.toLowerCase().includes(search))
-  .forEach(u=>{
-    total++;
-    if(u.aprobado) aprobados++;
-    else if(u.exam!==null) reprobados++;
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("adminName", data.name);
 
-    tbody.innerHTML += `
+      initDashboard();
+    }
+
+    async function initDashboard() {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        document.getElementById("login").style.display = "block";
+        document.getElementById("dashboard").style.display = "none";
+        return;
+      }
+
+      try {
+        const res = await fetch("/admin-data", {
+          headers: { "Authorization": token }
+        });
+
+        if (res.status !== 200) {
+          throw "No autorizado";
+        }
+
+        DATA = await res.json();
+
+        document.getElementById("login").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+
+        render();
+
+      } catch (e) {
+        logout();
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem("token");
+      location.reload();
+    }
+
+    function render() {
+      const tbody = document.getElementById("tbody");
+      tbody.innerHTML = "";
+
+      let total = 0, aprobados = 0, reprobados = 0;
+      const search = document.getElementById("search").value.toLowerCase();
+
+      DATA.filter(u => u.name.toLowerCase().includes(search))
+        .forEach(u => {
+          total++;
+          if (u.aprobado) aprobados++;
+          else if (u.exam !== null) reprobados++;
+
+          tbody.innerHTML += `
       <tr>
         <td>${u.name}</td>
         <td>${u.video}%</td>
@@ -300,17 +320,18 @@ function render(){
         <td>${u.qr ? `<img src="${u.qr}" width="40">` : "-"}</td>
       </tr>
     `;
-  });
+        });
 
-  document.getElementById("total").innerText = total;
-  document.getElementById("aprobados").innerText = aprobados;
-  document.getElementById("reprobados").innerText = reprobados;
-}
+      document.getElementById("total").innerText = total;
+      document.getElementById("aprobados").innerText = aprobados;
+      document.getElementById("reprobados").innerText = reprobados;
+    }
 
-// AUTO LOGIN
-initDashboard();
+    // AUTO LOGIN
+    initDashboard();
 
-</script>
+  </script>
 
 </body>
+
 </html>
