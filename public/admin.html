@@ -6,89 +6,109 @@
 
 <style>
 body{
-  font-family: Arial;
-  background:#0b1220;
-  color:white;
+  font-family: 'Segoe UI', sans-serif;
+  background:#f8fafc;
+  color:#0f172a;
+  margin:0;
+}
+
+/* HEADER */
+.header{
+  background:white;
+  padding:15px 25px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 2px 10px rgba(0,0,0,0.05);
+}
+
+.header b{
+  font-size:18px;
+}
+
+.container{
   padding:20px;
 }
 
 /* LOGIN */
 .login{
-  max-width:300px;
-  margin:auto;
-  margin-top:100px;
+  max-width:320px;
+  margin:100px auto;
   text-align:center;
-}
-
-/* DASHBOARD */
-.dashboard{
-  display:none;
 }
 
 input{
   width:100%;
-  padding:10px;
-  margin:10px 0;
-  border-radius:8px;
-  border:none;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid #cbd5e1;
+  margin-bottom:10px;
 }
 
+/* BOTONES */
 button{
-  width:100%;
   padding:10px;
   border:none;
   border-radius:8px;
-  background:#22c55e;
+  background:#3b82f6;
   color:white;
   cursor:pointer;
-  margin-top:5px;
 }
 
-.card{
-  background:#1e293b;
-  padding:15px;
-  border-radius:10px;
-  margin-top:20px;
+button:hover{
+  background:#2563eb;
 }
 
+/* KPI */
 .kpis{
   display:flex;
-  gap:10px;
+  gap:15px;
   margin-bottom:20px;
 }
 
 .kpi{
   flex:1;
-  background:#1e293b;
-  padding:15px;
-  border-radius:10px;
+  background:white;
+  padding:20px;
+  border-radius:12px;
   text-align:center;
+  box-shadow:0 4px 10px rgba(0,0,0,0.05);
 }
 
+/* TABLA */
 .table{
   width:100%;
-  border-collapse: collapse;
+  background:white;
+  border-radius:12px;
+  overflow:hidden;
+  margin-top:15px;
 }
 
 .table th{
-  background:#334155;
+  background:#e2e8f0;
 }
 
 .table td, .table th{
-  padding:10px;
+  padding:12px;
 }
 
+/* BADGES */
 .badge{
   padding:5px 10px;
   border-radius:20px;
-  font-size:12px;
+  color:white;
 }
 
-.ok{background:#16a34a;}
-.fail{background:#dc2626;}
+.ok{background:#22c55e;}
+.fail{background:#ef4444;}
 
-.qr{
-  width:50px;
+/* CARDS */
+.card{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  margin-top:20px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.05);
 }
 
 video{
@@ -109,9 +129,17 @@ video{
 </div>
 
 <!-- DASHBOARD -->
-<div class="dashboard" id="dashboard">
+<div id="dashboard" style="display:none;">
 
-<h1>🛫 Panel TIA PRO</h1>
+<div class="header">
+  <b>🛫 Panel TIA PRO</b>
+  <div>
+    <span id="adminName"></span>
+    <button onclick="logout()">Salir</button>
+  </div>
+</div>
+
+<div class="container">
 
 <div class="kpis">
   <div class="kpi">Usuarios<br><b id="total">0</b></div>
@@ -134,33 +162,34 @@ video{
 <tbody id="tbody"></tbody>
 </table>
 
-<!-- 🔍 VALIDAR POR IMAGEN -->
+<!-- VALIDAR QR -->
 <div class="card">
-<h2>📂 Validar QR (imagen)</h2>
-<input type="file" id="qrInput" accept="image/*">
+<h3>📂 Validar QR (imagen)</h3>
+<input type="file" id="qrInput">
 <button onclick="scanQR()">Escanear</button>
 <div id="result"></div>
 </div>
 
-<!-- 📷 ESCÁNER EN VIVO -->
+<!-- CÁMARA -->
 <div class="card">
-<h2>📷 Escaneo en vivo</h2>
-
+<h3>📷 Escaneo en vivo</h3>
 <video id="video" autoplay muted playsinline></video>
 
-<button onclick="startCamera()">Iniciar cámara</button>
+<div style="margin-top:10px;">
+<button onclick="startCamera()">Iniciar</button>
 <button onclick="stopCamera()">Detener</button>
+</div>
 
 <div id="scanResult"></div>
 </div>
 
+</div>
 </div>
 
 <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 
 <script>
 
-// LOGIN
 let DATA = [];
 
 async function login(){
@@ -179,24 +208,36 @@ async function login(){
     return;
   }
 
-  // 🔐 guardar token REAL
   localStorage.setItem("token", data.token);
+  localStorage.setItem("adminName", data.name);
 
-  // 🔥 cargar admin data correctamente
-  const r = await fetch("/admin-data", {
-    headers:{
-      "Authorization": data.token
-    }
+  initDashboard();
+}
+
+async function initDashboard(){
+  const token = localStorage.getItem("token");
+
+  if(!token) return;
+
+  const res = await fetch("/admin-data", {
+    headers:{ "Authorization": token }
   });
 
-  DATA = await r.json();
+  DATA = await res.json();
 
   document.getElementById("login").style.display="none";
   document.getElementById("dashboard").style.display="block";
 
+  document.getElementById("adminName").innerText = localStorage.getItem("adminName");
+
   render();
 }
-// RENDER
+
+function logout(){
+  localStorage.clear();
+  location.reload();
+}
+
 function render(){
   const tbody = document.getElementById("tbody");
   tbody.innerHTML="";
@@ -216,137 +257,18 @@ function render(){
         <td>${u.video}%</td>
         <td>${u.exam ?? "-"}</td>
         <td>${u.aprobado ? '<span class="badge ok">Aprobado</span>' : '<span class="badge fail">No</span>'}</td>
-        <td>${u.qr ? `<img src="${u.qr}" class="qr">` : "-"}</td>
+        <td>${u.qr ? `<img src="${u.qr}" width="40">` : "-"}</td>
       </tr>
     `;
   });
 
-  totalEl("total", total);
-  totalEl("aprobados", aprobados);
-  totalEl("reprobados", reprobados);
+  document.getElementById("total").innerText = total;
+  document.getElementById("aprobados").innerText = aprobados;
+  document.getElementById("reprobados").innerText = reprobados;
 }
 
-function totalEl(id,val){
-  document.getElementById(id).innerText = val;
-}
-
-// QR POR IMAGEN
-async function scanQR(){
-  const file = document.getElementById("qrInput").files[0];
-  if(!file) return alert("Selecciona imagen");
-
-  const img = new Image();
-  const reader = new FileReader();
-
-  reader.onload = e => img.src = e.target.result;
-
-  img.onload = async () => {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img,0,0);
-
-    const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code = jsQR(imageData.data,canvas.width,canvas.height);
-
-    if(!code) return renderResult(false);
-
-    procesarQR(code.data, "result");
-  };
-
-  reader.readAsDataURL(file);
-}
-
-// CÁMARA
-let stream, scanning=false;
-
-async function startCamera(){
-  try{
-    const video = document.getElementById("video");
-
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
-    });
-
-    video.srcObject = stream;
-    scanning=true;
-    scanFrame();
-
-  }catch(err){
-    alert("No se pudo acceder a la cámara");
-  }
-}
-
-function stopCamera(){
-  scanning=false;
-  if(stream) stream.getTracks().forEach(t=>t.stop());
-}
-
-function scanFrame(){
-  if(!scanning) return;
-
-  const video = document.getElementById("video");
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video,0,0);
-
-  const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-  const code = jsQR(img.data,canvas.width,canvas.height);
-
-  if(code){
-    stopCamera();
-    procesarQR(code.data, "scanResult");
-    return;
-  }
-
-  requestAnimationFrame(scanFrame);
-}
-
-// VALIDAR QR
-async function procesarQR(data, target){
-  try{
-    const url = new URL(data);
-    const raw = url.searchParams.get("data");
-    if(!raw) return renderResult(false, target);
-
-    const decoded = JSON.parse(decodeURIComponent(raw));
-
-    const res = await fetch("/validate-cert", {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization": localStorage.getItem("token")
-      },
-      body: JSON.stringify(decoded)
-    });
-
-    const r = await res.json();
-    renderResult(r.ok, target, r);
-
-  }catch(e){
-    renderResult(false, target);
-  }
-}
-
-function renderResult(ok, target="result", data={}){
-  const div = document.getElementById(target);
-
-  if(ok){
-    div.innerHTML = `
-      <h3 style="color:#22c55e;">✔ VÁLIDO</h3>
-      <p>${data.user.nombre}</p>
-    `;
-  }else{
-    div.innerHTML = `
-      <h3 style="color:#ef4444;">✖ INVÁLIDO</h3>
-    `;
-  }
-}
+// AUTO LOGIN
+initDashboard();
 
 </script>
 
