@@ -257,7 +257,7 @@ app.get("/admin-data", auth, async (req, res) => {
     }
 
     const [rows] = await db.query(
-      "SELECT * FROM users ORDER BY loginTime DESC"
+      "SELECT * FROM users ORDER BY id DESC"
     );
 
     res.json(rows);
