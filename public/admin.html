@@ -7,7 +7,7 @@
 <style>
 body{
   font-family: 'Segoe UI', sans-serif;
-  background:#f4f6f9;
+  background:#f1f5f9;
   margin:0;
 }
 
@@ -19,59 +19,88 @@ body{
   justify-content:space-between;
   align-items:center;
   border-bottom:1px solid #e5e7eb;
+  font-size:14px;
 }
 
 /* CONTENEDOR */
 .container{
-  padding:15px;
+  padding:12px;
   display:grid;
-  grid-template-columns: 2fr 1fr;
-  gap:15px;
+  grid-template-columns: 2.2fr 1fr;
+  gap:12px;
+  height:calc(100vh - 60px);
 }
 
-/* KPI COMPACTO */
+/* IZQUIERDA */
+.left{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* KPIs */
 .kpis{
   display:flex;
-  gap:10px;
+  gap:8px;
 }
 
 .kpi{
   flex:1;
   background:white;
-  padding:10px;
-  border-radius:8px;
-  font-size:12px;
+  padding:8px;
+  border-radius:6px;
+  font-size:11px;
   text-align:center;
-  box-shadow:0 2px 5px rgba(0,0,0,0.05);
 }
 
 .kpi b{
-  font-size:16px;
+  font-size:15px;
+}
+
+/* TABLA CONTENEDOR */
+.table-container{
+  background:white;
+  border-radius:8px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  flex:1;
+}
+
+.table-container input{
+  margin:0;
+  border-radius:0;
+  border:none;
+  border-bottom:1px solid #e5e7eb;
 }
 
 /* TABLA */
 .table{
   width:100%;
-  background:white;
-  border-radius:8px;
-  font-size:13px;
+  font-size:12px;
 }
 
 .table th{
   background:#eef2f7;
+  position:sticky;
+  top:0;
 }
 
 .table td, .table th{
-  padding:8px;
+  padding:7px;
 }
 
-/* INPUT */
-input{
-  width:100%;
-  padding:8px;
-  border-radius:6px;
-  border:1px solid #cbd5e1;
-  margin:8px 0;
+/* SCROLL */
+.table-body{
+  overflow:auto;
+  max-height:100%;
+}
+
+/* DERECHA */
+.right{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
 }
 
 /* CARDS */
@@ -79,36 +108,46 @@ input{
   background:white;
   padding:10px;
   border-radius:8px;
-  font-size:13px;
-  box-shadow:0 2px 5px rgba(0,0,0,0.05);
+  font-size:12px;
 }
 
 /* BOTONES */
 button{
-  padding:6px 10px;
+  padding:5px 8px;
   border:none;
   border-radius:6px;
   background:#3b82f6;
   color:white;
-  cursor:pointer;
-  font-size:12px;
+  font-size:11px;
 }
 
 /* BADGES */
 .badge{
-  padding:3px 8px;
-  border-radius:12px;
-  font-size:11px;
+  padding:3px 6px;
+  border-radius:10px;
+  font-size:10px;
   color:white;
 }
 
 .ok{background:#22c55e;}
 .fail{background:#ef4444;}
 
+/* RESULTADOS */
+.result-ok{
+  color:#16a34a;
+  font-weight:bold;
+}
+
+.result-bad{
+  color:#dc2626;
+  font-weight:bold;
+}
+
 /* VIDEO */
 video{
   width:100%;
-  border-radius:8px;
+  border-radius:6px;
+  margin-top:5px;
 }
 </style>
 
@@ -133,7 +172,7 @@ video{
 <div class="container">
 
   <!-- IZQUIERDA -->
-  <div>
+  <div class="left">
 
     <div class="kpis">
       <div class="kpi">Usuarios<br><b id="total">0</b></div>
@@ -141,24 +180,28 @@ video{
       <div class="kpi">Reprobados<br><b id="reprobados">0</b></div>
     </div>
 
-    <input id="search" placeholder="Buscar..." onkeyup="render()">
+    <div class="table-container">
+      <input id="search" placeholder="Buscar..." onkeyup="render()">
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Video</th>
-          <th>Examen</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
+      <div class="table-body">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Video</th>
+              <th>Examen</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
 
   </div>
 
   <!-- DERECHA -->
-  <div>
+  <div class="right">
 
     <div class="card">
       <b>📂 Validar QR</b>
@@ -167,11 +210,15 @@ video{
       <div id="result"></div>
     </div>
 
-    <div class="card" style="margin-top:10px;">
-      <b>📷 Escaneo</b>
+    <div class="card">
+      <b>📷 Escaneo en vivo</b>
       <video id="video" autoplay muted playsinline></video>
-      <button onclick="startCamera()">Iniciar</button>
-      <button onclick="stopCamera()">Detener</button>
+
+      <div style="margin-top:5px;">
+        <button onclick="startCamera()">Iniciar</button>
+        <button onclick="stopCamera()">Detener</button>
+      </div>
+
       <div id="scanResult"></div>
     </div>
 
