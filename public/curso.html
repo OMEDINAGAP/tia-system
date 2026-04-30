@@ -93,13 +93,25 @@
     if (!token) {
       location.href = "/";
     }
+    // 🎥 CONTROL DE PESTAÑA (UX PRO)
+    let wasPlaying = false;
 
-    // 🛑 BLOQUEO CAMBIO DE PESTAÑA
     document.addEventListener("visibilitychange", () => {
+
+      if (!player || typeof player.getPlayerState !== "function") return;
+
       if (document.hidden) {
-        alert("No puedes salir del curso");
-        location.reload();
+        if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+          wasPlaying = true;
+          player.pauseVideo();
+        }
+      } else {
+        if (wasPlaying) {
+          player.playVideo();
+          wasPlaying = false;
+        }
       }
+
     });
 
     // 🎥 VARIABLES
