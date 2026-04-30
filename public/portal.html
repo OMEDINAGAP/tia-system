@@ -1,17 +1,12 @@
-<script>
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    window.location.href = "/";
-  }
-</script>
-<script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <!DOCTYPE html>
 <html>
 
 <head>
   <title>Portal TIA</title>
   <link rel="stylesheet" href="styles.css">
+
+  <!-- ✅ FACE API -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 
 <body>
@@ -104,6 +99,10 @@
   </div>
   
 
+
+</body>
+
+
   <script>
     if (!localStorage.getItem("token")) {
       window.location.href = "/";
@@ -118,103 +117,80 @@
     }
   </script>
 
-<!-- 1. FACE API -->
+  
+<script>
+  
 
-  <script>
-    let video = document.getElementById("video");
-    let canvas = document.getElementById("canvas");
-    let ctx = canvas.getContext("2d");
-    let stream;
+const token = localStorage.getItem("token");
 
-    let player; // por si usas otras cosas
-    let duration = 0;
-    let maxTime = 0;
+if (!token) {
+  window.location.href = "/";
+}
 
+// DOM
+let video = document.getElementById("video");
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
+let stream;
 
-    // 🚀 CARGAR MODELO
-    async function loadModels() {
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-    }
+// 🚀 CARGAR MODELO
+async function loadModels() {
+  await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+}
 
-    // 🎥 INICIAR CÁMARA
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" }
-        });
+// 🎥 CÁMARA
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
 
-        video.srcObject = stream;
-        await video.play();
+    video.srcObject = stream;
+    await video.play();
 
-      } catch (err) {
-        alert("Error cámara");
-        console.error(err);
-      }
-    }
+  } catch (err) {
+    alert("Error cámara");
+  }
+}
 
-    // 📸 CAPTURAR
-    function capture() {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    }
+// 📸 CAPTURA
+function capture() {
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+}
 
-    // 🧠 VALIDAR Y ENVIAR
-    async function validateAndSend() {
+// 🧠 VALIDAR
+async function validateAndSend() {
 
-      document.getElementById("status").innerText = "Analizando...";
+  if(typeof faceapi === "undefined"){
+    alert("IA no cargada");
+    return;
+  }
 
-      const detections = await faceapi.detectAllFaces(
-        canvas,
-        new faceapi.TinyFaceDetectorOptions()
-      );
+  const detections = await faceapi.detectAllFaces(
+    canvas,
+    new faceapi.TinyFaceDetectorOptions()
+  );
 
-      if (detections.length !== 1) {
-        document.getElementById("status").innerText = "Solo una persona";
-        return;
-      }
+  if (detections.length !== 1) {
+    document.getElementById("status").innerText = "Solo una persona";
+    return;
+  }
 
-      const box = detections[0].box;
+  document.getElementById("status").innerText = "✅ Foto válida";
+}
 
-      const size = 200;
+// 🔥 INICIALIZACIÓN CORRECTA (UNA SOLA VEZ)
+window.addEventListener("load", async () => {
 
-      let cropX = box.x + box.width / 2 - size / 2;
-      let cropY = box.y + box.height / 2 - size / 2;
+  console.log("Cargando faceapi...");
 
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = size;
-      tempCanvas.height = size;
-      const tctx = tempCanvas.getContext("2d");
+  await loadModels();
 
-      tctx.fillStyle = "white";
-      tctx.fillRect(0, 0, size, size);
+  console.log("Modelo listo");
 
-      tctx.drawImage(canvas, cropX, cropY, size, size, 0, 0, size, size);
+});
 
-      tempCanvas.toBlob(async (blob) => {
-
-        const formData = new FormData();
-        formData.append("photo", blob, "tia.png");
-
-        const res = await fetch("/upload-photo", {
-          method: "POST",
-          headers: {
-            "Authorization": token
-          },
-          body: formData
-        });
-
-        if (res.status === 200) {
-          document.getElementById("status").innerText = "✅ Guardado";
-        } else {
-          document.getElementById("status").innerText = "Error";
-        }
-
-      }, "image/png");
-    }
-
-    // 🔥 INICIALIZAR
-    loadModels();
-  </script>
+</script>
 
 </body>
-
 </html>
