@@ -113,7 +113,10 @@
       cursor: pointer;
       text-decoration: none;
     }
+  
+  
   </style>
+
 
 
 </head>
@@ -121,6 +124,71 @@
 <body>
 
   <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      background: linear-gradient(135deg, #3b0764, #1e3a8a, #0f172a);
+    }
+
+    /* TARJETA */
+    .login-card {
+      width: 300px;
+      padding: 30px;
+      border-radius: 20px;
+      backdrop-filter: blur(15px);
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      color: white;
+    }
+
+    /* ICONO */
+    .avatar {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      margin: 0 auto 20px;
+    }
+
+    /* INPUTS */
+    .input-group {
+      position: relative;
+      margin: 15px 0;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 10px 10px;
+      border: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+      background: transparent;
+      color: white;
+      outline: none;
+    }
+
+    /* BOTÓN */
+    .login-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #ef4444, #3b82f6);
+      color: white;
+      cursor: pointer;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+
+    .login-btn:hover {
+      opacity: 0.9;
+    }
+
     /* CONTENEDOR GENERAL */
 .main{
   display:grid;
