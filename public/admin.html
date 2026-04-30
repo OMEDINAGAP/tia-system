@@ -121,70 +121,50 @@
 <body>
 
   <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    /* CONTENEDOR GENERAL */
+.main{
+  display:grid;
+  grid-template-columns: 3fr 1fr;
+  gap:20px;
+  padding:20px;
+}
 
-      background: linear-gradient(135deg, #3b0764, #1e3a8a, #0f172a);
-    }
+/* TABLA */
+.table-section{
+  background:white;
+  padding:15px;
+  border-radius:10px;
+}
 
-    /* TARJETA */
-    .login-card {
-      width: 300px;
-      padding: 30px;
-      border-radius: 20px;
-      backdrop-filter: blur(15px);
-      background: rgba(255, 255, 255, 0.1);
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-      text-align: center;
-      color: white;
-    }
+/* PANEL DERECHO */
+.side{
+  display:flex;
+  flex-direction:column;
+  gap:15px;
+}
 
-    /* ICONO */
-    .avatar {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
-      margin: 0 auto 20px;
-    }
+/* CARDS */
+.card{
+  background:white;
+  padding:15px;
+  border-radius:10px;
+}
 
-    /* INPUTS */
-    .input-group {
-      position: relative;
-      margin: 15px 0;
-    }
+/* KPIs */
+.kpis{
+  display:flex;
+  gap:15px;
+  padding:20px;
+}
 
-    .input-group input {
-      width: 100%;
-      padding: 10px 10px;
-      border: none;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-      background: transparent;
-      color: white;
-      outline: none;
-    }
-
-    /* BOTÓN */
-    .login-btn {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(90deg, #ef4444, #3b82f6);
-      color: white;
-      cursor: pointer;
-      margin-top: 20px;
-      font-weight: bold;
-    }
-
-    .login-btn:hover {
-      opacity: 0.9;
-    }
+/* HEADER */
+.header{
+  display:flex;
+  justify-content:space-between;
+  padding:15px 20px;
+  background:#111827;
+  color:white;
+}
   </style>
 
   <div id="login" class="login-card">
@@ -203,72 +183,64 @@
 
   </div>
 
-  <div id="dashboard" style="display:none;">
+<div id="dashboard" style="display:none;">
 
-    
+  <!-- HEADER -->
   <div class="header">
     <b>✈️ TIA Dashboard</b>
-    <div class="logout" onclick="logout()">Salir</div>
+    <button class="logout" onclick="logout()">Salir</button>
   </div>
 
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi kpi1">Usuarios<br><b id="total">0</b></div>
+    <div class="kpi kpi2">Aprobados<br><b id="aprobados">0</b></div>
+    <div class="kpi kpi3">Reprobados<br><b id="reprobados">0</b></div>
+  </div>
 
-    <div class="container">
+  <!-- CONTENIDO -->
+  <div class="main">
 
-      <!-- IZQUIERDA -->
-      <div class="left">
+    <!-- TABLA -->
+    <div class="table-section">
+      <input id="search" placeholder="Buscar..." onkeyup="render()">
 
-        <div class="kpis">
-          <div class="kpi kpi1">Usuarios<br><b id="total">0</b></div>
-          <div class="kpi kpi2">Aprobados<br><b id="aprobados">0</b></div>
-          <div class="kpi kpi3">Reprobados<br><b id="reprobados">0</b></div>
-        </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Video</th>
+            <th>Examen</th>
+            <th>Status</th>
+            <th>QR</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
 
-        <div class="table-container">
-          <input id="search" placeholder="Buscar..." onkeyup="render()">
+    <!-- PANEL DERECHO -->
+    <div class="side">
 
-          <div class="table-body">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Video</th>
-                  <th>Examen</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="tbody"></tbody>
-            </table>
-          </div>
-        </div>
-
+      <div class="card">
+        <b>📂 Validar QR</b>
+        <input type="file" id="qrInput">
+        <button onclick="scanQR()">Escanear</button>
+        <div id="result"></div>
       </div>
 
-      <!-- DERECHA -->
-      <div class="right">
-
-        <div class="card">
-          <b>📂 Validar QR</b>
-          <input type="file" id="qrInput">
-          <button onclick="scanQR()">Escanear</button>
-          <div id="result"></div>
-        </div>
-
-        <div class="card">
-          <b>📷 Escaneo en vivo</b>
-          <video id="video" autoplay muted playsinline></video>
-
-          <div style="margin-top:5px;">
-            <button onclick="startCamera()">Iniciar</button>
-            <button onclick="stopCamera()">Detener</button>
-          </div>
-
-          <div id="scanResult"></div>
-        </div>
-
+      <div class="card">
+        <b>📷 Escaneo</b>
+        <video id="video" autoplay muted playsinline></video>
+        <button onclick="startCamera()">Iniciar</button>
+        <button onclick="stopCamera()">Detener</button>
       </div>
 
     </div>
+
   </div>
+
+</div>
 
   <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 
