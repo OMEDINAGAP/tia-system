@@ -1,190 +1,175 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Curso de Seguridad</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
-    body{
+    body {
       font-family: Arial;
-      background:#0f172a;
-      color:white;
-      text-align:center;
-      padding:20px;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 20px;
     }
 
-    .container{
-      max-width:800px;
-      margin:auto;
+    .container {
+      max-width: 800px;
+      margin: auto;
     }
 
-    .progress-bar{
-      width:100%;
-      height:12px;
-      background:#1e293b;
-      border-radius:10px;
-      overflow:hidden;
-      margin-top:20px;
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #1e293b;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 20px;
     }
 
-    #progress-fill{
-      height:100%;
-      width:0%;
-      background:#22c55e;
-      transition:0.3s;
+    #progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #22c55e;
+      transition: 0.3s;
     }
 
-    .status{
-      margin-top:10px;
-      font-weight:bold;
+    .status {
+      margin-top: 10px;
+      font-weight: bold;
     }
 
-    .btn{
-      margin-top:20px;
-      padding:12px 20px;
-      border:none;
-      border-radius:10px;
-      background:#22c55e;
-      color:white;
-      cursor:pointer;
+    .btn {
+      margin-top: 20px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      background: #22c55e;
+      color: white;
+      cursor: pointer;
     }
 
-    .alert{
-      margin-top:20px;
-      color:#f87171;
+    .alert {
+      margin-top: 20px;
+      color: #f87171;
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
+  <div class="container">
 
-<h1>🎥 Curso de Seguridad Aeroportuaria</h1>
-<p>Debes ver el video completo para continuar.</p>
+    <h1>🎥 Curso de Seguridad Aeroportuaria</h1>
+    <p>Debes ver el video completo para continuar.</p>
 
-<div id="player"></div>
+    <div id="player"></div>
 
-<div class="progress-bar">
-  <div id="progress-fill"></div>
-</div>
+    <div class="progress-bar">
+      <div id="progress-fill"></div>
+    </div>
 
-<p id="progress">Progreso: 0%</p>
-<p id="status" class="status">Pendiente</p>
+    <p id="progress">Progreso: 0%</p>
+    <p id="status" class="status">Pendiente</p>
 
-<button id="btnExam" class="btn" disabled onclick="goExam()">
-Ir al examen
-</button>
+    <button id="btnExam" class="btn" disabled onclick="goExam()">
+      Ir al examen
+    </button>
 
-<div class="alert">
-⚠️ No puedes adelantar ni cambiar de pestaña.
-</div>
+    <div class="alert">
+      ⚠️ No puedes adelantar ni cambiar de pestaña.
+    </div>
 
-</div>
+  </div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
 
-<script>
+  <script>
 
-// 🔐 TOKEN
-const token = localStorage.getItem("token");
+    // 🔐 TOKEN
+    const token = localStorage.getItem("token");
 
-if(!token){
-  location.href = "/";
-}
-
-// 🛑 BLOQUEO CAMBIO DE PESTAÑA
-document.addEventListener("visibilitychange", ()=>{
-  if(document.hidden){
-    alert("No puedes salir del curso");
-    location.reload();
-  }
-});
-
-// 🎥 VARIABLES
-let player;
-let duration = 0;
-let maxTime = 0;
-
-// YOUTUBE READY
-function onYouTubeIframeAPIReady(){
-  player = new YT.Player('player',{
-    height:'400',
-    width:'100%',
-    videoId:'mFnukhtcY2c',
-    events:{
-      'onReady': onReady
+    if (!token) {
+      location.href = "/";
     }
-  });
-}
 
-function onReady(){
-  setInterval(track, 1000);
-}
+    // 🛑 BLOQUEO CAMBIO DE PESTAÑA
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        alert("No puedes salir del curso");
+        location.reload();
+      }
+    });
 
-// TRACKING
-function track(){
+    // 🎥 VARIABLES
+    let player;
+    let duration = 0;
+    let maxTime = 0;
 
-  if(!player || typeof player.getCurrentTime !== "function") return;
+    // YOUTUBE READY
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '400',
+        width: '100%',
+        videoId: 'mFnukhtcY2c',
+        events: {
+          'onReady': onReady
+        }
+      });
+    }
 
-  const current = player.getCurrentTime();
+    function onReady() {
+      setInterval(track, 1000);
+    }
 
-  if(!duration || duration === 0){
-    duration = player.getDuration();
-    return;
-  }
+    // TRACKING
+    function track() {
 
-  // 🚫 NO ADELANTAR
-  if(current > maxTime + 1){
-    player.seekTo(maxTime);
-  }else{
-    maxTime = current;
-  }
+      if (!player || typeof player.getCurrentTime !== "function") return;
 
-  const percent = (maxTime / duration) * 100;
+      const current = player.getCurrentTime();
 
-  // UI
-  document.getElementById("progress").innerText =
-    "Progreso: " + Math.floor(percent) + "%";
+      if (!duration || duration === 0) {
+        duration = player.getDuration();
+        return;
+      }
 
-  document.getElementById("progress-fill").style.width =
-    percent + "%";
+      // 🚫 NO ADELANTAR (con tolerancia real)
+      if (current - maxTime > 5) {
+        player.seekTo(maxTime);
+      } else {
+        maxTime = Math.max(maxTime, current);
+      }
 
-  // 📡 ENVIAR AL BACKEND (SEGURO)
-  fetch("/log-video", {
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization": token
-    },
-    body: JSON.stringify({
-      progress: percent
-    })
-  });
+      const percent = (maxTime / duration) * 100;
 
-  // ✅ COMPLETADO
-  if(percent >= 90){
+      // UI
+      document.getElementById("progress").innerText =
+        "Progreso: " + Math.floor(percent) + "%";
 
-    document.getElementById("status").innerText = "✔ Completado";
-    document.getElementById("status").style.color = "#22c55e";
+      document.getElementById("progress-fill").style.width =
+        percent + "%";
 
-    document.getElementById("btnExam").disabled = false;
+      // 📡 backend
+      fetch("/log-video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": token
+        },
+        body: JSON.stringify({
+          progress: percent
+        })
+      });
+    }
+    // IR AL EXAMEN
+    function goExam() {
+      window.location.href = "/examen.html";
+    }
 
-  }else{
-
-    document.getElementById("status").innerText = "En proceso";
-    document.getElementById("status").style.color = "#f87171";
-
-  }
-
-}
-
-// IR AL EXAMEN
-function goExam(){
-  window.location.href = "/examen.html";
-}
-
-</script>
+  </script>
 
 </body>
+
 </html>
