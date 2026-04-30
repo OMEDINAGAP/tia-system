@@ -1,96 +1,210 @@
 <script>
- const token = localStorage.getItem("token");
+  const token = localStorage.getItem("token");
 
-if(!token){
-  window.location.href = "/";
-}
+  if (!token) {
+    window.location.href = "/";
+  }
 </script>
 
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Portal TIA</title>
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
 
-<div class="container">
+  <div class="container">
 
-<h1>🛫 Solicitud de Tarjeta de Identificación Aeroportuaria (TIA)</h1>
+    <h1>🛫 Solicitud de Tarjeta de Identificación Aeroportuaria (TIA)</h1>
 
-<p>
-Sigue los pasos indicados para completar tu trámite correctamente.
-Este sistema te guiará durante todo el proceso.
-</p>
+    <p>
+      Sigue los pasos indicados para completar tu trámite correctamente.
+      Este sistema te guiará durante todo el proceso.
+    </p>
 
-<!-- PASOS -->
-<div class="card">
-  <h2>📌 Sigue estos pasos</h2>
+    <!-- PASOS -->
+    <div class="card">
+      <h2>📌 Sigue estos pasos</h2>
 
-  <div class="steps-pro">
+      <div class="steps-pro">
 
-    <!-- PASO 1 -->
-    <div class="step-card">
-      <div class="step-number">1</div>
-      <h3>Autorización</h3>
-      <p>Tu empresa debe darte de alta como solicitante.</p>
-      <div class="step-status red">Pendiente</div>
+        <!-- PASO 1 -->
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h3>Autorización</h3>
+          <p>Tu empresa debe darte de alta como solicitante.</p>
+          <div class="step-status red">Pendiente</div>
+        </div>
+
+        <!-- PASO 2 -->
+        <div class="step-card highlight">
+          <div class="step-number">2</div>
+          <h3>Requisitos</h3>
+          <p>Descarga formatos y revisa lo que debes llevar.</p>
+          <button onclick="goDocs()">Ver requisitos</button>
+        </div>
+        <!-- PASO 3 -->
+        <div class="card">
+          <div class="step-number">3</div>
+          <h3>📸 Tómate la foto</h3>
+          <video id="video" width="320" height="240" autoplay muted></video>
+          <button onclick="startCamera()">Iniciar cámara</button>
+          <button onclick="capture()">Tomar foto</button>
+          <br><br>
+          <canvas id="canvas" width="320" height="240"></canvas>
+          <br><br>
+          <button onclick="validateAndSend()">Validar y guardar</button>
+          <p id="status"></p>
+        </div>
+
+        <!-- PASO 4 -->
+        <div class="step-card">
+          <div class="step-number">4</div>
+          <h3>Curso</h3>
+          <p>Completa el curso obligatorio de seguridad.</p>
+          <button onclick="goCurso()">Ir al curso</button>
+        </div>
+
+        <!-- PASO 5 -->
+        <div class="step-card">
+          <div class="step-number">5</div>
+          <h3>Entrega</h3>
+          <p>Acude al módulo TIAS con tus documentos.</p>
+          <div class="step-status yellow">Final</div>
+        </div>
+
+      </div>
     </div>
 
-    <!-- PASO 2 -->
-    <div class="step-card highlight">
-      <div class="step-number">2</div>
-      <h3>Requisitos</h3>
-      <p>Descarga formatos y revisa lo que debes llevar.</p>
-      <button onclick="goDocs()">Ver requisitos</button>
-    </div>
-
-    <!-- PASO 3 -->
-    <div class="step-card">
-      <div class="step-number">3</div>
-      <h3>Curso</h3>
-      <p>Completa el curso obligatorio de seguridad.</p>
-      <button onclick="goCurso()">Ir al curso</button>
-    </div>
-
-    <!-- PASO 4 -->
-    <div class="step-card">
-      <div class="step-number">4</div>
-      <h3>Entrega</h3>
-      <p>Acude al módulo TIAS con tus documentos.</p>
-      <div class="step-status yellow">Final</div>
+    <!-- IMPORTANTE -->
+    <div class="alert">
+      <h2>⚠️ Información importante</h2>
+      <ul>
+        <li>Debes completar todos los requisitos antes de acudir al módulo.</li>
+        <li>El curso es obligatorio.</li>
+        <li>El proceso tiene un límite de tiempo.</li>
+      </ul>
     </div>
 
   </div>
-</div>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 
-<!-- IMPORTANTE -->
-<div class="alert">
-  <h2>⚠️ Información importante</h2>
-  <ul>
-    <li>Debes completar todos los requisitos antes de acudir al módulo.</li>
-    <li>El curso es obligatorio.</li>
-    <li>El proceso tiene un límite de tiempo.</li>
-  </ul>
-</div>
+  <script>
+    let video = document.getElementById("video");
+    let canvas = document.getElementById("canvas");
+    let ctx = canvas.getContext("2d");
+    let stream;
 
-</div>
+    // 🔐 TOKEN
+    const token = localStorage.getItem("token");
 
-<script>
-if(!localStorage.getItem("token")){
-  window.location.href = "/";
-}
+    // 🚀 CARGAR MODELOS
+    async function loadModels() {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+    }
 
-function goDocs(){
-  window.location.href = "/documentos.html";
-}
+    // 🎥 INICIAR CÁMARA
+    async function startCamera() {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+    }
 
-function goCurso(){
-  window.location.href = "/curso.html";
-}
-</script>
+    // 📸 CAPTURAR
+    function capture() {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    }
+
+    // 🧠 VALIDAR Y PROCESAR
+    async function validateAndSend() {
+
+      document.getElementById("status").innerText = "Analizando...";
+
+      const detections = await faceapi.detectAllFaces(
+        canvas,
+        new faceapi.TinyFaceDetectorOptions()
+      );
+
+      // ❌ MÁS DE UNA PERSONA
+      if (detections.length !== 1) {
+        document.getElementById("status").innerText = "Debe haber solo una persona";
+        return;
+      }
+
+      const box = detections[0].box;
+
+      // 📏 VALIDAR CENTRADO
+      if (box.x < 50 || box.x > 200) {
+        document.getElementById("status").innerText = "Céntrate en la cámara";
+        return;
+      }
+
+      // ✂️ RECORTE TIPO INFANTIL
+      const size = 200;
+
+      let cropX = box.x + box.width / 2 - size / 2;
+      let cropY = box.y + box.height / 2 - size / 2;
+
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = size;
+      tempCanvas.height = size;
+      const tctx = tempCanvas.getContext("2d");
+
+      // 🎨 FONDO BLANCO
+      tctx.fillStyle = "white";
+      tctx.fillRect(0, 0, size, size);
+
+      tctx.drawImage(
+        canvas,
+        cropX, cropY, size, size,
+        0, 0, size, size
+      );
+
+      // 📤 ENVIAR
+      tempCanvas.toBlob(async (blob) => {
+
+        const formData = new FormData();
+        formData.append("photo", blob, "tia.png");
+
+        const res = await fetch("/upload-photo", {
+          method: "POST",
+          headers: {
+            "Authorization": token
+          },
+          body: formData
+        });
+
+        if (res.status === 200) {
+          document.getElementById("status").innerText = "✅ Foto válida y guardada";
+        } else {
+          document.getElementById("status").innerText = "Error al guardar";
+        }
+
+      }, "image/png");
+    }
+
+    // 🔥 INICIALIZAR
+    loadModels();
+  </script>
+
+  <script>
+    if (!localStorage.getItem("token")) {
+      window.location.href = "/";
+    }
+
+    function goDocs() {
+      window.location.href = "/documentos.html";
+    }
+
+    function goCurso() {
+      window.location.href = "/curso.html";
+    }
+  </script>
 
 
 
 </body>
+
 </html>

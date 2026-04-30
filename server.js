@@ -376,3 +376,27 @@ app.post("/validate-cert", auth, async (req, res) => {
     res.status(500).json({ ok:false });
   }
 });
+
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
+
+// 📸 GUARDAR FOTO
+app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
+  try {
+
+    const userId = req.userId;
+
+    const filePath = req.file.path;
+
+    await db.query(
+      "UPDATE users SET photo=? WHERE id=?",
+      [filePath, userId]
+    );
+
+    res.json({ ok:true });
+
+  } catch(err){
+    console.error(err);
+    res.status(500).json({ ok:false });
+  }
+});
