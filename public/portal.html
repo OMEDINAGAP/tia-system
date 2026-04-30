@@ -47,17 +47,29 @@
           <button onclick="goDocs()">Ver requisitos</button>
         </div>
         <!-- PASO 3 -->
-        <div class="card">
-          <div class="step-number">3</div>
+        <div class="card" style="text-align:center">
+
           <h3>📸 Tómate la foto</h3>
-          <video id="video" width="320" height="240" autoplay muted></video>
-          <button onclick="startCamera()">Iniciar cámara</button>
-          <button onclick="capture()">Tomar foto</button>
+          <p style="font-size:13px;color:#666">
+            Rostro centrado, fondo claro, sin lentes
+          </p>
+
+          <video id="video" width="260" height="200" style="border-radius:10px; background:black;">
+          </video>
+
+          <canvas id="canvas" width="260" height="200" style="display:none;"></canvas>
+
           <br><br>
-          <canvas id="canvas" width="320" height="240"></canvas>
+
+          <button onclick="startCamera()">🎥 Iniciar cámara</button>
+          <button onclick="capture()">📸 Tomar foto</button>
+
           <br><br>
-          <button onclick="validateAndSend()">Validar y guardar</button>
-          <p id="status"></p>
+
+          <button onclick="validateAndSend()">✅ Validar y guardar</button>
+
+          <p id="status" style="margin-top:10px;font-weight:bold"></p>
+
         </div>
 
         <!-- PASO 4 -->
@@ -107,10 +119,21 @@
     }
 
     // 🎥 INICIAR CÁMARA
-    async function startCamera() {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      video.srcObject = stream;
-    }
+    async function startCamera(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
+
+    video.srcObject = stream;
+
+    await video.play(); // 🔥 IMPORTANTE
+
+  }catch(err){
+    alert("No se pudo acceder a la cámara");
+    console.error(err);
+  }
+}
 
     // 📸 CAPTURAR
     function capture() {
@@ -120,7 +143,7 @@
     // 🧠 VALIDAR Y PROCESAR
     async function validateAndSend() {
 
-      document.getElementById("status").innerText = "Analizando...";
+      document.getElementById("status").innerText = "🔍 Detectando rostro...";
 
       const detections = await faceapi.detectAllFaces(
         canvas,
@@ -129,7 +152,7 @@
 
       // ❌ MÁS DE UNA PERSONA
       if (detections.length !== 1) {
-        document.getElementById("status").innerText = "Debe haber solo una persona";
+        document.getElementById("status").innerText = "❌ Solo una persona";
         return;
       }
 
@@ -177,7 +200,7 @@
         });
 
         if (res.status === 200) {
-          document.getElementById("status").innerText = "✅ Foto válida y guardada";
+          document.getElementById("status").innerText = "✅ Foto correcta";
         } else {
           document.getElementById("status").innerText = "Error al guardar";
         }
