@@ -254,6 +254,15 @@ app.post("/log-exam", auth, async (req, res) => {
 
 });
 
+app.get("/admin-password", auth, (req, res) => {
+
+  if(!req.isAdmin){
+    return res.status(403).send("No autorizado");
+  }
+
+  res.send(generatePassword());
+});
+
 // ADMIN DATA
 app.get("/admin-data", auth, async (req, res) => {
   try {

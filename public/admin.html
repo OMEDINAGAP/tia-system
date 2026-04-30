@@ -113,8 +113,6 @@
       cursor: pointer;
       text-decoration: none;
     }
-  
-  
   </style>
 
 
@@ -190,56 +188,56 @@
     }
 
     /* CONTENEDOR GENERAL */
-.main{
-  display:grid;
-  grid-template-columns: 3fr 1fr;
-  gap:20px;
-  padding:20px;
-}
+    .main {
+      display: grid;
+      grid-template-columns: 3fr 1fr;
+      gap: 20px;
+      padding: 20px;
+    }
 
-/* TABLA */
-.table-section{
-  background:white;
-  padding:15px;
-  border-radius:10px;
-}
+    /* TABLA */
+    .table-section {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+    }
 
-/* PANEL DERECHO */
-.side{
-  display:flex;
-  flex-direction:column;
-  gap:15px;
-}
+    /* PANEL DERECHO */
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
 
-/* CARDS */
-.card{
-  background:white;
-  padding:15px;
-  border-radius:10px;
-}
+    /* CARDS */
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+    }
 
-/* KPIs */
-.kpis{
-  display:flex;
-  gap:15px;
-  padding:20px;
-}
+    /* KPIs */
+    .kpis {
+      display: flex;
+      gap: 15px;
+      padding: 20px;
+    }
 
-/* HEADER */
-.header{
-  display:flex;
-  justify-content:space-between;
-  padding:15px 20px;
-  background:#111827;
-  color:white;
-}
+    /* HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      padding: 15px 20px;
+      background: #111827;
+      color: white;
+    }
   </style>
 
   <div id="login" class="login-card">
 
     <div class="avatar">
-  <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" width="70">
-</div>
+      <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" width="70">
+    </div>
 
     <h3>Admin Login</h3>
 
@@ -251,69 +249,75 @@
 
   </div>
 
-<div id="dashboard" style="display:none;">
+  <div id="dashboard" style="display:none;">
 
-  <!-- HEADER -->
-  <div class="header">
-    <b>✈️ TIA Dashboard</b>
-    <button class="logout" onclick="logout()">Salir</button>
-  </div>
-
-  <!-- KPIs -->
-  <div class="kpis">
-    <div class="kpi kpi1">Usuarios<br><b id="total">0</b></div>
-    <div class="kpi kpi2">Aprobados<br><b id="aprobados">0</b></div>
-    <div class="kpi kpi3">Reprobados<br><b id="reprobados">0</b></div>
-  </div>
-
-  <!-- CONTENIDO -->
-  <div class="main">
-
-    <!-- TABLA -->
-    <div class="table-section">
-      <input id="search" placeholder="Buscar..." onkeyup="render()">
-
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Video</th>
-            <th>Examen</th>
-            <th>Status</th>
-            <th>QR</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <!-- HEADER -->
+    <div class="header">
+      <b>✈️ TIA Dashboard</b>
+      <button class="logout" onclick="logout()">Salir</button>
     </div>
 
-    <!-- PANEL DERECHO -->
-    <div class="side">
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi kpi1">Usuarios<br><b id="total">0</b></div>
+      <div class="kpi kpi2">Aprobados<br><b id="aprobados">0</b></div>
+      <div class="kpi kpi3">Reprobados<br><b id="reprobados">0</b></div>
+    </div>
 
-      <div class="card">
-        <b>📂 Validar QR</b>
-        <input type="file" id="qrInput">
-        <button onclick="scanQR()">Escanear</button>
-        <div id="result"></div>
+    <!-- CONTENIDO -->
+    <div class="main">
+
+      <!-- TABLA -->
+      <div class="table-section">
+        <input id="search" placeholder="Buscar..." onkeyup="render()">
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Video</th>
+              <th>Examen</th>
+              <th>Status</th>
+              <th>QR</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
       </div>
 
-      <div class="card">
-        <b>📷 Escaneo</b>
-        <video id="video" autoplay muted playsinline></video>
-        <button onclick="startCamera()">Iniciar</button>
-        <button onclick="stopCamera()">Detener</button>
+      <!-- PANEL DERECHO -->
+      <div class="side">
+
+        <div class="card">
+          <b>📂 Validar QR</b>
+          <input type="file" id="qrInput">
+          <button onclick="scanQR()">Escanear</button>
+          <div id="result"></div>
+        </div>
+
+        <div class="card">
+          <b>📷 Escaneo</b>
+          <video id="video" autoplay muted playsinline></video>
+          <button onclick="startCamera()">Iniciar</button>
+          <button onclick="stopCamera()">Detener</button>
+        </div>
+
+        <div class="card">
+          <b>🔐 Generar código TIA</b>
+          <button onclick="getCode()">Generar</button>
+          <h2 id="code"></h2>
+        </div>
+
       </div>
 
     </div>
 
   </div>
-
-</div>
 
   <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
 
   <script>
-    
+
 
     let DATA = [];
 
@@ -421,6 +425,28 @@
 
     // AUTO LOGIN
     initDashboard();
+
+
+    async function getCode() {
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("/admin-password", {
+        headers: {
+          "Authorization": token
+        }
+      });
+
+      if (res.status !== 200) {
+        alert("No autorizado");
+        return;
+      }
+
+      const code = await res.text();
+
+      document.getElementById("code").innerText = code;
+    }
+
 
   </script>
 
