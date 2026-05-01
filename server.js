@@ -32,12 +32,12 @@ const SECRET = process.env.SECRET;
 const sessions = new Map(); // token -> userId
 
 // 👇 AQUÍ VA EL MIDDLEWARE
-async function auth(req, res, next){
+async function auth(req, res, next) {
   try {
     const header = req.headers.authorization;
 
-    if(!header){
-      return res.status(401).json({ ok:false });
+    if (!header) {
+      return res.status(401).json({ ok: false });
     }
 
     const token = header.startsWith("Bearer ")
@@ -51,12 +51,12 @@ async function auth(req, res, next){
 
     const session = rows[0];
 
-    if(!session){
-      return res.status(401).json({ ok:false });
+    if (!session) {
+      return res.status(401).json({ ok: false });
     }
 
-    if(session.expires < Date.now()){
-      return res.status(401).json({ ok:false });
+    if (session.expires < Date.now()) {
+      return res.status(401).json({ ok: false });
     }
 
     // 🔥 IMPORTANTE
@@ -65,15 +65,19 @@ async function auth(req, res, next){
     // 🔥 AQUÍ ESTÁ LA CLAVE
     req.isAdmin = String(session.userId).startsWith("admin-");
 
+    console.log("HEADER RAW:", header);
+    console.log("TOKEN LIMPIO:", token);
+    console.log("TOKEN DB:", rows[0]?.token);
+
     next();
 
-  } catch(err){
+  } catch (err) {
     console.error(err);
-    res.status(500).json({ ok:false });
+    res.status(500).json({ ok: false });
   }
 }
 
-async function createSession(userId){
+async function createSession(userId) {
   const token = crypto.randomBytes(24).toString("hex");
 
   const expires = Date.now() + (1000 * 60 * 60);
@@ -108,7 +112,7 @@ function generatePassword() {
     hash |= 0;
   }
 
-  return "TIA#" + Math.abs(hash).toString(36).toUpperCase().slice(0,6);
+  return "TIA#" + Math.abs(hash).toString(36).toUpperCase().slice(0, 6);
 }
 
 
@@ -125,22 +129,22 @@ app.post("/admin-login", async (req, res) => {
 
     const admin = rows[0];
 
-    if(!admin){
-      return res.status(401).json({ ok:false });
+    if (!admin) {
+      return res.status(401).json({ ok: false });
     }
 
     // 🔥 crear sesión como usuario
     const token = await createSession("admin-" + admin.id);
 
     res.json({
-      ok:true,
+      ok: true,
       token,
       name: admin.name
     });
 
-  } catch(err){
+  } catch (err) {
     console.error(err);
-    res.status(500).json({ ok:false });
+    res.status(500).json({ ok: false });
   }
 });
 
@@ -161,7 +165,7 @@ app.post("/log-login", async (req, res) => {
 
   } catch (err) {
     console.error("DB ERROR:", err);
-    res.status(500).json({ ok:false, error:"DB error" });
+    res.status(500).json({ ok: false, error: "DB error" });
   }
 });
 // LOG VIDEO
@@ -178,7 +182,7 @@ app.post("/log-video", auth, async (req, res) => {
 
   } catch (err) {
     console.error("DB ERROR:", err);
-    res.status(500).json({ ok:false, error:"DB error" });
+    res.status(500).json({ ok: false, error: "DB error" });
   }
 });
 
@@ -191,8 +195,8 @@ app.post("/log-exam", auth, async (req, res) => {
     const score = req.body.score;
 
     // VALIDACIÓN BÁSICA
-    if(score === undefined){
-      return res.json({ ok:false, error:"Score requerido" });
+    if (score === undefined) {
+      return res.json({ ok: false, error: "Score requerido" });
     }
 
     const [rows] = await db.query(
@@ -202,16 +206,16 @@ app.post("/log-exam", auth, async (req, res) => {
 
     const user = rows[0];
 
-    if (!user) return res.json({ ok:false });
+    if (!user) return res.json({ ok: false });
 
     // 🔒 BLOQUEO POR INTENTOS
-    if(user.intentos >= 3){
-      return res.json({ ok:false, error:"Intentos agotados" });
+    if (user.intentos >= 3) {
+      return res.json({ ok: false, error: "Intentos agotados" });
     }
 
     // 🔒 BLOQUEO: no permitir examen si no terminó video
-    if(user.video < 90){
-      return res.json({ ok:false, error:"Curso no completado" });
+    if (user.video < 90) {
+      return res.json({ ok: false, error: "Curso no completado" });
     }
 
     const folio = generarFolio();
@@ -247,21 +251,21 @@ app.post("/log-exam", auth, async (req, res) => {
     );
 
     res.json({
-      ok:true,
+      ok: true,
       folio,
       qr
     });
 
-  } catch(err){
+  } catch (err) {
     console.error("LOG-EXAM ERROR:", err);
-    res.status(500).json({ ok:false });
+    res.status(500).json({ ok: false });
   }
 
 });
 
 app.get("/admin-password", auth, (req, res) => {
 
-  if(!req.isAdmin){
+  if (!req.isAdmin) {
     return res.status(403).send("No autorizado");
   }
 
@@ -273,8 +277,8 @@ app.get("/admin-data", auth, async (req, res) => {
   try {
 
     // 🔐 SOLO ADMIN
-    if(!req.isAdmin){
-      return res.status(403).json({ ok:false, error:"Acceso denegado" });
+    if (!req.isAdmin) {
+      return res.status(403).json({ ok: false, error: "Acceso denegado" });
     }
 
     const [rows] = await db.query(
@@ -285,7 +289,7 @@ app.get("/admin-data", auth, async (req, res) => {
 
   } catch (err) {
     console.error("DB ERROR:", err);
-    res.status(500).json({ ok:false, error:"DB error" });
+    res.status(500).json({ ok: false, error: "DB error" });
   }
 });
 
@@ -314,11 +318,11 @@ app.get("/validate", (req, res) => {
 
 
 
-function generarFolio(){
-  return "TIA-" + Math.random().toString(36).substring(2,8).toUpperCase();
+function generarFolio() {
+  return "TIA-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-function generarFirma(data){
+function generarFirma(data) {
   return crypto
     .createHmac("sha256", process.env.QR_SECRET || "TIA_SECRET")
     .update(data)
@@ -344,8 +348,8 @@ app.post("/validate-cert", auth, async (req, res) => {
       .update(base)
       .digest("hex");
 
-    if(expected !== firma){
-      return res.json({ ok:false, reason:"Firma inválida" });
+    if (expected !== firma) {
+      return res.json({ ok: false, reason: "Firma inválida" });
     }
 
     // 🗄 2. Validar existencia en BD
@@ -356,17 +360,17 @@ app.post("/validate-cert", auth, async (req, res) => {
 
     const user = rows[0];
 
-    if(!user){
-      return res.json({ ok:false, reason:"No existe en BD" });
+    if (!user) {
+      return res.json({ ok: false, reason: "No existe en BD" });
     }
 
     // 🔍 3. Validar consistencia
-    if(user.name !== nombre){
-      return res.json({ ok:false, reason:"Nombre no coincide" });
+    if (user.name !== nombre) {
+      return res.json({ ok: false, reason: "Nombre no coincide" });
     }
 
     res.json({
-      ok:true,
+      ok: true,
       user: {
         nombre: user.name,
         folio: user.folio,
@@ -376,9 +380,9 @@ app.post("/validate-cert", auth, async (req, res) => {
       }
     });
 
-  } catch(err){
+  } catch (err) {
     console.error(err);
-    res.status(500).json({ ok:false });
+    res.status(500).json({ ok: false });
   }
 });
 
@@ -396,8 +400,8 @@ const upload = multer({ dest: "uploads/" });
 app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
   try {
 
-    if(!req.file){
-      return res.status(400).json({ ok:false, error:"No file recibido" });
+    if (!req.file) {
+      return res.status(400).json({ ok: false, error: "No file recibido" });
     }
 
     const userId = req.userId;
@@ -411,10 +415,10 @@ app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
       [filePath, userId]
     );
 
-    res.json({ ok:true });
+    res.json({ ok: true });
 
-  } catch(err){
+  } catch (err) {
     console.error("UPLOAD ERROR:", err);
-    res.status(500).json({ ok:false });
+    res.status(500).json({ ok: false });
   }
 });
