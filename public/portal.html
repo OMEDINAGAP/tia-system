@@ -113,7 +113,7 @@
           <div class="step-number">4</div>
           <h3>Curso</h3>
           <p>Completa el curso obligatorio de seguridad.</p>
-          <button onclick="goCurso()">Ir al curso</button>
+          <button id="btnCurso" disabled onclick="goCurso()">Ir al curso</button>
         </div>
 
         <!-- PASO 5 -->
@@ -155,6 +155,11 @@
 
   function goCurso() {
     window.location.href = "/curso.html";
+  }
+
+  if (localStorage.getItem("fotoOK")) {
+    document.getElementById("btnCurso").disabled = false;
+    document.getElementById("overlay").style.display = "none";
   }
 </script>
 
@@ -318,6 +323,52 @@
   }
 
   init();
+</script>
+
+<script>
+  async function validateAndSend() {
+
+    if (!capturedBlob) {
+      alert("Primero toma la foto");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("photo", capturedBlob, "foto.png");
+
+    const res = await fetch("/upload-photo", {
+      method: "POST",
+      headers: {
+        Authorization: localStorage.getItem("token")
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+
+      // ✅ 1. quitar fondo oscuro
+      document.getElementById("overlay").style.display = "none";
+
+      // ✅ 2. mensaje éxito
+      document.getElementById("status").innerText = "Foto guardada correctamente";
+      document.getElementById("status").style.color = "green";
+
+      // ✅ 3. bloquear botones de foto
+      document.getElementById("btnCamera").disabled = true;
+      document.getElementById("btnCapture").disabled = true;
+
+      // ✅ 4. habilitar curso
+      document.getElementById("btnCurso").disabled = false;
+
+      // ✅ 5. guardar estado local
+      localStorage.setItem("fotoOK", "1");
+
+    } else {
+      alert("Error al guardar");
+    }
+  }
 </script>
 
 </body>
