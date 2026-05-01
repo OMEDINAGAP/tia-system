@@ -18,7 +18,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
+const fs = require("fs");
 
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
 
 const ADMIN_PIN = process.env.ADMIN_PIN;
 const SECRET = process.env.SECRET;
@@ -377,17 +381,29 @@ app.post("/validate-cert", auth, async (req, res) => {
     res.status(500).json({ ok:false });
   }
 });
-
 const multer = require("multer");
+const fs = require("fs");
+
+// 🔧 asegurar carpeta
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
+
 const upload = multer({ dest: "uploads/" });
 
 // 📸 GUARDAR FOTO
 app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
   try {
 
+    if(!req.file){
+      return res.status(400).json({ ok:false, error:"No file recibido" });
+    }
+
     const userId = req.userId;
 
     const filePath = req.file.path;
+
+    console.log("Archivo guardado:", filePath);
 
     await db.query(
       "UPDATE users SET photo=? WHERE id=?",
@@ -397,7 +413,7 @@ app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
     res.json({ ok:true });
 
   } catch(err){
-    console.error(err);
+    console.error("UPLOAD ERROR:", err);
     res.status(500).json({ ok:false });
   }
 });
