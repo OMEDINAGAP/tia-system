@@ -9,46 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 
-<style>
-  .camera-container {
-    position: relative;
-    width: 260px;
-    height: 320px;
-    margin: auto;
-  }
 
-  video,
-  canvas {
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
-    object-fit: cover;
-  }
-
-  canvas {
-    display: none;
-  }
-
-  /* 🔥 OSCURECER TODO */
-  .overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  /* 🎯 MARCO CARA */
-  .face-guide {
-    width: 160px;
-    height: 200px;
-    border: 3px dashed #00ff88;
-    border-radius: 50% / 60%;
-    background: transparent;
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
-  }
-</style>
 
 <body>
 
@@ -97,7 +58,7 @@
               <canvas id="canvas"></canvas>
 
               <!-- 🔥 OVERLAY -->
-              <div class="overlay">
+              <div id="overlay" class="overlay">
                 <div class="face-guide"></div>
               </div>
 
@@ -142,7 +103,50 @@
 
 
 </body>
+<style>
+  .camera-container {
+    position: relative;
+    width: 260px;
+    height: 320px;
+    margin: auto;
+  }
 
+  video,
+  canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    object-fit: cover;
+  }
+
+  canvas {
+    display: none;
+  }
+
+  /* 🔥 OSCURECER TODO */
+ .overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+  /* 🎯 MARCO CARA */
+  .face-guide {
+    width: 160px;
+    height: 200px;
+    border: 3px dashed #00ff88;
+    border-radius: 50% / 60%;
+    background: transparent;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  }
+</style>
 
 <script>
   if (!localStorage.getItem("token")) {
@@ -257,58 +261,89 @@
         clearInterval(interval);
       }
 
+      if(photoSaved) return;
+
     }, 800);
   }
 
   // 📸 CAPTURA AUTOMÁTICA
-  function capture(box) {
+ let photoSaved = false;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+function capture(box){
 
-    ctx.drawImage(video, 0, 0);
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-    // ✂️ recorte tipo credencial
-    const size = box.width * 1.8;
+  ctx.drawImage(video, 0, 0);
 
-    let cropX = box.x + box.width / 2 - size / 2;
-    let cropY = box.y - box.height * 0.4;
+  const size = box.width * 1.8;
 
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = 300;
-    tempCanvas.height = 400;
+  let cropX = box.x + box.width / 2 - size / 2;
+  let cropY = box.y - box.height * 0.4;
 
-    const tctx = tempCanvas.getContext("2d");
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = 300;
+  tempCanvas.height = 400;
 
-    // fondo blanco
-    tctx.fillStyle = "white";
-    tctx.fillRect(0, 0, 300, 400);
+  const tctx = tempCanvas.getContext("2d");
 
-    tctx.drawImage(
-      canvas,
-      cropX, cropY, size, size,
-      0, 0, 300, 400
-    );
+  // fondo blanco
+  tctx.fillStyle = "white";
+  tctx.fillRect(0, 0, 300, 400);
 
-    tempCanvas.toBlob(async (blob) => {
+  tctx.drawImage(
+    canvas,
+    cropX, cropY, size, size,
+    0, 0, 300, 400
+  );
 
-      const formData = new FormData();
-      formData.append("photo", blob, "tia.png");
+  tempCanvas.toBlob(async (blob) => {
 
-      await fetch("/upload-photo", {
-        method: "POST",
-        headers: {
-          "Authorization": localStorage.getItem("token")
-        },
-        body: formData
-      });
+    const formData = new FormData();
+    formData.append("photo", blob, "tia.png");
 
+    const res = await fetch("/upload-photo", {
+      method: "POST",
+      headers: {
+        "Authorization": localStorage.getItem("token")
+      },
+      body: formData
     });
 
-    canvas.style.display = "block";
-    video.style.display = "none";
-  }
+    const data = await res.json();
 
+    if(data.ok){
+
+      console.log("✅ FOTO GUARDADA");
+
+      // 🔥 QUITAR OSCURO SOLO AQUÍ
+      document.getElementById("overlay").classList.add("hidden");
+
+      // 🔥 MENSAJE VISUAL
+      setStatus("✅ Foto guardada correctamente", "green");
+
+      // 🔥 ACTIVAR CURSO
+      document.getElementById("btnCurso").disabled = false;
+
+      // 🔥 GUARDAR ESTADO
+      localStorage.setItem("fotoOK","1");
+
+      photoSaved = true;
+
+      // 🔥 detener cámara
+      if(stream){
+        stream.getTracks().forEach(t => t.stop());
+      }
+
+    } else {
+      setStatus("Error al guardar", "red");
+    }
+
+  });
+
+  canvas.style.display = "block";
+  video.style.display = "none";
+}
   // UI
   function setStatus(msg, color) {
     const el = document.getElementById("status");
@@ -374,3 +409,11 @@
 </body>
 
 </html>
+
+<script>
+  if(localStorage.getItem("fotoOK")){
+  document.getElementById("btnCurso").disabled = false;
+  document.getElementById("overlay").classList.add("hidden");
+  setStatus("✅ Foto ya registrada", "green");
+}
+</script>
