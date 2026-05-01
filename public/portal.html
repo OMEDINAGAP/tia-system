@@ -183,16 +183,16 @@
   let capturing = false;
 
   // 🎥 iniciar cámara
-  async function startCamera() {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" }
-    });
+  async function startCamera(){
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user" }
+  });
 
-    video.srcObject = stream;
-    await video.play();
+  video.srcObject = stream;
+  await video.play();
 
-    trackFace(); // 🔥 iniciar análisis continuo
-  }
+  trackFace(); // ✅ aquí sí, porque init ya cargó modelos
+}
 
   // 🧠 detectar rostro continuamente
   async function trackFace() {
