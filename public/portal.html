@@ -122,13 +122,20 @@
   }
 
   /* video y canvas alineados */
-  #video,
+
   #canvas {
     width: 100%;
     height: 100%;
     object-fit: cover;
     border-radius: 12px;
   }
+
+  #video {
+    transform: scaleX(-1);
+    border-radius: 12px;
+    object-fit: cover;
+  }
+
 
   /* overlay encima del video */
   .overlay {
