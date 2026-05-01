@@ -150,7 +150,8 @@ app.post("/log-login", async (req, res) => {
       [id, req.body.name]
     );
 
-    const token = createSession(id);
+    // 🔥 CORREGIDO
+    const token = await createSession(id);
 
     res.json({ id, token });
 
