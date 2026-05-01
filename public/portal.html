@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="styles.css">
 
   <!-- ✅ FACE API -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
+   
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 
@@ -365,48 +365,31 @@
   // 📸 CAPTURA
   function capture(box) {
 
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    ctx.drawImage(video, 0, 0);
+
     const size = box.width * 1.8;
 
-    const cropX = box.x + box.width / 2 - size / 2;
-    const cropY = box.y - box.height * 0.5;
+    let cropX = box.x + box.width / 2 - size / 2;
+    let cropY = box.y - box.height * 0.5;
 
-    const finalCanvas = document.createElement("canvas");
-    finalCanvas.width = 260;
-    finalCanvas.height = 320;
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = 260;
+    tempCanvas.height = 180;
 
-    const ctx2 = finalCanvas.getContext("2d");
+    const tctx = tempCanvas.getContext("2d");
 
-    // fondo blanco
-    ctx2.fillStyle = "white";
-    ctx2.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+    tctx.fillStyle = "white";
+    tctx.fillRect(0, 0, 260, 180);
 
-    // 🔥 máscara oval tipo credencial
-    ctx2.save();
-    ctx2.beginPath();
-    ctx2.ellipse(
-      finalCanvas.width / 2,
-      finalCanvas.height / 2,
-      90,
-      120,
-      0,
-      0,
-      Math.PI * 2
-    );
-    ctx2.clip();
-
-    // dibujar rostro
-    ctx2.drawImage(
-      video,
+    tctx.drawImage(
+      canvas,
       cropX, cropY, size, size,
-      0, 0, finalCanvas.width, finalCanvas.height
+      0, 0, 260, 180
     );
 
-    ctx2.restore();
-
-    // mostrar resultado
-    canvas.width = finalCanvas.width;
-    canvas.height = finalCanvas.height;
-    ctx.drawImage(finalCanvas, 0, 0);
 
     canvas.style.display = "block";
     video.style.display = "none";
@@ -422,7 +405,6 @@
   // 🚀 INIT
   async function init() {
     await loadModels();
-    initSegmentation();
     await startCamera();
   }
 
@@ -487,23 +469,6 @@
     }
   }
 
-
-</script>
-
-<script>
-
-  let segmenter;
-
-  function initSegmentation() {
-    segmenter = new SelfieSegmentation({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
-    });
-
-    segmenter.setOptions({
-      modelSelection: 1
-    });
-  }
 
 </script>
 
