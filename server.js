@@ -478,22 +478,27 @@ app.post("/submit-exam", async (req, res) => {
 });
 
 app.get("/can-take-exam", auth, async (req, res) => {
+  try {
+    // 👇 bypass de prueba
+    if (req.headers["x-test-mode"]) {
+      return res.json({ ok: true, test: true });
+    }
 
-  const [rows] = await db.query(
-    "SELECT video_progress FROM users WHERE id=?",
-    [req.userId]
-  );
+    const [rows] = await db.query(
+      "SELECT video_progress FROM users WHERE id=?",
+      [req.userId]
+    );
 
-  const progress = rows[0]?.video_progress || 0;
+    const progress = rows[0]?.video_progress || 0;
 
-  // 🧪 MODO TEST (bypass)
-  if (req.headers["x-test-mode"] === "true") {
-    return res.json({ ok: true, test: true });
+    if (progress >= 90) {
+      return res.json({ ok: true });
+    }
+
+    return res.json({ ok: false, progress });
+
+  } catch (err) {
+    console.error("ERROR can-take-exam:", err);
+    return res.status(500).json({ ok: false, error: "server error" });
   }
-
-  if (progress >= 90) {
-    return res.json({ ok: true });
-  }
-
-  res.json({ ok: false, progress });
 });
