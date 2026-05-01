@@ -199,6 +199,8 @@
 <script>
   // 🔐 TOKEN
   const token = localStorage.getItem("token");
+
+
   if (!token) location.href = "/";
 
   function goDocs() {
@@ -242,6 +244,7 @@
   let stream;
   let lastDetection = null;
   let detectionOK = false;
+  let autoCaptured = false;
 
   // 🎥 iniciar cámara
   async function startCamera() {
@@ -268,21 +271,30 @@
   }
 
   // 🧠 TRACK FACE PRO (VERSIÓN ESTABLE)
-  async function trackFace() {
+  // 🔥 CONTROL GLOBAL
+  let trackingInterval = null;
+
+  // 🧠 TRACK FACE PRO CONTROLADO
+  function trackFace() {
 
     if (typeof faceapi === "undefined") return;
 
-    setInterval(async () => {
+    // 🚫 evita múltiples intervalos
+    if (trackingInterval) return;
 
-      if (autoCaptured) return;
+    trackingInterval = setInterval(async () => {
+
+      // si ya tomó foto → detenemos todo
+      if (autoCaptured) {
+        clearInterval(trackingInterval);
+        trackingInterval = null;
+        return;
+      }
 
       detectionOK = false;
-      btn.style.display = "none"; // ocultamos botón viejo
+      btn.style.display = "none";
 
-      const detections = await faceapi.detectAllFaces(
-        video,
-        new faceapi.TinyFaceDetectorOptions()
-      );
+      const detections = await safeDetect();
 
       if (detections.length !== 1) {
         setStatus("Colócate solo frente a la cámara", "red");
@@ -301,14 +313,14 @@
         return;
       }
 
-      // ✅ PERFECTO
+      // ✅ TODO BIEN
       guide.style.borderColor = "#00ff88";
       setStatus("Capturando foto...", "green");
 
       autoCaptured = true;
 
       setTimeout(() => {
-        takePhoto(); // 📸 automática
+        takePhoto();
       }, 700);
 
     }, 600);
@@ -458,11 +470,26 @@
   function retakePhoto() {
 
     autoCaptured = false;
+    lastDetection = null;
 
     document.getElementById("photoActions").style.display = "none";
 
     setStatus("Coloca tu rostro dentro del marco", "black");
 
+    // 🔁 reiniciar tracking
+    trackFace();
+  }
+
+  async function safeDetect() {
+    try {
+      return await faceapi.detectAllFaces(
+        video,
+        new faceapi.TinyFaceDetectorOptions()
+      );
+    } catch (e) {
+      console.error("face detect error", e);
+      return [];
+    }
   }
 
 
