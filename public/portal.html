@@ -262,6 +262,8 @@
 
     if (typeof faceapi === "undefined") return;
 
+    let lastValidTime = 0;
+
     setInterval(async () => {
 
       detectionOK = false;
@@ -292,8 +294,8 @@
       const diffX = centerX - videoCenterX;
       const diffY = centerY - videoCenterY;
 
-      const faceRatio = box.width / video.videoWidth;
-      const faceHeightRatio = box.height / video.videoHeight;
+      const faceRatio = box.width / video.clientWidth;
+      const faceHeightRatio = box.height / video.clientHeight;
 
       // 🔹 HORIZONTAL
       if (Math.abs(diffX) > 80) {
@@ -340,13 +342,36 @@
         return;
       }
 
-      // ✅ OK
-      detectionOK = true;
-      guide.style.borderColor = "#00ff88";
-      setStatus("Listo para foto ✔", "green");
+      const now = Date.now();
 
-      btn.disabled = false;
-      btn.style.opacity = 1;
+      if (
+        Math.abs(diffX) <= 80 &&
+        Math.abs(diffY) <= 90 &&
+        faceRatio >= 0.22 &&
+        faceRatio <= 0.48 &&
+        faceHeightRatio >= 0.25 &&
+        faceHeightRatio <= 0.65
+      ) {
+        lastValidTime = now;
+        detectionOK = true;
+
+        guide.style.borderColor = "#00ff88";
+        setStatus("Listo para foto ✔", "green");
+
+        btn.disabled = false;
+        btn.style.opacity = 1;
+      }
+
+      // ⏳ mantener estado estable 1 segundo
+      if (now - lastValidTime < 1000) {
+        btn.disabled = false;
+        btn.style.opacity = 1;
+      } else {
+        detectionOK = false;
+        btn.disabled = true;
+        btn.style.opacity = 0.5;
+      }
+
 
     }, 700);
   }
