@@ -397,7 +397,7 @@
       const res = await fetch("/upload-photo", {
         method: "POST",
         headers: {
-          Authorization: token
+          "Authorization": "Bearer " + localStorage.getItem("token")
         },
         body: formData
       });

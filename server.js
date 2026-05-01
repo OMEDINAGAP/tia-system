@@ -381,6 +381,8 @@ app.post("/validate-cert", auth, async (req, res) => {
     res.status(500).json({ ok:false });
   }
 });
+
+
 const multer = require("multer");
 
 // 🔧 asegurar carpeta
