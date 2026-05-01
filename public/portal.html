@@ -154,6 +154,16 @@
   }
 </script>
 
+<script>
+  async function loadModels() {
+    console.log("Cargando faceapi...");
+
+    await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+
+    console.log("Modelo listo");
+  }
+</script>
+
 
 <script>
 
@@ -298,7 +308,12 @@
   }
 
   // 🚀 iniciar
-  startCamera();
+  async function init() {
+    await loadModels();   // 🔥 primero carga modelo
+    await startCamera();  // 🔥 luego cámara
+  }
+
+  init();
 </script>
 
 </body>
