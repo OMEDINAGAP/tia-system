@@ -154,8 +154,8 @@ app.post("/log-login", async (req, res) => {
     const id = Date.now();
 
     await db.query(
-      "INSERT INTO users (id, name, loginTime) VALUES (?, ?, NOW())",
-      [id, req.body.name]
+      "INSERT INTO users (id, name, loginTime, company) VALUES (?, ?, NOW(), ?)",
+      [id, req.body.name, req.body.company]
     );
 
     // 🔥 CORREGIDO
