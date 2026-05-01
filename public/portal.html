@@ -82,26 +82,30 @@
           <p>Descarga formatos y revisa lo que debes llevar.</p>
           <button onclick="goDocs()">Ver requisitos</button>
         </div>
-        <!-- PASO 3 -->
-        <div class="card camera-card">
 
-          <h3>📸 Tómate la foto</h3>
-          <p class="hint">Coloca tu rostro dentro del marco</p>
+        <!-- PASO 4 -->
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <div class="card camera-card">
 
-          <div class="camera-container">
+            <h3>📸 Tómate la foto</h3>
+            <p class="hint">Coloca tu rostro dentro del marco</p>
 
-            <video id="video" autoplay muted></video>
-            <canvas id="canvas"></canvas>
+            <div class="camera-container">
 
-            <!-- 🔥 OVERLAY -->
-            <div class="overlay">
-              <div class="face-guide"></div>
+              <video id="video" autoplay muted></video>
+              <canvas id="canvas"></canvas>
+
+              <!-- 🔥 OVERLAY -->
+              <div class="overlay">
+                <div class="face-guide"></div>
+              </div>
+
             </div>
 
+            <p id="status"></p>
+
           </div>
-
-          <p id="status"></p>
-
         </div>
 
         <!-- PASO 4 -->
@@ -183,16 +187,16 @@
   let capturing = false;
 
   // 🎥 iniciar cámara
-  async function startCamera(){
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: "user" }
-  });
+  async function startCamera() {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
 
-  video.srcObject = stream;
-  await video.play();
+    video.srcObject = stream;
+    await video.play();
 
-  trackFace(); // ✅ aquí sí, porque init ya cargó modelos
-}
+    trackFace(); // ✅ aquí sí, porque init ya cargó modelos
+  }
 
   // 🧠 detectar rostro continuamente
   async function trackFace() {
