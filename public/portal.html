@@ -263,102 +263,143 @@
     if (typeof faceapi === "undefined") return;
 
     let lastValidTime = 0;
+    let ticking = false; // evita solapamientos
 
     setInterval(async () => {
 
-      detectionOK = false;
-      btn.disabled = true;
-      btn.style.opacity = 0.5;
+      if (ticking) return;
+      ticking = true;
 
-      const detections = await faceapi.detectAllFaces(
-        video,
-        new faceapi.TinyFaceDetectorOptions()
-      );
+      try {
 
-      if (detections.length !== 1) {
-        setStatus("Colócate solo frente a la cámara", "red");
-        guide.style.borderColor = "red";
-        return;
-      }
+        // 🔒 estado por defecto
+        detectionOK = false;
+        btn.disabled = true;
+        btn.style.opacity = 0.5;
 
-      const box = detections[0].box;
+        const detections = await faceapi.detectAllFaces(
+          video,
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+        );
 
-      lastDetection = detections[0];
+        // ❌ 0 o más de 1 persona
+        if (detections.length !== 1) {
+          setStatus("Colócate solo frente a la cámara", "red");
+          guide.style.borderColor = "red";
+          return;
+        }
 
-      const centerX = box.x + box.width / 2;
-      const centerY = box.y + box.height / 2;
+        const det = detections[0];
+        const box = det.box;
 
-      const videoCenterX = video.videoWidth / 2;
-      const videoCenterY = video.videoHeight / 2;
+        // guardar última detección
+        lastDetection = det;
 
-      const diffX = centerX - videoCenterX;
-      const diffY = centerY - videoCenterY;
+        // centros
+        const faceCenterX = box.x + box.width / 2;
+        const faceCenterY = box.y + box.height / 2;
 
-      const faceRatio = box.width / video.videoWidth;
-      const faceHeightRatio = box.height / video.videoHeight;
+        const videoCenterX = video.videoWidth / 2;
+        const videoCenterY = video.videoHeight / 2;
 
-      // 🎯 RANGOS REALES (afinados)
-      if (faceRatio < 0.15) {
-        setStatus("Acércate un poco", "orange");
-        guide.style.borderColor = "red";
-        return;
-      }
+        const diffX = faceCenterX - videoCenterX;
+        const diffY = faceCenterY - videoCenterY;
 
-      if (faceRatio > 0.55) {
-        setStatus("Aléjate un poco", "orange");
-        guide.style.borderColor = "red";
-        return;
-      }
+        // proporciones (para respaldo)
+        const faceRatio = box.width / video.videoWidth;
+        const faceHeightRatio = box.height / video.videoHeight;
 
-      if (faceHeightRatio < 0.20) {
-        setStatus("Acércate un poco", "orange");
-        guide.style.borderColor = "red";
-        return;
-      }
+        // 🎯 VALIDACIÓN PRINCIPAL: CONTRA EL ÓVALO (UX REAL)
+        // tamaño del óvalo en CSS (ajústalo si cambias el diseño)
+        const guideWidth = 130;
+        const guideHeight = 170;
 
-      if (faceHeightRatio > 0.75) {
-        setStatus("Aléjate un poco", "orange");
-        guide.style.borderColor = "red";
-        return;
-      }
+        /* width: 130px;
+    height: 170px; */
 
-      const now = Date.now();
+        // normalización respecto al tamaño del óvalo
+        const normX = Math.abs(diffX) / (video.videoWidth * 0.25);  // tolerancia horizontal
+        const normY = Math.abs(diffY) / (video.videoHeight * 0.35); // tolerancia vertical
 
-      if (
-        Math.abs(diffX) <= 80 &&
-        Math.abs(diffY) <= 90 &&
-        faceRatio >= 0.22 &&
-        faceRatio <= 0.48 &&
-        faceHeightRatio >= 0.25 &&
-        faceHeightRatio <= 0.65
-      ) {
+        // 1) centrado horizontal
+        if (normX > 1) {
+          setStatus("Céntrate en el marco", "orange");
+          guide.style.borderColor = "red";
+          return;
+        }
+
+        // 2) altura con mensajes humanos
+        if (diffY < -80) {
+          setStatus("Baja un poco la cabeza", "orange");
+          guide.style.borderColor = "red";
+          return;
+        }
+
+        if (diffY > 80) {
+          setStatus("Sube un poco la cabeza", "orange");
+          guide.style.borderColor = "red";
+          return;
+        }
+
+        // 3) tamaño relativo al óvalo (clave UX)
+        if (box.width < guideWidth * 0.7) {
+          setStatus("Acércate un poco", "orange");
+          guide.style.borderColor = "red";
+          return;
+        }
+
+        if (box.width > guideWidth * 1.25) {
+          setStatus("Aléjate un poco", "orange");
+          guide.style.borderColor = "red";
+          return;
+        }
+
+        // 4) respaldo por proporciones (más tolerante)
+        if (faceRatio < 0.18 || faceRatio > 0.55) {
+          setStatus("Ajusta la distancia", "orange");
+          guide.style.borderColor = "red";
+          return;
+        }
+
+        if (faceHeightRatio < 0.22 || faceHeightRatio > 0.70) {
+          setStatus("Ajusta la postura", "orange");
+          guide.style.borderColor = "red";
+          return;
+        }
+
+        // ✅ TODO OK
+        const now = Date.now();
         lastValidTime = now;
         detectionOK = true;
 
         guide.style.borderColor = "#00ff88";
         setStatus("Listo para foto ✔", "green");
 
-        btn.disabled = false;
-        btn.style.opacity = 1;
+        // ⏳ anti-parpadeo (mantiene 1s)
+        if (now - lastValidTime < 1000) {
+          btn.disabled = false;
+          btn.style.opacity = 1;
+        }
+
+        // 🔎 debug opcional
+        // console.log("faceRatio:", faceRatio, "faceHeightRatio:", faceHeightRatio);
+
+      } finally {
+        ticking = false;
       }
 
-      // ⏳ mantener estado estable 1 segundo
-      if (now - lastValidTime < 1000) {
-        btn.disabled = false;
-        btn.style.opacity = 1;
-      } else {
+      // ⏳ si pierde validez, desactiva tras 1s
+      const now = Date.now();
+      if (now - lastValidTime >= 1000) {
         detectionOK = false;
         btn.disabled = true;
         btn.style.opacity = 0.5;
       }
 
-      console.log("faceRatio:", faceRatio);
-      console.log("faceHeightRatio:", faceHeightRatio);
-
-
-    }, 700);
+    }, 600); // un poco más fluido
   }
 
+  
   // 📸 CAPTURA
   function capture(box) {
 
