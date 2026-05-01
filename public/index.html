@@ -1,128 +1,156 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<meta charset="UTF-8">
-<title>Acceso</title>
+  <meta charset="UTF-8">
+  <title>Acceso</title>
 
-<style>
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: linear-gradient(135deg, #141e30, #243b55);
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #141e30, #243b55);
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
 
-.container {
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 40px;
-  width: 320px;
-  box-shadow: 0 0 25px rgba(0,0,0,0.3);
-  color: white;
-  text-align: center;
-}
+    .container {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 40px;
+      width: 320px;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.3);
+      color: white;
+      text-align: center;
+    }
 
-.container h2 {
-  margin-bottom: 25px;
-}
+    .container h2 {
+      margin-bottom: 25px;
+    }
 
-.input-group {
-  margin-bottom: 15px;
-}
+    .input-group {
+      margin-bottom: 15px;
+    }
 
-input {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-}
+    input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+    }
 
-button {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  background: #00c6ff;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  transition: 0.3s;
-}
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: #00c6ff;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
 
-button:hover {
-  background: #0072ff;
-}
+    button:hover {
+      background: #0072ff;
+    }
 
-.footer {
-  margin-top: 15px;
-  font-size: 12px;
-  opacity: 0.6;
-}
-</style>
+    .footer {
+      margin-top: 15px;
+      font-size: 12px;
+      opacity: 0.6;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="container">
-  <h2>🔐 Acceso</h2>
+  <div class="container">
+    <h2>🔐 Acceso</h2>
 
-  <div class="input-group">
-    <input id="name" placeholder="Nombre">
+    <div class="input-group">
+      <input id="name" placeholder="Nombre Completo">
+      <label for="name">El nombre ingresado aparecerá en su Certificado</label>
+    </div>
+    <div class="input-group">
+      <input id="company" placeholder="Empresa">
+    </div>
+
+    <div class="input-group">
+      <input id="pass" type="password" placeholder="Contraseña">
+    </div>
+
+    <button onclick="login()">Entrar</button>
+
+    <div class="footer">
+      Sistema TIA
+    </div>
   </div>
 
-  <div class="input-group">
-    <input id="pass" type="password" placeholder="Contraseña">
-  </div>
+  <script>
+    const API = "";
 
-  <button onclick="login()">Entrar</button>
+    async function login() {
+      const pass = document.getElementById("pass").value.trim();
+      const name = document.getElementById("name").value.trim();
+      const company = document.getElementById("company").value.trim();
 
-  <div class="footer">
-    Sistema TIA
-  </div>
-</div>
+      // 🔐 Validación básica
+      if (!name || !company || !pass) {
+        alert("Todos los campos son obligatorios");
+        return;
+      }
 
-<script>
-const API = "";
+      try {
+        const res = await fetch(`/validate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pass,
+            company
+          })
+        });
 
-async function login(){
-  const pass = document.getElementById("pass").value;
-  const name = document.getElementById("name").value;
+        const data = await res.json();
 
-  const res = await fetch(`/validate?pass=${encodeURIComponent(pass)}&t=${Date.now()}`, {
-    cache: "no-store"
-  });
+        if (data.ok) {
 
-  const data = await res.json();
+          const u = await fetch("/log-login", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              company
+            })
+          });
 
-  if(data.ok){
-    const u = await fetch("/log-login", {
-      method:"POST",
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name})
+          const user = await u.json();
+
+          localStorage.setItem("token", user.token);
+
+          window.location.href = "/portal.html";
+
+        } else {
+          alert("Acceso incorrecto");
+        }
+
+      } catch (err) {
+        console.error(err);
+        alert("Error de conexión");
+      }
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        login();
+      }
     });
-
-    const user = await u.json();
-
-    // 🔥 CAMBIO IMPORTANTE
-    localStorage.setItem("token", user.token);
-
-    window.location.href = "/portal.html";
-
-  }else{
-    alert("Incorrecto");
-  }
-}
-document.addEventListener("keydown", function(e){
-  if(e.key === "Enter"){
-    login();
-  }
-});
-</script>
+  </script>
 
 </body>
+
 </html>

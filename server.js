@@ -305,12 +305,16 @@ app.get("/me", auth, async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Running"));
 
-app.get("/validate", (req, res) => {
-  const pass = req.query.pass;
+app.post("/validate", (req, res) => {
+  const { pass, company } = req.body;
+
   const current = generatePassword();
 
-  console.log("PASS USER:", pass);
-  console.log("PASS SERVER:", current);
+
+  // Validación básica
+  if (!company) {
+    return res.json({ ok: false, error: "Empresa requerida" });
+  }
 
   res.json({ ok: pass === current });
 });
