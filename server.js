@@ -426,3 +426,39 @@ app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
     res.status(500).json({ ok: false });
   }
 });
+
+
+app.get("/questions", async (req, res) => {
+
+  const group = Math.floor(Math.random() * 3) + 1;
+
+  const [rows] = await db.query(
+    "SELECT id, question, option_a, option_b, option_c, option_d FROM questions WHERE exam_group=? ORDER BY RAND() LIMIT 10",
+    [group]
+  );
+
+  res.json(rows);
+});
+
+app.post("/submit-exam", async (req, res) => {
+
+  const { answers } = req.body;
+
+  let correct = 0;
+
+  for (let a of answers) {
+
+    const [row] = await db.query(
+      "SELECT correct FROM questions WHERE id=?",
+      [a.id]
+    );
+
+    if (row[0].correct === a.answer) {
+      correct++;
+    }
+  }
+
+  const score = Math.round((correct / answers.length) * 100);
+
+  res.json({ score });
+});

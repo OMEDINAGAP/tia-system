@@ -1,207 +1,302 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <title>Examen TIA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Examen TIA</title>
 
   <style>
-    body{
+    body {
+      margin: 0;
       font-family: Arial;
-      background:#0f172a;
-      color:white;
-      padding:20px;
+      background: linear-gradient(135deg, #020617, #0f172a);
+      color: white;
+      display: flex;
     }
 
-    .container{
-      max-width:900px;
-      margin:auto;
+    /* SIDEBAR */
+    .sidebar {
+      width: 250px;
+      background: #020617;
+      padding: 20px;
+      height: 100vh;
     }
 
-    .question{
-      background:#1e293b;
-      padding:15px;
-      border-radius:10px;
-      margin-bottom:15px;
+    .menu-item {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      cursor: pointer;
     }
 
-    button{
-      padding:12px 20px;
-      border:none;
-      border-radius:10px;
-      background:#22c55e;
-      color:white;
-      cursor:pointer;
-      margin-top:20px;
+    .active {
+      background: #22c55e;
     }
 
-    #resultado{
-      margin-top:20px;
-      font-size:20px;
-      font-weight:bold;
+    /* MAIN */
+    .main {
+      flex: 1;
+      padding: 30px;
     }
 
-    .qr{
-      margin-top:20px;
-      width:150px;
+    .card {
+      background: #1e293b;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .option {
+      display: block;
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 10px;
+      background: #0f172a;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .option:hover {
+      border: 1px solid #22c55e;
+    }
+
+    .btn {
+      margin-top: 20px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      background: #22c55e;
+      color: white;
+      cursor: pointer;
+    }
+
+    .progress-bar {
+      height: 10px;
+      background: #0f172a;
+      border-radius: 10px;
+      margin: 10px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #22c55e;
+      width: 0%;
+      border-radius: 10px;
+    }
+
+    /* RIGHT PANEL */
+    .right {
+      width: 200px;
+      padding: 20px;
+    }
+
+    .nav-box {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+    }
+
+    .nav-box div {
+      padding: 10px;
+      text-align: center;
+      background: #1e293b;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .answered {
+      background: #22c55e;
+    }
+
+    .current {
+      border: 2px solid white;
     }
   </style>
 </head>
 
 <body>
 
-<div class="container">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h2>✈️ TIA</h2>
 
-<h1>🧠 Evaluación de Seguridad Aeroportuaria</h1>
-<p>Responde correctamente todas las preguntas.</p>
+    <div class="menu-item">Curso</div>
+    <div class="menu-item active">Examen</div>
+    <div class="menu-item">Certificado</div>
+  </div>
 
-<form id="quiz"></form>
+  <!-- MAIN -->
+  <div class="main">
 
-<button id="btnEnviar" onclick="calificar()">Finalizar examen</button>
+    <h2>Examen de Seguridad</h2>
 
-<div id="resultado"></div>
-<img id="qr" class="qr" style="display:none;">
+    <div class="progress-bar">
+      <div id="progressFill" class="progress-fill"></div>
+    </div>
 
-<br>
-<button id="btnCert" style="display:none;" onclick="verCert()">Ver certificado</button>
+    <p id="progressText"></p>
 
-</div>
+    <div id="questionBox" class="card"></div>
 
-<script>
+    <button class="btn" onclick="next()">Siguiente</button>
 
-// 🔐 TOKEN
-const token = localStorage.getItem("token");
+  </div>
 
-if(!token){
-  location.href = "/";
-}
+  <!-- RIGHT PANEL -->
+  <div class="right">
+    <h3>Navegación</h3>
+    <div id="nav" class="nav-box"></div>
+  </div>
 
-// 🔒 VALIDAR ACCESO
-async function validar(){
+  <script>
 
-  const res = await fetch("/me", {
-    headers:{ Authorization: token }
-  });
+    const questionBanks = [
 
-  if(res.status !== 200){
-    location.href = "/";
-    return;
-  }
+      [
+        {
+          q: "¿QUE SIGNIFICA TIA?",
+          options: [
+            "Tarjeta para instalaciones aeroportuarias",
+            "Tarjeta de información aérea",
+            "Tarjeta de identificación aeroportuaria"
+          ],
+          correct: 2
+        },
+        {
+          q: "¿CUAL ES EL OBJETIVO DEL PLAN DE SEGURIDAD?",
+          options: [
+            "Conocer el aeropuerto",
+            "Prevenir actos de interferencia ilícita",
+            "Seguridad a comercios",
+            "Todas"
+          ],
+          correct: 1
+        }
+      ],
 
-  const user = await res.json();
+      [
+        {
+          q: "¿QUÉ ES SEGURIDAD?",
+          options: [
+            "Medidas y recursos para proteger aviación",
+            "Evitar pasajeros",
+            "Leyes laborales"
+          ],
+          correct: 0
+        }
+      ],
 
-  if(user.video < 90){
-    alert("Debes completar el curso");
-    location.href = "/curso.html";
-  }
+      [
+        {
+          q: "¿QUE ES UN ACTO DE INTERFERENCIA ILICITA?",
+          options: [
+            "Operación normal",
+            "Reglas de abordaje",
+            "Actos que comprometen seguridad"
+          ],
+          correct: 2
+        }
+      ]
 
-}
+    ];
 
-validar();
-
-
-// 🧠 PREGUNTAS
-const preguntas = [
-{q:"¿Qué significa TIA?",o:["Tarjeta para Instalaciones Aeroportuarias","Tarjeta de Información Aérea","Tarjeta de Identificación Aeroportuaria"],a:2},
-{q:"Objetivo del plan de seguridad:",o:["Conocer aeropuerto","Prevenir actos ilícitos","Seguridad comercio","Todas"],a:1},
-{q:"Extravío de TIA:",o:["Reportar módulo TIAS","Ignorar","Seguridad privada"],a:0},
-{q:"Zona restringida:",o:["TIA vigente","Autorizada","Revisión","Todas"],a:3},
-{q:"Qué reportar:",o:["Persona sin TIA","Objeto abandonado","Vandalismo","Todas"],a:3},
-{q:"Qué es seguridad:",o:["Medidas de protección","Evitar pasajeros","Ley laboral"],a:0},
-{q:"Acto ilícito:",o:["Operación","Reglas","Compromete seguridad"],a:2},
-{q:"Contingencia:",o:["Evacuar","Extintor","Prevenir"],a:2},
-{q:"Nivel contingencia:",o:["Administrador","AFAC","Aerolínea"],a:0},
-{q:"Amenaza:",o:["Aerolínea","Limpieza","Seguridad"],a:2},
-{q:"Normas:",o:["Nacional e internacional","Municipal","Global"],a:0},
-{q:"Áreas:",o:["Seguridad y operacional","Judicial","Laboral"],a:0},
-{q:"TIAV:",o:["Aerovehicular","Aeroportuaria vehicular","Vehicular"],a:1},
-{q:"Niveles:",o:["3","5","4"],a:0}
-];
-
-const form = document.getElementById("quiz");
-
-// RENDER
-preguntas.forEach((p,i)=>{
-  let html = `<div class="question"><h3>${i+1}. ${p.q}</h3>`;
-  p.o.forEach((op,j)=>{
-    html += `<label>
-      <input type="radio" name="q${i}" value="${j}"> ${op}
-    </label><br>`;
-  });
-  html += "</div>";
-  form.innerHTML += html;
-});
-
-
-// 🧠 CALIFICAR
-let enviado = false;
-
-async function calificar(){
-
-  if(enviado) return;
-  enviado = true;
-
-  let score = 0;
-
-  for(let i=0;i<preguntas.length;i++){
-    const sel = document.querySelector(`input[name="q${i}"]:checked`);
-    
-    if(!sel){
-      alert("Responde todas las preguntas");
-      enviado = false;
-      return;
+    function shuffle(arr) {
+      return arr.sort(() => Math.random() - 0.5);
     }
 
-    if(Number(sel.value) === preguntas[i].a){
-      score++;
-    }
-  }
+    const exam = shuffle(questionBanks[Math.floor(Math.random() * questionBanks.length)]);
 
-  const porcentaje = Math.round((score / preguntas.length) * 100);
+    let current = 0;
+    let answers = new Array(exam.length).fill(null);
 
-  document.getElementById("resultado").innerText =
-    `Resultado: ${porcentaje}%`;
+    // render nav
+    function renderNav() {
+      const nav = document.getElementById("nav");
+      nav.innerHTML = "";
 
-  // 📡 ENVIAR
-  const res = await fetch("/log-exam", {
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization": token
-    },
-    body: JSON.stringify({
-      score: porcentaje
-    })
-  });
+      exam.forEach((_, i) => {
+        const div = document.createElement("div");
+        div.innerText = i + 1;
 
-  const data = await res.json();
+        if (answers[i] !== null) div.classList.add("answered");
+        if (i === current) div.classList.add("current");
 
-  if(porcentaje >= 80){
+        div.onclick = () => {
+          current = i;
+          render();
+        };
 
-    alert("Aprobado");
-
-    // mostrar QR
-    if(data.qr){
-      const qr = document.getElementById("qr");
-      qr.src = data.qr;
-      qr.style.display = "block";
+        nav.appendChild(div);
+      });
     }
 
-    // botón certificado
-    document.getElementById("btnCert").style.display = "inline-block";
+    // render question
+    function render() {
 
-  }else{
-    alert("No aprobado");
-  }
+      const q = exam[current];
 
-}
+      document.getElementById("questionBox").innerHTML = `
+    <h3>${q.q}</h3>
 
+    ${shuffle(q.options.map((opt, i) => ({ opt, i }))).map(o => `
+      <label class="option">
+        <input type="radio" name="q" value="${o.i}"
+        ${answers[current] === o.i ? "checked" : ""}>
+        ${o.opt}
+      </label>
+    `).join("")}
+  `;
 
-// 🎓 CERTIFICADO
-function verCert(){
-  window.location.href = "/certificado.html";
-}
+      const percent = ((current + 1) / exam.length) * 100;
 
-</script>
+      document.getElementById("progressFill").style.width = percent + "%";
+      document.getElementById("progressText").innerText =
+        `Pregunta ${current + 1} de ${exam.length}`;
+
+      renderNav();
+    }
+
+    // next
+    function next() {
+
+      const selected = document.querySelector("input[name='q']:checked");
+
+      if (!selected) {
+        alert("Selecciona una respuesta");
+        return;
+      }
+
+      answers[current] = parseInt(selected.value);
+
+      if (current < exam.length - 1) {
+        current++;
+        render();
+      } else {
+        finish();
+      }
+    }
+
+    // finish
+    function finish() {
+
+      let correct = 0;
+
+      exam.forEach((q, i) => {
+        if (q.correct === answers[i]) correct++;
+      });
+
+      const score = Math.round((correct / exam.length) * 100);
+
+      document.body.innerHTML = `
+    <h1>Resultado: ${score}%</h1>
+    <button onclick="location.href='/certificado.html'">Ver certificado</button>
+  `;
+    }
+
+    // init
+    render();
+  </script>
 
 </body>
+
 </html>
