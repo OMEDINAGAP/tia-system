@@ -68,6 +68,10 @@
 
             </div>
             <button id="btnFoto" onclick="takePhoto()">📸 Tomar foto</button>
+            <div id="photoActions" style="display:none; margin-top:10px;">
+              <button onclick="savePhoto()">✅ Guardar</button>
+              <button onclick="retakePhoto()">🔄 Nueva foto</button>
+            </div>
 
             <p id="status"></p>
 
@@ -224,6 +228,10 @@
     await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
     console.log("Modelo listo");
   }
+  function showPostCaptureUI() {
+    document.getElementById("photoActions").style.display = "block";
+  }
+
 </script>
 
 <script>
@@ -249,12 +257,14 @@
 
   // 📸 botón
   function takePhoto() {
-    if (!detectionOK || !lastDetection) {
-      setStatus("Acomoda tu rostro correctamente", "red");
-      return;
-    }
 
-    capture(lastDetection.box);
+    if (!lastDetection) return;
+
+    const box = lastDetection.box;
+
+    capture(box);
+
+    showPostCaptureUI();
   }
 
   // 🧠 TRACK FACE PRO (VERSIÓN ESTABLE)
@@ -262,144 +272,83 @@
 
     if (typeof faceapi === "undefined") return;
 
-    let lastValidTime = 0;
-    let ticking = false; // evita solapamientos
-
     setInterval(async () => {
 
-      if (ticking) return;
-      ticking = true;
+      if (autoCaptured) return;
 
-      try {
+      detectionOK = false;
+      btn.style.display = "none"; // ocultamos botón viejo
 
-        // 🔒 estado por defecto
-        detectionOK = false;
-        btn.disabled = true;
-        btn.style.opacity = 0.5;
+      const detections = await faceapi.detectAllFaces(
+        video,
+        new faceapi.TinyFaceDetectorOptions()
+      );
 
-        const detections = await faceapi.detectAllFaces(
-          video,
-          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
-        );
-
-        // ❌ 0 o más de 1 persona
-        if (detections.length !== 1) {
-          setStatus("Colócate solo frente a la cámara", "red");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        const det = detections[0];
-        const box = det.box;
-
-        // guardar última detección
-        lastDetection = det;
-
-        // centros
-        const faceCenterX = box.x + box.width / 2;
-        const faceCenterY = box.y + box.height / 2;
-
-        const videoCenterX = video.videoWidth / 2;
-        const videoCenterY = video.videoHeight / 2;
-
-        const diffX = faceCenterX - videoCenterX;
-        const diffY = faceCenterY - videoCenterY;
-
-        // proporciones (para respaldo)
-        const faceRatio = box.width / video.videoWidth;
-        const faceHeightRatio = box.height / video.videoHeight;
-
-        // 🎯 VALIDACIÓN PRINCIPAL: CONTRA EL ÓVALO (UX REAL)
-        // tamaño del óvalo en CSS (ajústalo si cambias el diseño)
-        const guideWidth = 130;
-        const guideHeight = 170;
-
-        /* width: 130px;
-    height: 170px; */
-
-        // normalización respecto al tamaño del óvalo
-        const normX = Math.abs(diffX) / (video.videoWidth * 0.25);  // tolerancia horizontal
-        const normY = Math.abs(diffY) / (video.videoHeight * 0.35); // tolerancia vertical
-
-        // 1) centrado horizontal
-        if (normX > 1) {
-          setStatus("Céntrate en el marco", "orange");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        // 2) altura con mensajes humanos
-        if (diffY < -80) {
-          setStatus("Baja un poco la cabeza", "orange");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        if (diffY > 80) {
-          setStatus("Sube un poco la cabeza", "orange");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        // 3) tamaño relativo al óvalo (clave UX)
-        if (box.width < guideWidth * 0.7) {
-          setStatus("Acércate un poco", "orange");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        if (box.width > guideWidth * 1.25) {
-          setStatus("Aléjate un poco", "orange");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        // 4) respaldo por proporciones (más tolerante)
-        if (faceRatio < 0.18 || faceRatio > 0.55) {
-          setStatus("Ajusta la distancia", "orange");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        if (faceHeightRatio < 0.22 || faceHeightRatio > 0.70) {
-          setStatus("Ajusta la postura", "orange");
-          guide.style.borderColor = "red";
-          return;
-        }
-
-        // ✅ TODO OK
-        const now = Date.now();
-        lastValidTime = now;
-        detectionOK = true;
-
-        guide.style.borderColor = "#00ff88";
-        setStatus("Listo para foto ✔", "green");
-
-        // ⏳ anti-parpadeo (mantiene 1s)
-        if (now - lastValidTime < 1000) {
-          btn.disabled = false;
-          btn.style.opacity = 1;
-        }
-
-        // 🔎 debug opcional
-        // console.log("faceRatio:", faceRatio, "faceHeightRatio:", faceHeightRatio);
-
-      } finally {
-        ticking = false;
+      if (detections.length !== 1) {
+        setStatus("Colócate solo frente a la cámara", "red");
+        guide.style.borderColor = "red";
+        return;
       }
 
-      // ⏳ si pierde validez, desactiva tras 1s
-      const now = Date.now();
-      if (now - lastValidTime >= 1000) {
-        detectionOK = false;
-        btn.disabled = true;
-        btn.style.opacity = 0.5;
+      const box = detections[0].box;
+      lastDetection = detections[0];
+
+      const inside = isFaceInsideGuide(box);
+
+      if (!inside) {
+        setStatus("Ajusta tu rostro dentro del marco", "orange");
+        guide.style.borderColor = "red";
+        return;
       }
 
-    }, 600); // un poco más fluido
+      // ✅ PERFECTO
+      guide.style.borderColor = "#00ff88";
+      setStatus("Capturando foto...", "green");
+
+      autoCaptured = true;
+
+      setTimeout(() => {
+        takePhoto(); // 📸 automática
+      }, 700);
+
+    }, 600);
+  }
+  function isFaceInsideGuide(box) {
+
+    const guideRect = document.querySelector(".face-guide").getBoundingClientRect();
+    const videoRect = video.getBoundingClientRect();
+
+    // convertir coordenadas del face-api al DOM real
+    const scaleX = videoRect.width / video.videoWidth;
+    const scaleY = videoRect.height / video.videoHeight;
+
+    const face = {
+      x: videoRect.left + box.x * scaleX,
+      y: videoRect.top + box.y * scaleY,
+      w: box.width * scaleX,
+      h: box.height * scaleY
+    };
+
+    const guide = {
+      x: guideRect.left,
+      y: guideRect.top,
+      w: guideRect.width,
+      h: guideRect.height
+    };
+
+    // calcular intersección
+    const x_overlap = Math.max(0, Math.min(face.x + face.w, guide.x + guide.w) - Math.max(face.x, guide.x));
+    const y_overlap = Math.max(0, Math.min(face.y + face.h, guide.y + guide.h) - Math.max(face.y, guide.y));
+
+    const overlapArea = x_overlap * y_overlap;
+    const faceArea = face.w * face.h;
+
+    const coverage = overlapArea / faceArea;
+
+    return coverage > 0.65; // 🔥 65% del rostro dentro del óvalo
   }
 
-  
+
   // 📸 CAPTURA
   function capture(box) {
 
@@ -481,6 +430,42 @@
   }
 
   init();
+</script>
+<script>
+
+  async function savePhoto() {
+
+    const canvas = document.getElementById("canvas");
+
+    canvas.toBlob(async (blob) => {
+
+      const formData = new FormData();
+      formData.append("photo", blob);
+
+      await fetch("/upload-photo", {
+        method: "POST",
+        headers: {
+          "Authorization": localStorage.getItem("token")
+        },
+        body: formData
+      });
+
+      setStatus("Foto guardada correctamente ✔", "green");
+
+    }, "image/jpeg");
+  }
+
+  function retakePhoto() {
+
+    autoCaptured = false;
+
+    document.getElementById("photoActions").style.display = "none";
+
+    setStatus("Coloca tu rostro dentro del marco", "black");
+
+  }
+
+
 </script>
 
 
