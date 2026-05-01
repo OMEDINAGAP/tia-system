@@ -63,6 +63,7 @@
               </div>
 
             </div>
+            <button id="btnFoto" onclick="takePhoto()">📸 Tomar foto</button>
 
             <p id="status"></p>
 
@@ -111,12 +112,12 @@
     margin: auto;
   }
 
-  video,
-  canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+  #canvas,
+  #video {
+    width: 100%;
+    max-width: 260px;
+    border-radius: 12px;
+  }
 
   canvas {
     display: none;
@@ -136,14 +137,51 @@
     display: none;
   }
 
-  /* 🎯 MARCO CARA */
+  .camera-wrapper {
+    position: relative;
+    width: 260px;
+    margin: auto;
+  }
+
+  /* 🎯 MARCO CARA PRO */
   .face-guide {
-    width: 160px;
-    height: 200px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+
+    width: 180px;
+    height: 240px;
+
+    transform: translate(-50%, -50%);
     border: 3px dashed #00ff88;
-    border-radius: 50% / 60%;
-    background: transparent;
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+    border-radius: 50%;
+
+    pointer-events: none;
+
+    /* 🔥 glow pro */
+    box-shadow:
+      0 0 20px rgba(0, 255, 136, 0.9),
+      inset 0 0 20px rgba(0, 255, 136, 0.5);
+
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  /* 🔥 animación CORRECTA (sin romper translate) */
+  @keyframes pulse {
+    0% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.8;
+    }
+
+    50% {
+      transform: translate(-50%, -50%) scale(1.05);
+      opacity: 1;
+    }
+
+    100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.8;
+    }
   }
 </style>
 
@@ -193,6 +231,7 @@
 
   let stream;
   let capturing = false;
+  let lastDetection = null;
 
   // 🎥 iniciar cámara
   async function startCamera() {
@@ -206,7 +245,18 @@
     trackFace(); // ✅ aquí sí, porque init ya cargó modelos
   }
 
-  // 🧠 detectar rostro continuamente
+  function takePhoto() {
+
+    if (!lastDetection) {
+      setStatus("No se detecta rostro", "red");
+      return;
+    }
+
+    const box = lastDetection.box;
+
+    capture(box);
+  }
+
   async function trackFace() {
 
     if (typeof faceapi === "undefined") {
@@ -214,7 +264,7 @@
       return;
     }
 
-    const interval = setInterval(async () => {
+    setInterval(async () => {
 
       const detections = await faceapi.detectAllFaces(
         video,
@@ -228,42 +278,33 @@
 
       const box = detections[0].box;
 
+      // 🔥 guardar última detección AQUÍ (correcto)
+      lastDetection = detections[0];
+
       const centerX = box.x + box.width / 2;
-      const centerY = box.y + box.height / 2;
-
       const videoCenterX = video.videoWidth / 2;
-      const videoCenterY = video.videoHeight / 2;
 
-      // 🎯 VALIDAR CENTRADO
       if (Math.abs(centerX - videoCenterX) > 60) {
-        setStatus("Céntrate", "orange");
+        setStatus("Céntrate en el marco", "orange");
         return;
       }
 
-      // 📏 VALIDAR DISTANCIA
       if (box.width < 100) {
-        setStatus("Acércate", "orange");
+        setStatus("Acércate un poco", "orange");
         return;
       }
 
       if (box.width > 220) {
-        setStatus("Aléjate", "orange");
+        setStatus("Aléjate un poco", "orange");
         return;
       }
 
-      // ✅ PERFECTO
-      setStatus("Foto correcta ✔", "green");
-
-      if (!capturing) {
-        capturing = true;
-        capture(box);
-        clearInterval(interval);
-      }
-
-      if (photoSaved) return;
+      setStatus("Listo para foto ✔", "green");
 
     }, 800);
   }
+
+
 
   // 📸 CAPTURA AUTOMÁTICA
   let photoSaved = false;
@@ -357,52 +398,6 @@
   }
 
   init();
-</script>
-
-<script>
-  async function validateAndSend() {
-
-    if (!capturedBlob) {
-      alert("Primero toma la foto");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("photo", capturedBlob, "foto.png");
-
-    const res = await fetch("/upload-photo", {
-      method: "POST",
-      headers: {
-        Authorization: localStorage.getItem("token")
-      },
-      body: formData
-    });
-
-    const data = await res.json();
-
-    if (data.ok) {
-
-      // ✅ 1. quitar fondo oscuro
-      document.getElementById("overlay").style.display = "none";
-
-      // ✅ 2. mensaje éxito
-      document.getElementById("status").innerText = "Foto guardada correctamente";
-      document.getElementById("status").style.color = "green";
-
-      // ✅ 3. bloquear botones de foto
-      document.getElementById("btnCamera").disabled = true;
-      document.getElementById("btnCapture").disabled = true;
-
-      // ✅ 4. habilitar curso
-      document.getElementById("btnCurso").disabled = false;
-
-      // ✅ 5. guardar estado local
-      localStorage.setItem("fotoOK", "1");
-
-    } else {
-      alert("Error al guardar");
-    }
-  }
 </script>
 
 </body>
