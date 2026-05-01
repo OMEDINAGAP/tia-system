@@ -107,8 +107,8 @@
 <style>
   .camera-container {
     position: relative;
-    width: 260px;
-    height: 320px;
+    width: 320px;
+    height: 260px;
     margin: auto;
   }
 
@@ -116,6 +116,7 @@
   #video {
     width: 100%;
     max-width: 260px;
+    height: 260px;
     border-radius: 12px;
   }
 
@@ -323,18 +324,18 @@
 
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = 260;
-    tempCanvas.height = 320;
+    tempCanvas.height = 180;
 
     const tctx = tempCanvas.getContext("2d");
 
     // fondo blanco
     tctx.fillStyle = "white";
-    tctx.fillRect(0, 0, 260, 320);
+    tctx.fillRect(0, 0, 260, 180);
 
     tctx.drawImage(
       canvas,
       cropX, cropY, size, size,
-      0, 0, 260, 320
+      0, 0, 260, 180
     );
 
     tempCanvas.toBlob(async (blob) => {
