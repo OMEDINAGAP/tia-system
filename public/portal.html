@@ -280,24 +280,50 @@
       const centerX = box.x + box.width / 2;
       const videoCenterX = video.videoWidth / 2;
 
+      const centerY = box.y + box.height / 2;
+      const videoCenterY = video.videoHeight / 2;
+
+      if (Math.abs(centerY - videoCenterY) > 50) {
+        setStatus("Ajusta altura del rostro", "orange");
+        return;
+      }
+
+
       if (Math.abs(centerX - videoCenterX) > 40) {
         setStatus("Céntrate en el marco", "orange");
         return;
       }
 
       const faceRatio = box.width / video.videoWidth;
+      const faceHeightRatio = box.height / video.videoHeight;
 
-      // 🎯 rango ideal (ajustado al óvalo más chico)
-      if (faceRatio < 0.18) {
+      // 🎯 AJUSTE TIPO FOTO CREDENCIAL
+      if (faceRatio < 0.28) {
         setStatus("Acércate un poco", "orange");
+        document.querySelector(".face-guide").style.borderColor = "red";
         return;
       }
 
-      if (faceRatio > 0.32) {
+      if (faceRatio > 0.40) {
         setStatus("Aléjate un poco", "orange");
+        document.querySelector(".face-guide").style.borderColor = "red";
         return;
       }
 
+
+      if (faceHeightRatio < 0.30) {
+        setStatus("Acércate un poco", "orange");
+        document.querySelector(".face-guide").style.borderColor = "red";
+        return;
+      }
+
+      if (faceHeightRatio > 0.55) {
+        setStatus("Aléjate un poco", "orange");
+        document.querySelector(".face-guide").style.borderColor = "red";
+        return;
+      }
+
+      document.querySelector(".face-guide").style.borderColor = "#00ff88"; // verde
       setStatus("Listo para foto ✔", "green");
 
     }, 800);
