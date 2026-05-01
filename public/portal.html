@@ -273,7 +273,6 @@
         new faceapi.TinyFaceDetectorOptions()
       );
 
-      // ❌ más de una persona o ninguna
       if (detections.length !== 1) {
         setStatus("Colócate solo frente a la cámara", "red");
         guide.style.borderColor = "red";
@@ -282,7 +281,6 @@
 
       const box = detections[0].box;
 
-      // 🔥 guardar detección válida SIEMPRE
       lastDetection = detections[0];
 
       const centerX = box.x + box.width / 2;
@@ -297,8 +295,6 @@
       const faceRatio = box.width / video.videoWidth;
       const faceHeightRatio = box.height / video.videoHeight;
 
-      // 🎯 VALIDACIONES INTELIGENTES
-
       // 🔹 HORIZONTAL
       if (Math.abs(diffX) > 80) {
         setStatus("Céntrate en el marco", "orange");
@@ -306,7 +302,7 @@
         return;
       }
 
-      // 🔹 VERTICAL (mensajes más humanos)
+      // 🔹 VERTICAL
       if (diffY < -90) {
         setStatus("Baja un poco la cabeza", "orange");
         guide.style.borderColor = "red";
@@ -319,7 +315,7 @@
         return;
       }
 
-      // 🔹 DISTANCIA (ANCHO)
+      // 🔹 DISTANCIA
       if (faceRatio < 0.22) {
         setStatus("Acércate un poco", "orange");
         guide.style.borderColor = "red";
@@ -332,7 +328,6 @@
         return;
       }
 
-      // 🔹 DISTANCIA (ALTO)
       if (faceHeightRatio < 0.25) {
         setStatus("Inclínate un poco hacia adelante", "orange");
         guide.style.borderColor = "red";
@@ -345,16 +340,15 @@
         return;
       }
 
-      // ✅ TODO CORRECTO
+      // ✅ OK
       detectionOK = true;
-
       guide.style.borderColor = "#00ff88";
       setStatus("Listo para foto ✔", "green");
 
       btn.disabled = false;
       btn.style.opacity = 1;
 
-    }, 700); // 🔥 menos carga que 800 y más fluido
+    }, 700);
   }
 
   if (typeof faceapi === "undefined") return;
