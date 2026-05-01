@@ -143,8 +143,8 @@
     top: 50%;
     left: 50%;
 
-    width: 160px;
-    height: 200px;
+    width: 130px;
+    height: 170px;
 
     transform: translate(-50%, -50%);
     border: 3px dashed #00ff88;
@@ -280,17 +280,20 @@
       const centerX = box.x + box.width / 2;
       const videoCenterX = video.videoWidth / 2;
 
-      if (Math.abs(centerX - videoCenterX) > 60) {
+      if (Math.abs(centerX - videoCenterX) > 40) {
         setStatus("Céntrate en el marco", "orange");
         return;
       }
 
-      if (box.width < 100) {
+      const faceRatio = box.width / video.videoWidth;
+
+      // 🎯 rango ideal (ajustado al óvalo más chico)
+      if (faceRatio < 0.18) {
         setStatus("Acércate un poco", "orange");
         return;
       }
 
-      if (box.width > 220) {
+      if (faceRatio > 0.32) {
         setStatus("Aléjate un poco", "orange");
         return;
       }
