@@ -389,40 +389,6 @@
       0, 0, 260, 180
     );
 
-    tempCanvas.toBlob(async (blob) => {
-
-      const formData = new FormData();
-      formData.append("photo", blob, "tia.png");
-
-      const res = await fetch("/upload-photo", {
-        method: "POST",
-        headers: {
-          "Authorization": "Bearer " + localStorage.getItem("token").trim()
-        },
-        body: formData
-      });
-
-      const data = await res.json();
-
-      if (data.ok) {
-
-        document.getElementById("overlay").classList.add("hidden");
-
-        setStatus("✅ Foto guardada correctamente", "green");
-
-        document.getElementById("btnCurso").disabled = false;
-
-        localStorage.setItem("fotoOK", "1");
-
-        if (stream) {
-          stream.getTracks().forEach(t => t.stop());
-        }
-
-      } else {
-        setStatus("Error al guardar", "red");
-      }
-
-    });
 
     canvas.style.display = "block";
     video.style.display = "none";
@@ -447,14 +413,12 @@
 
   async function savePhoto() {
 
-    const canvas = document.getElementById("canvas");
-
     canvas.toBlob(async (blob) => {
 
       const formData = new FormData();
       formData.append("photo", blob);
 
-      await fetch("/upload-photo", {
+      const res = await fetch("/upload-photo", {
         method: "POST",
         headers: {
           "Authorization": "Bearer " + localStorage.getItem("token").trim()
@@ -462,11 +426,16 @@
         body: formData
       });
 
-      setStatus("Foto guardada correctamente ✔", "green");
+      const data = await res.json();
+
+      if (data.ok) {
+        setStatus("Foto guardada correctamente ✔", "green");
+      } else {
+        setStatus("Error al guardar", "red");
+      }
 
     }, "image/jpeg");
   }
-
   function retakePhoto() {
 
     autoCaptured = false;
@@ -475,6 +444,13 @@
     document.getElementById("photoActions").style.display = "none";
 
     setStatus("Coloca tu rostro dentro del marco", "black");
+    canvas.style.display = "none";
+    video.style.display = "block";
+
+    // 🔥 reiniciar cámara si estaba detenida
+    if (!stream) {
+      startCamera();
+    }
 
     // 🔁 reiniciar tracking
     trackFace();
