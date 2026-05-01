@@ -294,50 +294,30 @@
       const diffX = centerX - videoCenterX;
       const diffY = centerY - videoCenterY;
 
-      const faceRatio = box.width / video.clientWidth;
-      const faceHeightRatio = box.height / video.clientHeight;
+      const faceRatio = box.width / video.videoWidth;
+      const faceHeightRatio = box.height / video.videoHeight;
 
-      // 🔹 HORIZONTAL
-      if (Math.abs(diffX) > 80) {
-        setStatus("Céntrate en el marco", "orange");
-        guide.style.borderColor = "red";
-        return;
-      }
-
-      // 🔹 VERTICAL
-      if (diffY < -90) {
-        setStatus("Baja un poco la cabeza", "orange");
-        guide.style.borderColor = "red";
-        return;
-      }
-
-      if (diffY > 90) {
-        setStatus("Sube un poco la cabeza", "orange");
-        guide.style.borderColor = "red";
-        return;
-      }
-
-      // 🔹 DISTANCIA
-      if (faceRatio < 0.22) {
+      // 🎯 RANGOS REALES (afinados)
+      if (faceRatio < 0.15) {
         setStatus("Acércate un poco", "orange");
         guide.style.borderColor = "red";
         return;
       }
 
-      if (faceRatio > 0.48) {
+      if (faceRatio > 0.55) {
         setStatus("Aléjate un poco", "orange");
         guide.style.borderColor = "red";
         return;
       }
 
-      if (faceHeightRatio < 0.25) {
-        setStatus("Inclínate un poco hacia adelante", "orange");
+      if (faceHeightRatio < 0.20) {
+        setStatus("Acércate un poco", "orange");
         guide.style.borderColor = "red";
         return;
       }
 
-      if (faceHeightRatio > 0.65) {
-        setStatus("Aléjate ligeramente", "orange");
+      if (faceHeightRatio > 0.75) {
+        setStatus("Aléjate un poco", "orange");
         guide.style.borderColor = "red";
         return;
       }
@@ -371,6 +351,9 @@
         btn.disabled = true;
         btn.style.opacity = 0.5;
       }
+
+      console.log("faceRatio:", faceRatio);
+      console.log("faceHeightRatio:", faceHeightRatio);
 
 
     }, 700);
