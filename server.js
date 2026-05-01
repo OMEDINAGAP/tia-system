@@ -40,9 +40,9 @@ async function auth(req, res, next) {
       return res.status(401).json({ ok: false });
     }
 
-    const token = header.startsWith("Bearer ")
-      ? header.split(" ")[1]
-      : header;
+    const token = header
+      .replace("Bearer", "")
+      .trim();
 
     const [rows] = await db.query(
       "SELECT * FROM sessions WHERE token=?",
