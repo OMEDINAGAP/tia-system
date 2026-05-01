@@ -81,6 +81,10 @@
       ⚠️ No puedes adelantar ni cambiar de pestaña.
     </div>
 
+    <button class="btn" style="background:#3b82f6;" onclick="goExamDirecto()">
+      ⚡ Ir directo al examen
+    </button>
+
   </div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -148,7 +152,7 @@
         return;
       }
 
-      // 🚫 NO ADELANTAR (con tolerancia real)
+      // 🚫 NO ADELANTAR
       if (current - maxTime > 5) {
         player.seekTo(maxTime);
       } else {
@@ -164,6 +168,16 @@
       document.getElementById("progress-fill").style.width =
         percent + "%";
 
+      let completed = false;
+
+      // 🔥 AQUI ESTA LA MAGIA
+      if (percent >= 92 && !completed) {
+        completed = true;
+
+        document.getElementById("status").innerText = "✅ Curso completado";
+        document.getElementById("btnExam").disabled = false;
+      }
+
       // 📡 backend
       fetch("/log-video", {
         method: "POST",
@@ -176,8 +190,14 @@
         })
       });
     }
+
+
     // IR AL EXAMEN
     function goExam() {
+      window.location.href = "/examen.html";
+    }
+
+    function goExamDirecto() {
       window.location.href = "/examen.html";
     }
 

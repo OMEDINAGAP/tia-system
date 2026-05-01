@@ -1,104 +1,123 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-<title>Certificado TIA</title>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js"></script>
+  <title>Certificado TIA</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js"></script>
 
-<style>
+  <style>
+    body {
+      font-family: Georgia;
+      background: #e5e7eb;
+    }
 
-body{
-  font-family: Georgia;
-  background:#e5e7eb;
-}
+    .cert {
+      width: 800px;
+      margin: auto;
+      background: white;
+      padding: 40px;
+      border: 8px solid #1e3a8a;
+      text-align: center;
+    }
 
-.cert{
-  width:800px;
-  margin:auto;
-  background:white;
-  padding:40px;
-  border:8px solid #1e3a8a;
-  text-align:center;
-}
+    h1 {
+      color: #1e3a8a;
+    }
 
-h1{
-  color:#1e3a8a;
-}
+    .logo {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
 
-.logo{
-  font-size:30px;
-  margin-bottom:10px;
-}
+    .qr {
+      width: 120px;
+      margin-top: 20px;
+    }
 
-.qr{
-  width:120px;
-  margin-top:20px;
-}
-
-.footer{
-  margin-top:40px;
-  font-size:12px;
-}
-
-</style>
+    .footer {
+      margin-top: 40px;
+      font-size: 12px;
+    }
+  </style>
 </head>
 
 <body>
 
-<div class="cert" id="cert">
+  <div class="cert" id="cert">
 
-<div class="logo">✈️ AEROPUERTO INTERNACIONAL</div>
+    <div class="logo">✈️ AEROPUERTO INTERNACIONAL</div>
 
-<h1>CONSTANCIA DE ACREDITACIÓN</h1>
+    <h1>CONSTANCIA DE ACREDITACIÓN</h1>
 
-<p>Se certifica que:</p>
+    <p>Se certifica que:</p>
 
-<h2 id="nombre">---</h2>
+    <h2 id="nombre">---</h2>
 
-<p>Ha completado satisfactoriamente el</p>
+    <span>de la empresa: </span><br>
+    <span id="empresa"></span><br><br>
 
-<b>CURSO DE SEGURIDAD AEROPORTUARIA</b>
 
-<p>cumpliendo con los lineamientos de seguridad establecidos.</p>
+    <p>Ha completado satisfactoriamente el</p>
 
-<p><b>Folio:</b> <span id="folio"></span></p>
-<p><b>Fecha:</b> <span id="fecha"></span></p>
+    <b>CURSO DE SEGURIDAD AEROPORTUARIA</b>
 
-<img id="qr" class="qr">
+    <p>cumpliendo con los lineamientos de seguridad establecidos.</p>
 
-<div class="footer">
-Documento válido únicamente con código QR verificable.
-</div>
+    <p><b>Folio:</b> <span id="folio"></span></p>
+    <p><b>Fecha:</b> <span id="fecha"></span></p>
 
-</div>
+    <img id="qr" class="qr">
 
-<button onclick="descargar()">Descargar PDF</button>
+    <div class="footer">
+      Documento válido únicamente con código QR verificable.
+    </div>
 
-<script>
+  </div>
 
-async function load(){
+  <button onclick="descargar()">Descargar PDF</button>
 
-  const id = new URLSearchParams(window.location.search).get("id");
+  <script>
 
-  const res = await fetch("/me", {
-  headers:{ Authorization: localStorage.getItem("token") }
-});
-  const data = await res.json();
+    async function load() {
 
-  const user = data.find(u=>u.id==id);
+      const res = await fetch("/me", {
+        headers: { Authorization: localStorage.getItem("token") }
+      });
 
-  document.getElementById("nombre").innerText = user.name;
-  document.getElementById("folio").innerText = user.folio;
-  document.getElementById("fecha").innerText = new Date(user.fecha).toLocaleDateString();
-  document.getElementById("qr").src = user.qr;
-}
+      const user = await res.json(); // 🔥 ya no es array
 
-function descargar(){
-  html2pdf().from(document.getElementById("cert")).save();
-}
+      if (!user || !user.name) {
+        alert("Error cargando certificado");
+        return;
+      }
 
-load();
+      document.getElementById("nombre").innerText = user.name;
 
-</script>
+      document.getElementById("empresa").innerText =
+        user.company ? "Empresa: " + user.company : "";
+
+      document.getElementById("folio").innerText = user.folio || "---";
+
+      document.getElementById("fecha").innerText =
+        user.fecha ? new Date(user.fecha).toLocaleDateString() : "---";
+
+      document.getElementById("qr").src = user.qr || "";
+
+      // 🔥 auto descargar
+      setTimeout(() => {
+        descargar();
+      }, 800);
+    }
+    function descargar() {
+      function descargar() {
+        html2pdf().from(document.getElementById("cert")).save();
+      }
+    }
+
+    load();
+
+  </script>
 
 </body>
+
 </html>
