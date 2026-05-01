@@ -134,7 +134,7 @@
     transform: scaleX(-1);
     border-radius: 12px;
     object-fit: cover;
-     width: 100%;
+    width: 100%;
     height: 100%;
   }
 
@@ -257,7 +257,7 @@
     capture(lastDetection.box);
   }
 
-  // 🧠 TRACK FACE PRO
+  // 🧠 TRACK FACE PRO (VERSIÓN ESTABLE)
   async function trackFace() {
 
     if (typeof faceapi === "undefined") return;
@@ -273,13 +273,17 @@
         new faceapi.TinyFaceDetectorOptions()
       );
 
+      // ❌ más de una persona o ninguna
       if (detections.length !== 1) {
-        setStatus("Solo una persona frente a cámara", "red");
+        setStatus("Colócate solo frente a la cámara", "red");
         guide.style.borderColor = "red";
         return;
       }
 
       const box = detections[0].box;
+
+      // 🔥 guardar detección válida SIEMPRE
+      lastDetection = detections[0];
 
       const centerX = box.x + box.width / 2;
       const centerY = box.y + box.height / 2;
@@ -287,53 +291,137 @@
       const videoCenterX = video.videoWidth / 2;
       const videoCenterY = video.videoHeight / 2;
 
-      // 🎯 POSICIÓN HORIZONTAL
-      if (Math.abs(centerX - videoCenterX) > 40) {
-        setStatus("Céntrate en el marco", "orange");
-        guide.style.borderColor = "orange";
-        return;
-      }
+      const diffX = centerX - videoCenterX;
+      const diffY = centerY - videoCenterY;
 
-      // 🎯 POSICIÓN VERTICAL
-      if (centerY < videoCenterY - 40) {
-        setStatus("Baja un poco la cabeza", "orange");
-        guide.style.borderColor = "orange";
-        return;
-      }
-
-      if (centerY > videoCenterY + 40) {
-        setStatus("Sube un poco la cabeza", "orange");
-        guide.style.borderColor = "orange";
-        return;
-      }
-
-      // 📏 TAMAÑO
       const faceRatio = box.width / video.videoWidth;
       const faceHeightRatio = box.height / video.videoHeight;
 
-      if (faceRatio < 0.28 || faceHeightRatio < 0.30) {
+      // 🎯 VALIDACIONES INTELIGENTES
+
+      // 🔹 HORIZONTAL
+      if (Math.abs(diffX) > 80) {
+        setStatus("Céntrate en el marco", "orange");
+        guide.style.borderColor = "red";
+        return;
+      }
+
+      // 🔹 VERTICAL (mensajes más humanos)
+      if (diffY < -90) {
+        setStatus("Baja un poco la cabeza", "orange");
+        guide.style.borderColor = "red";
+        return;
+      }
+
+      if (diffY > 90) {
+        setStatus("Sube un poco la cabeza", "orange");
+        guide.style.borderColor = "red";
+        return;
+      }
+
+      // 🔹 DISTANCIA (ANCHO)
+      if (faceRatio < 0.22) {
         setStatus("Acércate un poco", "orange");
-        guide.style.borderColor = "orange";
+        guide.style.borderColor = "red";
         return;
       }
 
-      if (faceRatio > 0.40 || faceHeightRatio > 0.55) {
+      if (faceRatio > 0.48) {
         setStatus("Aléjate un poco", "orange");
-        guide.style.borderColor = "orange";
+        guide.style.borderColor = "red";
         return;
       }
 
-      // ✅ TODO PERFECTO
+      // 🔹 DISTANCIA (ALTO)
+      if (faceHeightRatio < 0.25) {
+        setStatus("Inclínate un poco hacia adelante", "orange");
+        guide.style.borderColor = "red";
+        return;
+      }
+
+      if (faceHeightRatio > 0.65) {
+        setStatus("Aléjate ligeramente", "orange");
+        guide.style.borderColor = "red";
+        return;
+      }
+
+      // ✅ TODO CORRECTO
+      detectionOK = true;
+
       guide.style.borderColor = "#00ff88";
       setStatus("Listo para foto ✔", "green");
-
-      lastDetection = detections[0];
-      detectionOK = true;
 
       btn.disabled = false;
       btn.style.opacity = 1;
 
-    }, 800);
+    }, 700); // 🔥 menos carga que 800 y más fluido
+  }
+
+  if (typeof faceapi === "undefined") return;
+
+  setInterval(async () => {
+
+    detectionOK = false;
+    btn.disabled = true;
+    btn.style.opacity = 0.5;
+
+    const detections = await faceapi.detectAllFaces(
+      video,
+      new faceapi.TinyFaceDetectorOptions()
+    );
+
+    if (detections.length !== 1) {
+      setStatus("Solo una persona frente a cámara", "red");
+      guide.style.borderColor = "red";
+      return;
+    }
+
+    const box = detections[0].box;
+
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    const videoCenterX = video.videoWidth / 2;
+    const videoCenterY = video.videoHeight / 2;
+
+    // MÁS REALISTA
+    if (faceRatio < 0.22) {
+      setStatus("Acércate un poco", "orange");
+      guide.style.borderColor = "orange";
+      return;
+    }
+
+    if (faceRatio > 0.48) {
+      setStatus("Aléjate un poco", "orange");
+      guide.style.borderColor = "orange";
+      return;
+    }
+
+    if (faceHeightRatio < 0.25) {
+      setStatus("Acércate un poco", "orange");
+      guide.style.borderColor = "orange";
+      return;
+    }
+
+    if (faceHeightRatio > 0.65) {
+      setStatus("Aléjate un poco", "orange");
+      guide.style.borderColor = "orange";
+      return;
+    }
+
+
+
+    // ✅ TODO PERFECTO
+    guide.style.borderColor = "#00ff88";
+    setStatus("Listo para foto ✔", "green");
+
+    lastDetection = detections[0];
+    detectionOK = true;
+
+    btn.disabled = false;
+    btn.style.opacity = 1;
+
+  }, 800);
   }
 
   // 📸 CAPTURA
