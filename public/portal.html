@@ -97,100 +97,122 @@
     </div>
 
   </div>
-  
+
 
 
 </body>
 
 
-  <script>
-    if (!localStorage.getItem("token")) {
-      window.location.href = "/";
-    }
-
-    function goDocs() {
-      window.location.href = "/documentos.html";
-    }
-
-    function goCurso() {
-      window.location.href = "/curso.html";
-    }
-  </script>
-
-  
 <script>
-  
-
-const token = localStorage.getItem("token");
-
-if (!token) {
-  window.location.href = "/";
-}
-
-// DOM
-let video = document.getElementById("video");
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
-let stream;
-
-// 🚀 CARGAR MODELO
-async function loadModels() {
-  await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-}
-
-// 🎥 CÁMARA
-async function startCamera() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" }
-    });
-
-    video.srcObject = stream;
-    await video.play();
-
-  } catch (err) {
-    alert("Error cámara");
-  }
-}
-
-// 📸 CAPTURA
-function capture() {
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-}
-
-// 🧠 VALIDAR
-async function validateAndSend() {
-
-  if(typeof faceapi === "undefined"){
-    alert("IA no cargada");
-    return;
+  if (!localStorage.getItem("token")) {
+    window.location.href = "/";
   }
 
-  const detections = await faceapi.detectAllFaces(
-    canvas,
-    new faceapi.TinyFaceDetectorOptions()
-  );
-
-  if (detections.length !== 1) {
-    document.getElementById("status").innerText = "Solo una persona";
-    return;
+  function goDocs() {
+    window.location.href = "/documentos.html";
   }
 
-  document.getElementById("status").innerText = "✅ Foto válida";
-}
+  function goCurso() {
+    window.location.href = "/curso.html";
+  }
+</script>
 
-// 🔥 INICIALIZACIÓN CORRECTA (UNA SOLA VEZ)
-window.addEventListener("load", async () => {
 
-  console.log("Cargando faceapi...");
+<script>
 
-  await loadModels();
 
-  console.log("Modelo listo");
+  const token = localStorage.getItem("token");
 
-});
+  if (!token) {
+    window.location.href = "/";
+  }
+
+  // DOM
+  let video = document.getElementById("video");
+  let canvas = document.getElementById("canvas");
+  let ctx = canvas.getContext("2d");
+  let stream;
+
+  // 🚀 CARGAR MODELO
+  async function loadModels() {
+    await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+  }
+
+  // 🎥 CÁMARA
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" }
+      });
+
+      video.srcObject = stream;
+      await video.play();
+
+    } catch (err) {
+      alert("Error cámara");
+    }
+  }
+
+  // 📸 CAPTURA
+  let fotoTomada = false;
+  function capture() {
+
+    if (!video.srcObject) {
+      alert("Primero inicia la cámara");
+      return;
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // ocultar video
+    video.style.display = "none";
+
+    // mostrar foto
+    canvas.style.display = "block";
+
+    fotoTomada = true;
+
+  }
+
+  // 🧠 VALIDAR
+  async function validateAndSend() {
+
+    if (typeof faceapi === "undefined") {
+      alert("IA no cargada");
+      return;
+    }
+
+    const detections = await faceapi.detectAllFaces(
+      canvas,
+      new faceapi.TinyFaceDetectorOptions()
+    );
+
+    if (detections.length !== 1) {
+      document.getElementById("status").innerText = "Solo una persona";
+      return;
+    }
+
+    if (!fotoTomada) {
+      alert("Primero toma la foto");
+      return;
+    }
+
+    document.getElementById("status").innerText = "✅ Foto válida";
+  }
+
+  // 🔥 INICIALIZACIÓN CORRECTA (UNA SOLA VEZ)
+  window.addEventListener("load", async () => {
+
+    console.log("Cargando faceapi...");
+
+    await loadModels();
+
+    console.log("Modelo listo");
+
+  });
 
 </script>
 
 </body>
+
 </html>
