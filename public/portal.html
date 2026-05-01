@@ -9,6 +9,47 @@
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 
+<style>
+  .camera-container {
+    position: relative;
+    width: 260px;
+    height: 320px;
+    margin: auto;
+  }
+
+  video,
+  canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    object-fit: cover;
+  }
+
+  canvas {
+    display: none;
+  }
+
+  /* 🔥 OSCURECER TODO */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* 🎯 MARCO CARA */
+  .face-guide {
+    width: 160px;
+    height: 200px;
+    border: 3px dashed #00ff88;
+    border-radius: 50% / 60%;
+    background: transparent;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
+  }
+</style>
+
 <body>
 
   <div class="container">
@@ -42,28 +83,24 @@
           <button onclick="goDocs()">Ver requisitos</button>
         </div>
         <!-- PASO 3 -->
-        <div class="card" style="text-align:center">
+        <div class="card camera-card">
 
           <h3>📸 Tómate la foto</h3>
-          <p style="font-size:13px;color:#666">
-            Rostro centrado, fondo claro, sin lentes
-          </p>
+          <p class="hint">Coloca tu rostro dentro del marco</p>
 
-          <video id="video" width="260" height="200" style="border-radius:10px; background:black;">
-          </video>
+          <div class="camera-container">
 
-          <canvas id="canvas" width="260" height="200" style="display:none;"></canvas>
+            <video id="video" autoplay muted></video>
+            <canvas id="canvas"></canvas>
 
-          <br><br>
+            <!-- 🔥 OVERLAY -->
+            <div class="overlay">
+              <div class="face-guide"></div>
+            </div>
 
-          <button onclick="startCamera()">🎥 Iniciar cámara</button>
-          <button onclick="capture()">📸 Tomar foto</button>
+          </div>
 
-          <br><br>
-
-          <button onclick="validateAndSend()">✅ Validar y guardar</button>
-
-          <p id="status" style="margin-top:10px;font-weight:bold"></p>
+          <p id="status"></p>
 
         </div>
 
@@ -127,90 +164,141 @@
     window.location.href = "/";
   }
 
-  // DOM
+
   let video = document.getElementById("video");
   let canvas = document.getElementById("canvas");
   let ctx = canvas.getContext("2d");
+
   let stream;
+  let capturing = false;
 
-  // 🚀 CARGAR MODELO
-  async function loadModels() {
-    await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-  }
-
-  // 🎥 CÁMARA
+  // 🎥 iniciar cámara
   async function startCamera() {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" }
-      });
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
 
-      video.srcObject = stream;
-      await video.play();
+    video.srcObject = stream;
+    await video.play();
 
-    } catch (err) {
-      alert("Error cámara");
-    }
+    trackFace(); // 🔥 iniciar análisis continuo
   }
 
-  // 📸 CAPTURA
-  let fotoTomada = false;
-  function capture() {
-
-    if (!video.srcObject) {
-      alert("Primero inicia la cámara");
-      return;
-    }
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    // ocultar video
-    video.style.display = "none";
-
-    // mostrar foto
-    canvas.style.display = "block";
-
-    fotoTomada = true;
-
-  }
-
-  // 🧠 VALIDAR
-  async function validateAndSend() {
+  // 🧠 detectar rostro continuamente
+  async function trackFace() {
 
     if (typeof faceapi === "undefined") {
-      alert("IA no cargada");
+      console.log("faceapi no listo");
       return;
     }
 
-    const detections = await faceapi.detectAllFaces(
-      canvas,
-      new faceapi.TinyFaceDetectorOptions()
-    );
+    const interval = setInterval(async () => {
 
-    if (detections.length !== 1) {
-      document.getElementById("status").innerText = "Solo una persona";
-      return;
-    }
+      const detections = await faceapi.detectAllFaces(
+        video,
+        new faceapi.TinyFaceDetectorOptions()
+      );
 
-    if (!fotoTomada) {
-      alert("Primero toma la foto");
-      return;
-    }
+      if (detections.length !== 1) {
+        setStatus("Solo una persona", "red");
+        return;
+      }
 
-    document.getElementById("status").innerText = "✅ Foto válida";
+      const box = detections[0].box;
+
+      const centerX = box.x + box.width / 2;
+      const centerY = box.y + box.height / 2;
+
+      const videoCenterX = video.videoWidth / 2;
+      const videoCenterY = video.videoHeight / 2;
+
+      // 🎯 VALIDAR CENTRADO
+      if (Math.abs(centerX - videoCenterX) > 60) {
+        setStatus("Céntrate", "orange");
+        return;
+      }
+
+      // 📏 VALIDAR DISTANCIA
+      if (box.width < 100) {
+        setStatus("Acércate", "orange");
+        return;
+      }
+
+      if (box.width > 220) {
+        setStatus("Aléjate", "orange");
+        return;
+      }
+
+      // ✅ PERFECTO
+      setStatus("Foto correcta ✔", "green");
+
+      if (!capturing) {
+        capturing = true;
+        capture(box);
+        clearInterval(interval);
+      }
+
+    }, 800);
   }
 
-  // 🔥 INICIALIZACIÓN CORRECTA (UNA SOLA VEZ)
-  window.addEventListener("load", async () => {
+  // 📸 CAPTURA AUTOMÁTICA
+  function capture(box) {
 
-    console.log("Cargando faceapi...");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-    await loadModels();
+    ctx.drawImage(video, 0, 0);
 
-    console.log("Modelo listo");
+    // ✂️ recorte tipo credencial
+    const size = box.width * 1.8;
 
-  });
+    let cropX = box.x + box.width / 2 - size / 2;
+    let cropY = box.y - box.height * 0.4;
 
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = 300;
+    tempCanvas.height = 400;
+
+    const tctx = tempCanvas.getContext("2d");
+
+    // fondo blanco
+    tctx.fillStyle = "white";
+    tctx.fillRect(0, 0, 300, 400);
+
+    tctx.drawImage(
+      canvas,
+      cropX, cropY, size, size,
+      0, 0, 300, 400
+    );
+
+    tempCanvas.toBlob(async (blob) => {
+
+      const formData = new FormData();
+      formData.append("photo", blob, "tia.png");
+
+      await fetch("/upload-photo", {
+        method: "POST",
+        headers: {
+          "Authorization": localStorage.getItem("token")
+        },
+        body: formData
+      });
+
+    });
+
+    canvas.style.display = "block";
+    video.style.display = "none";
+  }
+
+  // UI
+  function setStatus(msg, color) {
+    const el = document.getElementById("status");
+    el.innerText = msg;
+    el.style.color = color;
+  }
+
+  // 🚀 iniciar
+  startCamera();
 </script>
 
 </body>
