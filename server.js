@@ -382,7 +382,6 @@ app.post("/validate-cert", auth, async (req, res) => {
   }
 });
 const multer = require("multer");
-const fs = require("fs");
 
 // 🔧 asegurar carpeta
 if (!fs.existsSync("uploads")) {
