@@ -397,7 +397,7 @@
       const res = await fetch("/upload-photo", {
         method: "POST",
         headers: {
-          "Authorization": "Bearer " + localStorage.getItem("token")
+          "Authorization": "Bearer " + localStorage.getItem("token").trim()
         },
         body: formData
       });
@@ -457,7 +457,7 @@
       await fetch("/upload-photo", {
         method: "POST",
         headers: {
-          "Authorization": localStorage.getItem("token")
+          "Authorization": "Bearer " + localStorage.getItem("token").trim()
         },
         body: formData
       });
