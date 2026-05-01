@@ -73,7 +73,7 @@
     <p id="progress">Progreso: 0%</p>
     <p id="status" class="status">Pendiente</p>
 
-    <button id="btnExam" class="btn" disabled onclick="goExam()">
+    <button id="btnExam" class="btn" onclick="goExam()">
       Ir al examen
     </button>
 
@@ -81,8 +81,8 @@
       ⚠️ No puedes adelantar ni cambiar de pestaña.
     </div>
 
-    <button class="btn" style="background:#3b82f6;" onclick="goExamDirecto()">
-      ⚡ Ir directo al examen
+    <button class="btn" style="background:#3b82f6;" onclick="goExamTest()">
+      ⚡ Modo prueba (directo)
     </button>
 
   </div>
@@ -193,12 +193,41 @@
 
 
     // IR AL EXAMEN
-    function goExam() {
-      window.location.href = "/examen.html";
+    async function goExam() {
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("/can-take-exam", {
+        headers: {
+          Authorization: token
+        }
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        window.location.href = "/examen.html";
+      } else {
+        alert("Debes completar al menos el 90% del video.\nProgreso actual: " + Math.floor(data.progress) + "%");
+      }
     }
 
-    function goExamDirecto() {
-      window.location.href = "/examen.html";
+    async function goExamTest() {
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("/can-take-exam", {
+        headers: {
+          Authorization: token,
+          "x-test-mode": "true" // 🔥 bypass backend
+        }
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        window.location.href = "/examen.html";
+      }
     }
 
   </script>

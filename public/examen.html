@@ -2,8 +2,8 @@
 <html>
 
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Examen TIA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body {
@@ -14,9 +14,8 @@
       display: flex;
     }
 
-    /* SIDEBAR */
     .sidebar {
-      width: 250px;
+      width: 220px;
       background: #020617;
       padding: 20px;
       height: 100vh;
@@ -26,14 +25,12 @@
       padding: 10px;
       margin: 10px 0;
       border-radius: 8px;
-      cursor: pointer;
     }
 
     .active {
       background: #22c55e;
     }
 
-    /* MAIN */
     .main {
       flex: 1;
       padding: 30px;
@@ -43,17 +40,15 @@
       background: #1e293b;
       padding: 25px;
       border-radius: 15px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
     .option {
       display: block;
       margin: 10px 0;
       padding: 12px;
-      border-radius: 10px;
       background: #0f172a;
+      border-radius: 10px;
       cursor: pointer;
-      border: 1px solid transparent;
     }
 
     .option:hover {
@@ -63,9 +58,9 @@
     .btn {
       margin-top: 20px;
       padding: 12px 20px;
+      background: #22c55e;
       border: none;
       border-radius: 10px;
-      background: #22c55e;
       color: white;
       cursor: pointer;
     }
@@ -81,10 +76,8 @@
       height: 100%;
       background: #22c55e;
       width: 0%;
-      border-radius: 10px;
     }
 
-    /* RIGHT PANEL */
     .right {
       width: 200px;
       padding: 20px;
@@ -98,8 +91,8 @@
 
     .nav-box div {
       padding: 10px;
-      text-align: center;
       background: #1e293b;
+      text-align: center;
       border-radius: 6px;
       cursor: pointer;
     }
@@ -116,16 +109,12 @@
 
 <body>
 
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <h2>✈️ TIA</h2>
-
     <div class="menu-item">Curso</div>
     <div class="menu-item active">Examen</div>
-    <div class="menu-item">Certificado</div>
   </div>
 
-  <!-- MAIN -->
   <div class="main">
 
     <h2>Examen de Seguridad</h2>
@@ -142,83 +131,71 @@
 
   </div>
 
-  <!-- RIGHT PANEL -->
   <div class="right">
     <h3>Navegación</h3>
     <div id="nav" class="nav-box"></div>
   </div>
 
   <script>
+    const token = localStorage.getItem("token");
 
-    const questionBanks = [
+    let questions = [];
+    let current = 0;
+    let answers = [];
 
-      [
-        {
-          q: "¿QUE SIGNIFICA TIA?",
-          options: [
-            "Tarjeta para instalaciones aeroportuarias",
-            "Tarjeta de información aérea",
-            "Tarjeta de identificación aeroportuaria"
-          ],
-          correct: 2
-        },
-        {
-          q: "¿CUAL ES EL OBJETIVO DEL PLAN DE SEGURIDAD?",
-          options: [
-            "Conocer el aeropuerto",
-            "Prevenir actos de interferencia ilícita",
-            "Seguridad a comercios",
-            "Todas"
-          ],
-          correct: 1
-        }
-      ],
+    // 🔥 Cargar preguntas desde backend
+    async function loadExam() {
 
-      [
-        {
-          q: "¿QUÉ ES SEGURIDAD?",
-          options: [
-            "Medidas y recursos para proteger aviación",
-            "Evitar pasajeros",
-            "Leyes laborales"
-          ],
-          correct: 0
-        }
-      ],
+      const res = await fetch("/questions", {
+        headers: { Authorization: token }
+      });
 
-      [
-        {
-          q: "¿QUE ES UN ACTO DE INTERFERENCIA ILICITA?",
-          options: [
-            "Operación normal",
-            "Reglas de abordaje",
-            "Actos que comprometen seguridad"
-          ],
-          correct: 2
-        }
-      ]
+      questions = await res.json();
+      answers = new Array(questions.length).fill(null);
 
-    ];
-
-    function shuffle(arr) {
-      return arr.sort(() => Math.random() - 0.5);
+      render();
     }
 
-    const exam = shuffle(questionBanks[Math.floor(Math.random() * questionBanks.length)]);
+    function render() {
 
-    let current = 0;
-    let answers = new Array(exam.length).fill(null);
+      const q = questions[current];
 
-    // render nav
+      document.getElementById("questionBox").innerHTML = `
+    <h3>${q.question}</h3>
+
+    ${["A", "B", "C", "D"].map(letter => {
+        const text = q["option_" + letter.toLowerCase()];
+        if (!text) return "";
+        return `
+        <label class="option">
+          <input type="radio" name="q" value="${letter}"
+          ${answers[current] === letter ? "checked" : ""}>
+          ${letter}) ${text}
+        </label>
+      `;
+      }).join("")}
+  `;
+
+      const percent = ((current + 1) / questions.length) * 100;
+
+      document.getElementById("progressFill").style.width = percent + "%";
+      document.getElementById("progressText").innerText =
+        `Pregunta ${current + 1} de ${questions.length}`;
+
+      renderNav();
+    }
+
     function renderNav() {
+
       const nav = document.getElementById("nav");
       nav.innerHTML = "";
 
-      exam.forEach((_, i) => {
+      questions.forEach((_, i) => {
+
         const div = document.createElement("div");
         div.innerText = i + 1;
 
-        if (answers[i] !== null) div.classList.add("answered");
+        if (answers[i]) div.classList.add("answered");
         if (i === current) div.classList.add("current");
 
         div.onclick = () => {
@@ -230,33 +207,6 @@
       });
     }
 
-    // render question
-    function render() {
-
-      const q = exam[current];
-
-      document.getElementById("questionBox").innerHTML = `
-    <h3>${q.q}</h3>
-
-    ${shuffle(q.options.map((opt, i) => ({ opt, i }))).map(o => `
-      <label class="option">
-        <input type="radio" name="q" value="${o.i}"
-        ${answers[current] === o.i ? "checked" : ""}>
-        ${o.opt}
-      </label>
-    `).join("")}
-  `;
-
-      const percent = ((current + 1) / exam.length) * 100;
-
-      document.getElementById("progressFill").style.width = percent + "%";
-      document.getElementById("progressText").innerText =
-        `Pregunta ${current + 1} de ${exam.length}`;
-
-      renderNav();
-    }
-
-    // next
     function next() {
 
       const selected = document.querySelector("input[name='q']:checked");
@@ -266,9 +216,9 @@
         return;
       }
 
-      answers[current] = parseInt(selected.value);
+      answers[current] = selected.value;
 
-      if (current < exam.length - 1) {
+      if (current < questions.length - 1) {
         current++;
         render();
       } else {
@@ -276,25 +226,52 @@
       }
     }
 
-    // finish
-    function finish() {
+    // 🔥 Enviar al backend
+    async function finish() {
 
-      let correct = 0;
+      const payload = questions.map((q, i) => ({
+        id: q.id,
+        answer: answers[i]
+      }));
 
-      exam.forEach((q, i) => {
-        if (q.correct === answers[i]) correct++;
+      const res = await fetch("/submit-exam", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": token
+        },
+        body: JSON.stringify({ answers: payload })
       });
 
-      const score = Math.round((correct / exam.length) * 100);
+      const data = await res.json();
 
       document.body.innerHTML = `
-    <h1>Resultado: ${score}%</h1>
+    <h1>Resultado: ${data.score}%</h1>
     <button onclick="location.href='/certificado.html'">Ver certificado</button>
   `;
     }
 
-    // init
-    render();
+    loadExam();
+
+    async function validateAccess() {
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("/can-take-exam", {
+        headers: { Authorization: token }
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        alert("No tienes acceso al examen");
+        window.location.href = "/curso.html";
+      }
+    }
+
+    validateAccess();
+
+
   </script>
 
 </body>

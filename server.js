@@ -169,7 +169,7 @@ app.post("/log-login", async (req, res) => {
   }
 });
 // LOG VIDEO
-app.post("/log-video", auth, async (req, res) => {
+/* app.post("/log-video", auth, async (req, res) => {
   try {
     const userId = req.userId; // 🔐 del token
 
@@ -184,7 +184,21 @@ app.post("/log-video", auth, async (req, res) => {
     console.error("DB ERROR:", err);
     res.status(500).json({ ok: false, error: "DB error" });
   }
+}); */
+
+
+app.post("/log-video", auth, async (req, res) => {
+
+  const { progress } = req.body;
+
+  await db.query(
+    "UPDATE users SET video_progress=? WHERE id=?",
+    [progress, req.userId]
+  );
+
+  res.json({ ok: true });
 });
+
 
 // LOG EXAM SEGURO
 app.post("/log-exam", auth, async (req, res) => {
@@ -461,4 +475,25 @@ app.post("/submit-exam", async (req, res) => {
   const score = Math.round((correct / answers.length) * 100);
 
   res.json({ score });
+});
+
+app.get("/can-take-exam", auth, async (req, res) => {
+
+  const [rows] = await db.query(
+    "SELECT video_progress FROM users WHERE id=?",
+    [req.userId]
+  );
+
+  const progress = rows[0]?.video_progress || 0;
+
+  // 🧪 MODO TEST (bypass)
+  if (req.headers["x-test-mode"] === "true") {
+    return res.json({ ok: true, test: true });
+  }
+
+  if (progress >= 90) {
+    return res.json({ ok: true });
+  }
+
+  res.json({ ok: false, progress });
 });
