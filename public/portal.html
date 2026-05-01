@@ -37,16 +37,16 @@
         </div>
 
         <!-- PASO 2 -->
-        <div class="step-card highlight">
+        <div class="step-card">
           <div class="step-number">2</div>
           <h3>Requisitos</h3>
           <p>Descarga formatos y revisa lo que debes llevar.</p>
           <button onclick="goDocs()">Ver requisitos</button>
         </div>
 
-        <!-- PASO 4 -->
-        <div class="step-card">
-          <div class="step-number">1</div>
+        <!-- PASO 3 -->
+        <div class="step-card highlight">
+          <div class="step-number">3</div>
           <div class="card camera-card">
 
             <h3>📸 Tómate la foto</h3>
@@ -70,7 +70,7 @@
         </div>
 
         <!-- PASO 4 -->
-        <div class="step-card">
+        <div class="step-card highlight">
           <div class="step-number">4</div>
           <h3>Curso</h3>
           <p>Completa el curso obligatorio de seguridad.</p>
@@ -113,29 +113,28 @@
 
   video,
   canvas {
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
-    object-fit: cover;
-  }
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
   canvas {
     display: none;
   }
 
   /* 🔥 OSCURECER TODO */
- .overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
 
-.overlay.hidden {
-  display: none;
-}
+  .overlay.hidden {
+    display: none;
+  }
 
   /* 🎯 MARCO CARA */
   .face-guide {
@@ -261,89 +260,89 @@
         clearInterval(interval);
       }
 
-      if(photoSaved) return;
+      if (photoSaved) return;
 
     }, 800);
   }
 
   // 📸 CAPTURA AUTOMÁTICA
- let photoSaved = false;
+  let photoSaved = false;
 
-function capture(box){
+  function capture(box) {
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-  ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0);
 
-  const size = box.width * 1.8;
+    const size = box.width * 1.8;
 
-  let cropX = box.x + box.width / 2 - size / 2;
-  let cropY = box.y - box.height * 0.4;
+    let cropX = box.x + box.width / 2 - size / 2;
+    let cropY = box.y - box.height * 0.5;
 
-  const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = 300;
-  tempCanvas.height = 400;
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = 260;
+    tempCanvas.height = 320;
 
-  const tctx = tempCanvas.getContext("2d");
+    const tctx = tempCanvas.getContext("2d");
 
-  // fondo blanco
-  tctx.fillStyle = "white";
-  tctx.fillRect(0, 0, 300, 400);
+    // fondo blanco
+    tctx.fillStyle = "white";
+    tctx.fillRect(0, 0, 260, 320);
 
-  tctx.drawImage(
-    canvas,
-    cropX, cropY, size, size,
-    0, 0, 300, 400
-  );
+    tctx.drawImage(
+      canvas,
+      cropX, cropY, size, size,
+      0, 0, 260, 320
+    );
 
-  tempCanvas.toBlob(async (blob) => {
+    tempCanvas.toBlob(async (blob) => {
 
-    const formData = new FormData();
-    formData.append("photo", blob, "tia.png");
+      const formData = new FormData();
+      formData.append("photo", blob, "tia.png");
 
-    const res = await fetch("/upload-photo", {
-      method: "POST",
-      headers: {
-        "Authorization": localStorage.getItem("token")
-      },
-      body: formData
-    });
+      const res = await fetch("/upload-photo", {
+        method: "POST",
+        headers: {
+          "Authorization": localStorage.getItem("token")
+        },
+        body: formData
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if(data.ok){
+      if (data.ok) {
 
-      console.log("✅ FOTO GUARDADA");
+        console.log("✅ FOTO GUARDADA");
 
-      // 🔥 QUITAR OSCURO SOLO AQUÍ
-      document.getElementById("overlay").classList.add("hidden");
+        // 🔥 QUITAR OSCURO SOLO AQUÍ
+        document.getElementById("overlay").classList.add("hidden");
 
-      // 🔥 MENSAJE VISUAL
-      setStatus("✅ Foto guardada correctamente", "green");
+        // 🔥 MENSAJE VISUAL
+        setStatus("✅ Foto guardada correctamente", "green");
 
-      // 🔥 ACTIVAR CURSO
-      document.getElementById("btnCurso").disabled = false;
+        // 🔥 ACTIVAR CURSO
+        document.getElementById("btnCurso").disabled = false;
 
-      // 🔥 GUARDAR ESTADO
-      localStorage.setItem("fotoOK","1");
+        // 🔥 GUARDAR ESTADO
+        localStorage.setItem("fotoOK", "1");
 
-      photoSaved = true;
+        photoSaved = true;
 
-      // 🔥 detener cámara
-      if(stream){
-        stream.getTracks().forEach(t => t.stop());
+        // 🔥 detener cámara
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+        }
+
+      } else {
+        setStatus("Error al guardar", "red");
       }
 
-    } else {
-      setStatus("Error al guardar", "red");
-    }
+    });
 
-  });
-
-  canvas.style.display = "block";
-  video.style.display = "none";
-}
+    canvas.style.display = "block";
+    video.style.display = "none";
+  }
   // UI
   function setStatus(msg, color) {
     const el = document.getElementById("status");
@@ -411,9 +410,9 @@ function capture(box){
 </html>
 
 <script>
-  if(localStorage.getItem("fotoOK")){
-  document.getElementById("btnCurso").disabled = false;
-  document.getElementById("overlay").classList.add("hidden");
-  setStatus("✅ Foto ya registrada", "green");
-}
+  if (localStorage.getItem("fotoOK")) {
+    document.getElementById("btnCurso").disabled = false;
+    document.getElementById("overlay").classList.add("hidden");
+    setStatus("✅ Foto ya registrada", "green");
+  }
 </script>
