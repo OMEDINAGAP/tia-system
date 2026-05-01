@@ -181,10 +181,12 @@
   }
 </style>
 
+</body>
+
 <script>
-  if (!localStorage.getItem("token")) {
-    window.location.href = "/";
-  }
+  // 🔐 TOKEN
+  const token = localStorage.getItem("token");
+  if (!token) location.href = "/";
 
   function goDocs() {
     window.location.href = "/documentos.html";
@@ -194,40 +196,35 @@
     window.location.href = "/curso.html";
   }
 
+  // UI refs
+  const btn = document.getElementById("btnFoto");
+  const guide = document.querySelector(".face-guide");
+
+  btn.disabled = true;
+  btn.style.opacity = 0.5;
+
   if (localStorage.getItem("fotoOK")) {
     document.getElementById("btnCurso").disabled = false;
-    document.getElementById("overlay").style.display = "none";
+    document.getElementById("overlay").classList.add("hidden");
   }
 </script>
 
 <script>
   async function loadModels() {
     console.log("Cargando faceapi...");
-
     await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
-
     console.log("Modelo listo");
   }
 </script>
 
-
 <script>
-
-
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    window.location.href = "/";
-  }
-
-
   let video = document.getElementById("video");
   let canvas = document.getElementById("canvas");
   let ctx = canvas.getContext("2d");
 
   let stream;
-  let capturing = false;
   let lastDetection = null;
+  let detectionOK = false;
 
   // 🎥 iniciar cámara
   async function startCamera() {
@@ -238,29 +235,29 @@
     video.srcObject = stream;
     await video.play();
 
-    trackFace(); // ✅ aquí sí, porque init ya cargó modelos
+    trackFace();
   }
 
+  // 📸 botón
   function takePhoto() {
-
-    if (!lastDetection) {
-      setStatus("No se detecta rostro", "red");
+    if (!detectionOK || !lastDetection) {
+      setStatus("Acomoda tu rostro correctamente", "red");
       return;
     }
 
-    const box = lastDetection.box;
-
-    capture(box);
+    capture(lastDetection.box);
   }
 
+  // 🧠 TRACK FACE PRO
   async function trackFace() {
 
-    if (typeof faceapi === "undefined") {
-      console.log("faceapi no listo");
-      return;
-    }
+    if (typeof faceapi === "undefined") return;
 
     setInterval(async () => {
+
+      detectionOK = false;
+      btn.disabled = true;
+      btn.style.opacity = 0.5;
 
       const detections = await faceapi.detectAllFaces(
         video,
@@ -268,72 +265,69 @@
       );
 
       if (detections.length !== 1) {
-        setStatus("Solo una persona", "red");
+        setStatus("Solo una persona frente a cámara", "red");
+        guide.style.borderColor = "red";
         return;
       }
 
       const box = detections[0].box;
 
-      // 🔥 guardar última detección AQUÍ (correcto)
-      lastDetection = detections[0];
-
       const centerX = box.x + box.width / 2;
-      const videoCenterX = video.videoWidth / 2;
-
       const centerY = box.y + box.height / 2;
+
+      const videoCenterX = video.videoWidth / 2;
       const videoCenterY = video.videoHeight / 2;
 
-      if (Math.abs(centerY - videoCenterY) > 50) {
-        setStatus("Ajusta altura del rostro", "orange");
-        return;
-      }
-
-
+      // 🎯 POSICIÓN HORIZONTAL
       if (Math.abs(centerX - videoCenterX) > 40) {
         setStatus("Céntrate en el marco", "orange");
+        guide.style.borderColor = "orange";
         return;
       }
 
+      // 🎯 POSICIÓN VERTICAL
+      if (centerY < videoCenterY - 40) {
+        setStatus("Baja un poco la cabeza", "orange");
+        guide.style.borderColor = "orange";
+        return;
+      }
+
+      if (centerY > videoCenterY + 40) {
+        setStatus("Sube un poco la cabeza", "orange");
+        guide.style.borderColor = "orange";
+        return;
+      }
+
+      // 📏 TAMAÑO
       const faceRatio = box.width / video.videoWidth;
       const faceHeightRatio = box.height / video.videoHeight;
 
-      // 🎯 AJUSTE TIPO FOTO CREDENCIAL
-      if (faceRatio < 0.28) {
+      if (faceRatio < 0.28 || faceHeightRatio < 0.30) {
         setStatus("Acércate un poco", "orange");
-        document.querySelector(".face-guide").style.borderColor = "red";
+        guide.style.borderColor = "orange";
         return;
       }
 
-      if (faceRatio > 0.40) {
+      if (faceRatio > 0.40 || faceHeightRatio > 0.55) {
         setStatus("Aléjate un poco", "orange");
-        document.querySelector(".face-guide").style.borderColor = "red";
+        guide.style.borderColor = "orange";
         return;
       }
 
-
-      if (faceHeightRatio < 0.30) {
-        setStatus("Acércate un poco", "orange");
-        document.querySelector(".face-guide").style.borderColor = "red";
-        return;
-      }
-
-      if (faceHeightRatio > 0.55) {
-        setStatus("Aléjate un poco", "orange");
-        document.querySelector(".face-guide").style.borderColor = "red";
-        return;
-      }
-
-      document.querySelector(".face-guide").style.borderColor = "#00ff88"; // verde
+      // ✅ TODO PERFECTO
+      guide.style.borderColor = "#00ff88";
       setStatus("Listo para foto ✔", "green");
+
+      lastDetection = detections[0];
+      detectionOK = true;
+
+      btn.disabled = false;
+      btn.style.opacity = 1;
 
     }, 800);
   }
 
-
-
-  // 📸 CAPTURA AUTOMÁTICA
-  let photoSaved = false;
-
+  // 📸 CAPTURA
   function capture(box) {
 
     canvas.width = video.videoWidth;
@@ -352,7 +346,6 @@
 
     const tctx = tempCanvas.getContext("2d");
 
-    // fondo blanco
     tctx.fillStyle = "white";
     tctx.fillRect(0, 0, 260, 180);
 
@@ -370,7 +363,7 @@
       const res = await fetch("/upload-photo", {
         method: "POST",
         headers: {
-          "Authorization": localStorage.getItem("token")
+          Authorization: token
         },
         body: formData
       });
@@ -379,23 +372,14 @@
 
       if (data.ok) {
 
-        console.log("✅ FOTO GUARDADA");
-
-        // 🔥 QUITAR OSCURO SOLO AQUÍ
         document.getElementById("overlay").classList.add("hidden");
 
-        // 🔥 MENSAJE VISUAL
         setStatus("✅ Foto guardada correctamente", "green");
 
-        // 🔥 ACTIVAR CURSO
         document.getElementById("btnCurso").disabled = false;
 
-        // 🔥 GUARDAR ESTADO
         localStorage.setItem("fotoOK", "1");
 
-        photoSaved = true;
-
-        // 🔥 detener cámara
         if (stream) {
           stream.getTracks().forEach(t => t.stop());
         }
@@ -409,6 +393,7 @@
     canvas.style.display = "block";
     video.style.display = "none";
   }
+
   // UI
   function setStatus(msg, color) {
     const el = document.getElementById("status");
@@ -416,23 +401,14 @@
     el.style.color = color;
   }
 
-  // 🚀 iniciar
+  // 🚀 INIT
   async function init() {
-    await loadModels();   // 🔥 primero carga modelo
-    await startCamera();  // 🔥 luego cámara
+    await loadModels();
+    await startCamera();
   }
 
   init();
 </script>
 
-</body>
 
 </html>
-
-<script>
-  if (localStorage.getItem("fotoOK")) {
-    document.getElementById("btnCurso").disabled = false;
-    document.getElementById("overlay").classList.add("hidden");
-    setStatus("✅ Foto ya registrada", "green");
-  }
-</script>
