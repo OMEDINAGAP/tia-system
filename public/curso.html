@@ -215,6 +215,9 @@
 
       if (!player || typeof player.getCurrentTime !== "function") return;
 
+      const state = player.getPlayerState();
+      if (state !== YT.PlayerState.PLAYING) return;
+
       const current = player.getCurrentTime();
 
       if (!duration || duration === 0) {
@@ -222,17 +225,18 @@
         return;
       }
 
-      // 🚫 NO ADELANTAR
-      if (current - maxTime > 5) {
-        player.seekTo(maxTime);
+      // 🚫 NO ADELANTAR (CORREGIDO)
+      if (current > maxTime + 8) {
+        player.seekTo(maxTime - 1);
       } else {
         maxTime = Math.max(maxTime, current);
       }
 
       const percentCurrentVideo = (maxTime / duration);
-
-      // 🔥 PROGRESO TOTAL
       const totalProgress = ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
+
+
+
       // 🔥 SOLO ENVÍA SI AVANZÓ 3%
       if (totalProgress - lastSent >= 3) {
 
