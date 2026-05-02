@@ -130,6 +130,7 @@
       border: 2px solid white;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -159,7 +160,6 @@
     <!-- 🎮 CARD ACCIONES -->
     <div class="card actions">
       <button class="btn-success" onclick="next()">Siguiente</button>
-      <button class="btn-back" onclick="goBack()">← Regresar</button>
     </div>
 
   </div>
@@ -248,7 +248,16 @@
       const selected = document.querySelector("input[name='q']:checked");
 
       if (!selected) {
-        alert("Selecciona una respuesta");
+        Swal.fire({
+          title: '✈️ TIA',
+          html: '<b>Selecciona una respuesta antes de continuar</b>',
+          icon: 'warning',
+          confirmButtonText: 'Aceptar',
+          background: '#0f172a',
+          color: '#fff',
+          confirmButtonColor: '#22c55e',
+          backdrop: 'rgba(0,0,0,0.8)'
+        });
         return;
       }
 
@@ -274,19 +283,66 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": token
+          "Authorization": "Bearer " + token
         },
         body: JSON.stringify({ answers: payload })
       });
 
       const data = await res.json();
 
-      document.body.innerHTML = `
-    <h1>Resultado: ${data.score}%</h1>
-    <button onclick="location.href='/certificado.html'">Ver certificado</button>
-  `;
-    }
+      const score = data.score;
+      const PASS_SCORE = 70; // 🔥 puedes subirlo a 80 o 90 si quieres
 
+      // ✅ APROBADO
+      if (score >= PASS_SCORE) {
+
+        Swal.fire({
+          title: '🎉 ¡Felicidades!',
+          html: `
+        <p>Has aprobado el examen con <b>${score}%</b></p>
+        <p>Tu conocimiento contribuye a la seguridad aeroportuaria ✈️</p>
+      `,
+          icon: 'success',
+          confirmButtonText: 'Ver certificado',
+          background: '#0f172a',
+          color: '#fff',
+          confirmButtonColor: '#22c55e',
+          backdrop: 'rgba(0,0,0,0.8)'
+        }).then(() => {
+
+          localStorage.removeItem("testMode"); // limpia modo prueba
+          window.location.href = "/certificado.html";
+
+        });
+
+      } else {
+
+        // ❌ REPROBADO
+        Swal.fire({
+          title: '⚠️ No aprobado',
+          html: `
+        <p>Obtuviste <b>${score}%</b></p>
+        <p>La seguridad en el aeropuerto es una responsabilidad crítica.</p>
+        <p><b>Puedes intentarlo nuevamente y mejorar tu resultado.</b></p>
+      `,
+          icon: 'warning',
+          confirmButtonText: 'Intentar nuevamente',
+          background: '#0f172a',
+          color: '#fff',
+          confirmButtonColor: '#f59e0b',
+          backdrop: 'rgba(0,0,0,0.8)'
+        }).then(() => {
+
+          // 🔁 REINICIAR EXAMEN
+          current = 0;
+          answers = new Array(questions.length).fill(null);
+
+          loadExam(); // vuelve a cargar preguntas nuevas al reiniciar
+
+        });
+
+      }
+    }
     loadExam();
 
     async function validateAccess() {
@@ -304,7 +360,15 @@
       const data = await res.json();
 
       if (!data.ok) {
-        alert("No tienes acceso al examen");
+        Swal.fire({
+          title: '⚠️ Atención',
+          text: 'No tienes acceso al examen',
+          icon: 'warning',
+          confirmButtonText: 'Entendido',
+          background: '#1e293b',
+          color: '#fff',
+          confirmButtonColor: '#22c55e'
+        });
         window.location.href = "/curso.html";
       }
     }
