@@ -264,30 +264,39 @@
   }
 
   async function loadProgress() {
-
     try {
+
       const res = await fetch("/video-progress", {
         headers: {
-          Authorization: "Bearer " + token
+          "Authorization": "Bearer " + token
         }
       });
 
+      if (!res.ok) {
+        console.error("ERROR 401 o backend:", res.status);
+        return;
+      }
+
       const data = await res.json();
 
-      if (!Array.isArray(data)) return;
+      console.log("PROGRESO RECIBIDO:", data);
 
-      // 🔥 convertir a mapa
-      data.forEach(v => {
-        videoProgressMap[v.videoIndex] = v.progress;
+      videoProgressMap = {};
+
+      data.forEach(row => {
+        videoProgressMap[row.videoIndex] = {
+          progress: row.progress,
+          completed: row.completed
+        };
       });
 
-      console.log("PROGRESO CARGADO:", videoProgressMap);
-
     } catch (err) {
-      console.error("Error cargando progreso:", err);
+      console.error("ERROR loadProgress:", err);
     }
   }
 
+
+  
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
 

@@ -244,7 +244,7 @@ app.post("/log-video", auth, async (req, res) => {
 app.get("/video-progress", auth, async (req, res) => {
 
   const [rows] = await db.query(
-    "SELECT * FROM video_progress WHERE userId=?",
+    "SELECT videoIndex, progress, completed FROM video_progress WHERE userId=?",
     [req.userId]
   );
 
