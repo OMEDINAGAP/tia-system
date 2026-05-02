@@ -183,7 +183,7 @@ app.post("/log-login", async (req, res) => {
 });
 
 
-
+/* 
 app.post("/log-video", auth, async (req, res) => {
   try {
 
@@ -203,7 +203,7 @@ app.post("/log-video", auth, async (req, res) => {
     console.error("ERROR log-video:", err);
     res.status(500).json({ ok: false });
   }
-});
+}); */
 
 app.get("/video-progress", auth, async (req, res) => {
 
@@ -216,7 +216,7 @@ app.get("/video-progress", auth, async (req, res) => {
 });
 
 
-app.post("/log-video-log", auth, async (req, res) => {
+app.post("/log-video", auth, async (req, res) => {
 
   const userId = req.userId;
   const { progress, videoIndex } = req.body;
