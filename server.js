@@ -216,6 +216,9 @@ app.post("/log-login", async (req, res) => {
     console.error("DB ERROR:", err);
     res.status(500).json({ ok: false, error: "DB error" });
   }
+
+  console.log("🆕 LOGIN USER:", id);
+
 });
 
 
@@ -230,7 +233,7 @@ app.get("/video-progress", auth, async (req, res) => {
   );
 
   console.log("📊 RESULTADOS BD:", rows);
-
+  console.log("📥 GET USER:", req.userId);
   res.json(rows);
 });
 
@@ -294,10 +297,14 @@ app.post("/log-video", auth, async (req, res) => {
 
     res.json({ ok: true, total: avg });
 
+
   } catch (err) {
     console.error("❌ ERROR log-video:", err);
     res.status(500).json({ ok: false });
   }
+
+  console.log("💾 SAVE USER:", userId);
+
 });
 
 // LOG EXAM SEGURO

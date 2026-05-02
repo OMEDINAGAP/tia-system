@@ -286,6 +286,7 @@
       const data = await res.json();
 
       console.log("PROGRESO RECIBIDO:", data);
+      
 
       videoProgressMap = {};
 
@@ -423,6 +424,8 @@
     document.getElementById("progress").innerText =
       "Progreso total: " + Math.floor(totalProgress) + "%";
 
+      
+
     // 🚀 ENVÍO CONTROLADO (SOLO POR VIDEO, NO TOTAL)
     if (percentCurrentVideo - lastSent >= 5) {
 
@@ -438,6 +441,8 @@
           progress: percentCurrentVideo,   // ✅ porcentaje correcto
           videoIndex: currentVideoIndex
         })
+
+
       })
         .then(res => res.json())
         .then(data => console.log("💾 guardado:", data))
