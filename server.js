@@ -197,35 +197,60 @@ app.post("/admin-login", async (req, res) => {
   }
 });
 
-// LOG LOGIN
+
 app.post("/log-login", async (req, res) => {
   try {
-    const id = Date.now();
 
-    await db.query(
-      "INSERT INTO users (id, name, loginTime, company) VALUES (?, ?, NOW(), ?)",
-      [id, req.body.name, req.body.company]
+    const { name, company } = req.body;
+
+    if (!name || !company) {
+      return res.status(400).json({ ok: false, error: "Datos requeridos" });
+    }
+
+    // 🔍 Buscar usuario existente
+    const [rows] = await db.query(
+      "SELECT * FROM users WHERE name=? AND company=?",
+      [name.trim(), company.trim()]
     );
 
-    // 🔥 CORREGIDO
-    const token = await createSession(id);
+    let userId;
 
-    res.json({ id, token });
+    if (rows.length > 0) {
+      // ✅ Usuario existente
+      userId = rows[0].id;
+
+      console.log("👤 Usuario existente:", userId);
+
+    } else {
+      // 🆕 Crear nuevo usuario
+      userId = Date.now();
+
+      await db.query(
+        "INSERT INTO users (id, name, loginTime, company) VALUES (?, ?, NOW(), ?)",
+        [userId, name.trim(), company.trim()]
+      );
+
+      console.log("🆕 Usuario nuevo:", userId);
+    }
+
+    // 🔥 Eliminar sesiones anteriores (IMPORTANTE)
+    await db.query("DELETE FROM sessions WHERE userId=?", [userId]);
+
+    // 🔐 Crear nueva sesión
+    const token = await createSession(userId);
+
+    res.json({ ok: true, token, userId });
 
   } catch (err) {
-    console.error("DB ERROR:", err);
-    res.status(500).json({ ok: false, error: "DB error" });
+    console.error("❌ ERROR log-login:", err);
+    res.status(500).json({ ok: false });
   }
-
-  console.log("🆕 LOGIN USER:", id);
-
 });
-
 
 
 app.get("/video-progress", auth, async (req, res) => {
 
-  console.log("🔐 USER ID DEL TOKEN:", req.userId);
+  console.log("📥 GET USER:", req.userId);
 
   const [rows] = await db.query(
     "SELECT videoIndex, progress, completed FROM video_progress WHERE userId=?",
@@ -233,7 +258,7 @@ app.get("/video-progress", auth, async (req, res) => {
   );
 
   console.log("📊 RESULTADOS BD:", rows);
-  console.log("📥 GET USER:", req.userId);
+
   res.json(rows);
 });
 
@@ -243,23 +268,18 @@ app.post("/log-video", auth, async (req, res) => {
     const userId = req.userId;
     let { progress, videoIndex } = req.body;
 
-    console.log("📥 RECIBIDO:", { userId, videoIndex, progress });
-
-    // 🔒 Validaciones
     progress = parseFloat(progress);
     videoIndex = parseInt(videoIndex);
 
     if (isNaN(progress) || isNaN(videoIndex)) {
-      return res.status(400).json({ ok: false, error: "Datos inválidos" });
+      return res.status(400).json({ ok: false });
     }
 
-    // 🔥 limitar rango 0 - 100
     progress = Math.max(0, Math.min(progress, 100));
-
-    // ✅ completar si >= 90%
     const completed = progress >= 90;
 
-    // 💾 guardar o actualizar progreso del video
+    console.log("💾 SAVE USER:", userId);
+
     await db.query(`
       INSERT INTO video_progress (userId, videoIndex, progress, completed)
       VALUES (?, ?, ?, ?)
@@ -268,43 +288,12 @@ app.post("/log-video", auth, async (req, res) => {
         completed = VALUES(completed)
     `, [userId, videoIndex, progress, completed]);
 
-    // 🔥 calcular progreso TOTAL del curso
-    const [rows] = await db.query(
-      "SELECT progress FROM video_progress WHERE userId=?",
-      [userId]
-    );
-
-    let total = 0;
-
-    for (let r of rows) {
-      total += parseFloat(r.progress) || 0;
-    }
-
-    const avg = rows.length ? total / rows.length : 0;
-
-    // 💾 guardar progreso global en users
-    await db.query(
-      "UPDATE users SET video=? WHERE id=?",
-      [avg, userId]
-    );
-
-    console.log("📊 PROGRESO:", {
-      userId,
-      videoIndex,
-      progress,
-      total: avg
-    });
-
-    res.json({ ok: true, total: avg });
-
+    res.json({ ok: true });
 
   } catch (err) {
     console.error("❌ ERROR log-video:", err);
     res.status(500).json({ ok: false });
   }
-
-  console.log("💾 SAVE USER:", userId);
-
 });
 
 // LOG EXAM SEGURO

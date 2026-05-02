@@ -181,17 +181,17 @@
 
   // 🔐 TOKEN
   const token = localStorage.getItem("token");
-  console.log("TOKEN:", token);
+
 
   if (!token) {
-    alert("Sesión no encontrada");
+    alert("Sesión expirada");
     window.location.href = "/";
   }
 
   // 🎥 VIDEOS (ORDENADOS)
   const videos = [
-    "qnpYpzOIN0c", // Video 1
-    "YDpYySq7KIo"   // Video 2
+    "qnpYpzOIN0c",
+    "YDpYySq7KIo"
   ];
 
   let currentVideoIndex = 0;
@@ -279,17 +279,15 @@
       });
 
       if (!res.ok) {
-        console.error("ERROR 401 o backend:", res.status);
+        console.error("ERROR:", res.status);
         return;
       }
 
       const data = await res.json();
 
       console.log("PROGRESO RECIBIDO:", data);
-      
 
       videoProgressMap = {};
-
       let lastVideoIndex = 0;
 
       data.forEach(row => {
@@ -299,7 +297,6 @@
           completed: row.completed
         };
 
-        // 🔥 detectar último video
         if (!row.completed) {
           lastVideoIndex = row.videoIndex;
         } else {
@@ -309,7 +306,6 @@
 
       console.log("MAPA FINAL:", videoProgressMap);
 
-      // 🔥 cargar video correcto
       currentVideoIndex = lastVideoIndex;
 
       player.loadVideoById(videos[currentVideoIndex]);
@@ -318,7 +314,6 @@
       console.error("ERROR loadProgress:", err);
     }
   }
-
 
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
@@ -424,7 +419,7 @@
     document.getElementById("progress").innerText =
       "Progreso total: " + Math.floor(totalProgress) + "%";
 
-      
+
 
     // 🚀 ENVÍO CONTROLADO (SOLO POR VIDEO, NO TOTAL)
     if (percentCurrentVideo - lastSent >= 5) {

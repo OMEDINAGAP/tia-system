@@ -166,31 +166,34 @@
         // 🔥 CREAR SESIÓN (AQUÍ VA)
         const u = await fetch("/log-login", {
           method: "POST",
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
             name,
             company
           })
-        });
+        })
+          .then(res => res.json())
+          .then(data => {
 
-        const user = await u.json();
+            localStorage.setItem("token", data.token); // 🔥 CLAVE
 
-        // 🔐 GUARDAR TOKEN
-        localStorage.setItem("token", user.token);
+            // 🎉 mensaje bonito
+            Swal.fire({
+              title: "✅ Registro exitoso",
+              html: `Tu folio es:<br><b>${data.folio}</b>`,
+              confirmButtonText: "Continuar",
+              background: "#0f172a",
+              color: "#fff"
+            }).then(() => {
+              window.location.href = "/portal.html";
+            });
 
-        // (opcional pero útil)
-        localStorage.setItem("userId", data.id);
+          });
 
-        // 🎉 mensaje bonito
-        Swal.fire({
-          title: "✅ Registro exitoso",
-          html: `Tu folio es:<br><b>${data.folio}</b>`,
-          confirmButtonText: "Continuar",
-          background: "#0f172a",
-          color: "#fff"
-        }).then(() => {
-          window.location.href = "/portal.html";
-        });
+
+
 
       }
     }
@@ -233,7 +236,7 @@
           })
         });
 
-   
+
         const session = await u.json();
 
         if (!session.token) {
