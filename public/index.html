@@ -233,6 +233,7 @@
           })
         });
 
+   
         const session = await u.json();
 
         if (!session.token) {
@@ -245,6 +246,9 @@
 
         // opcional
         localStorage.setItem("userId", userData.id);
+
+        console.log("💾 GUARDANDO PARA USER:", userId);
+
 
         // 🚀 entrar
         window.location.href = "/portal.html";

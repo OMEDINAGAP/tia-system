@@ -222,10 +222,14 @@ app.post("/log-login", async (req, res) => {
 
 app.get("/video-progress", auth, async (req, res) => {
 
+  console.log("🔐 USER ID DEL TOKEN:", req.userId);
+
   const [rows] = await db.query(
     "SELECT videoIndex, progress, completed FROM video_progress WHERE userId=?",
     [req.userId]
   );
+
+  console.log("📊 RESULTADOS BD:", rows);
 
   res.json(rows);
 });
@@ -237,7 +241,7 @@ app.post("/log-video", auth, async (req, res) => {
     let { progress, videoIndex } = req.body;
 
     console.log("📥 RECIBIDO:", { userId, videoIndex, progress });
-    
+
     // 🔒 Validaciones
     progress = parseFloat(progress);
     videoIndex = parseInt(videoIndex);

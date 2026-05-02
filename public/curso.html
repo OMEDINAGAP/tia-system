@@ -181,9 +181,11 @@
 
   // 🔐 TOKEN
   const token = localStorage.getItem("token");
+  console.log("TOKEN:", token);
 
   if (!token) {
-    location.href = "/";
+    alert("Sesión no encontrada");
+    window.location.href = "/";
   }
 
   // 🎥 VIDEOS (ORDENADOS)
