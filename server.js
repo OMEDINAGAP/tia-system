@@ -32,48 +32,61 @@ const SECRET = process.env.SECRET;
 const sessions = new Map(); // token -> userId
 
 // 👇 AQUÍ VA EL MIDDLEWARE
-async function auth(req, res, next) {
-  try {
-    const header = req.headers.authorization;
+let lastSent = 0;
 
-    if (!header) {
-      return res.status(401).json({ ok: false });
-    }
+function track() {
 
-    const token = header
-      .replace("Bearer", "")
-      .trim();
+  if (!player || typeof player.getCurrentTime !== "function") return;
 
-    const [rows] = await db.query(
-      "SELECT * FROM sessions WHERE token=?",
-      [token]
-    );
+  const state = player.getPlayerState();
+  if (state !== YT.PlayerState.PLAYING) return;
 
-    const session = rows[0];
+  const current = player.getCurrentTime();
 
-    if (!session) {
-      return res.status(401).json({ ok: false });
-    }
+  if (!duration || duration === 0) {
+    duration = player.getDuration();
+    return;
+  }
 
-    if (session.expires < Date.now()) {
-      return res.status(401).json({ ok: false });
-    }
+  // 🚫 NO ADELANTAR
+  if (current > maxTime + 8) {
+    player.seekTo(maxTime - 1);
+  } else {
+    maxTime = Math.max(maxTime, current);
+  }
 
-    // 🔥 IMPORTANTE
-    req.userId = session.userId;
+  const percentCurrentVideo = (maxTime / duration);
+  const totalProgress =
+    ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
 
-    // 🔥 AQUÍ ESTÁ LA CLAVE
-    req.isAdmin = String(session.userId).startsWith("admin-");
+  // 🧠 UI
+  document.getElementById("progress").innerText =
+    "Progreso total: " + Math.floor(totalProgress) + "%";
 
-    console.log("HEADER RAW:", header);
-    console.log("TOKEN LIMPIO:", token);
-    console.log("TOKEN DB:", rows[0]?.token);
+  document.getElementById("progress-fill").style.width =
+    totalProgress + "%";
 
-    next();
+  console.log("TRACK:", currentVideoIndex, maxTime, totalProgress);
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ ok: false });
+  // 🔥 ENVÍO
+  if (totalProgress - lastSent >= 3) {
+
+    lastSent = totalProgress;
+
+    fetch("/log-video", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({
+        progress: maxTime,
+        videoIndex: currentVideoIndex
+      })
+    })
+    .then(r => r.text())
+    .then(console.log)
+    .catch(err => console.error("LOG VIDEO ERROR:", err));
   }
 }
 
