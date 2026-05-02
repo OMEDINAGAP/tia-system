@@ -111,7 +111,7 @@
 
   <div class="sidebar">
     <h2>✈️ TIA</h2>
-    <div class="menu-item">Curso</div>
+    <div class="menu-item" onclick="goCurso()">Curso</div>
     <div class="menu-item active">Examen</div>
   </div>
 
@@ -274,6 +274,10 @@
     }
 
     validateAccess();
+
+    function goCurso() {
+      window.location.href = "/curso.html";
+    }
 
 
   </script>
