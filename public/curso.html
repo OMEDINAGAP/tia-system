@@ -214,22 +214,9 @@
       }
     }
 
-    async function goExamTest() {
-
-      const token = localStorage.getItem("token");
-
-      const res = await fetch("/can-take-exam", {
-        headers: {
-          "Authorization": "Bearer " + localStorage.getItem("token"),
-          "x-test-mode": "true" // 🔥 bypass backend
-        }
-      });
-
-      const data = await res.json();
-
-      if (data.ok) {
-        window.location.href = "/examen.html";
-      }
+    function goExamTest() {
+      localStorage.setItem("testMode", "true");
+      window.location.href = "/examen.html";
     }
 
   </script>

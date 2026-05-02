@@ -256,9 +256,13 @@
     async function validateAccess() {
 
       const token = localStorage.getItem("token");
+      const isTest = localStorage.getItem("testMode") === "true";
 
       const res = await fetch("/can-take-exam", {
-        headers: { Authorization: token }
+        headers: {
+          Authorization: "Bearer " + token,
+          ...(isTest && { "x-test-mode": "true" }) // 🔥 clave
+        }
       });
 
       const data = await res.json();
