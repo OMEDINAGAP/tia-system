@@ -318,36 +318,35 @@
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
 
-    // 🔥 CUANDO CARGA VIDEO
-    if (event.data === YT.PlayerState.CUED) {
+    // 🔥 REANUDAR CUANDO EMPIEZA
+    if (event.data === YT.PlayerState.PLAYING) {
 
       const saved = videoProgressMap[currentVideoIndex]?.progress || 0;
 
-      const waitSeek = () => {
-        const d = player.getDuration();
+      if (!saved || saved <= 0) return;
 
-        if (d && d > 0) {
-          const savedTime = (saved / 100) * d;
+      const d = player.getDuration();
+      if (!d || d === 0) return;
 
-          console.log("REANUDANDO EN:", savedTime);
+      const savedTime = (saved / 100) * d;
 
-          if (savedTime > 0) {
-            player.seekTo(savedTime, true);
-          }
-        } else {
-          setTimeout(waitSeek, 400);
-        }
-      };
+      console.log("🎯 REANUDANDO EN:", savedTime);
 
-      waitSeek();
+      // 🔥 evitar que lo haga múltiples veces
+      if (!window._seekDone) {
+        player.seekTo(savedTime, true);
+        window._seekDone = true;
+      }
     }
 
-    // 🔥 CUANDO TERMINA
+    // 🔥 RESET bandera cuando cambie video
     if (event.data === YT.PlayerState.ENDED) {
+
+      window._seekDone = false;
 
       videoProgressMap[currentVideoIndex] = {
         completed: true,
-        progress: 100 // ✅ corregido
+        progress: 100
       };
 
       if (currentVideoIndex < videos.length - 1) {
@@ -365,7 +364,6 @@
       }
     }
   }
-
 
   function resetTracking() {
     duration = 0;
