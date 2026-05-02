@@ -308,6 +308,9 @@
 
       currentVideoIndex = lastVideoIndex;
 
+      // 🔥 RESET DEL SEEK (IMPORTANTE)
+      window._seekDone = false;
+
       player.loadVideoById(videos[currentVideoIndex]);
 
     } catch (err) {
@@ -318,8 +321,8 @@
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
 
-    // 🔥 REANUDAR CUANDO EMPIEZA
-    if (event.data === YT.PlayerState.PLAYING) {
+    // 🔥 USAR BUFFERING (clave)
+    if (event.data === YT.PlayerState.BUFFERING) {
 
       const saved = videoProgressMap[currentVideoIndex]?.progress || 0;
 
@@ -332,14 +335,13 @@
 
       console.log("🎯 REANUDANDO EN:", savedTime);
 
-      // 🔥 evitar que lo haga múltiples veces
       if (!window._seekDone) {
         player.seekTo(savedTime, true);
         window._seekDone = true;
       }
     }
 
-    // 🔥 RESET bandera cuando cambie video
+    // 🔥 RESET AL CAMBIAR VIDEO
     if (event.data === YT.PlayerState.ENDED) {
 
       window._seekDone = false;
@@ -354,6 +356,9 @@
         currentVideoIndex++;
         resetTracking();
 
+        // 🔥 RESET DEL SEEK
+        window._seekDone = false;
+
         player.loadVideoById(videos[currentVideoIndex]);
         updateStatus();
 
@@ -364,7 +369,6 @@
       }
     }
   }
-
   function resetTracking() {
     duration = 0;
     maxTime = 0;
