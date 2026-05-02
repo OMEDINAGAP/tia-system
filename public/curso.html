@@ -200,6 +200,7 @@
   let maxTime = 0;
   let wasPlaying = false;
   let lastSent = 0; // 🔥 ESTA FALTABA
+  let videoProgressMap = {};
 
   // 🔒 CONTROL DE PESTAÑA
   document.addEventListener("visibilitychange", () => {
@@ -247,31 +248,68 @@
     // 🔊 FORZAR SONIDO
     player.unMute();
     player.setVolume(100);
+    loadProgress(); // 🔥 IMPORTANTE
     setInterval(track, 5000);
     updateStatus();
   }
+
+  async function loadProgress() {
+
+    const res = await fetch("/video-progress", {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+
+    const data = await res.json();
+
+    data.forEach(v => {
+      videoProgressMap[v.videoIndex] = v;
+    });
+
+    // 🔥 reanudar video correcto
+    for (let i = 0; i < videos.length; i++) {
+      if (!videoProgressMap[i]?.completed) {
+        currentVideoIndex = i;
+        break;
+      }
+    }
+
+    player.loadVideoById(videos[currentVideoIndex]);
+
+    // 🔥 reanudar tiempo
+    const saved = videoProgressMap[currentVideoIndex];
+    if (saved && saved.progress > 0) {
+      setTimeout(() => {
+        player.seekTo(saved.progress);
+      }, 1500);
+    }
+
+    updateStatus();
+  }
+
 
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
 
     if (event.data === YT.PlayerState.ENDED) {
 
-      if (currentVideoIndex < videos.length - 1) {
+      videoProgressMap[currentVideoIndex] = {
+        completed: true,
+        progress: duration
+      };
 
+      if (currentVideoIndex < videos.length - 1) {
         currentVideoIndex++;
         resetTracking();
-
         player.loadVideoById(videos[currentVideoIndex]);
-
         updateStatus();
-
       } else {
-
         document.getElementById("status").innerText = "✅ Curso completado";
         document.getElementById("btnExam").disabled = false;
-
       }
     }
+
   }
 
   // 🔁 RESET ENTRE VIDEOS
@@ -280,7 +318,7 @@
     maxTime = 0;
   }
 
-  // 📊 TRACKING
+
   function track() {
 
     if (!player || typeof player.getCurrentTime !== "function") return;
@@ -292,10 +330,10 @@
 
     if (!duration || duration === 0) {
       duration = player.getDuration();
-      return;
+      if (!duration) return; // 🔥 evita bug
     }
 
-    // 🚫 NO ADELANTAR (CORREGIDO)
+    // 🚫 NO ADELANTAR
     if (current > maxTime + 8) {
       player.seekTo(maxTime - 1);
     } else {
@@ -303,11 +341,16 @@
     }
 
     const percentCurrentVideo = (maxTime / duration);
-    const totalProgress = ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
+    const totalProgress =
+      ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
 
+    // 🔥 UI (ESTO TE FALTABA)
+    document.getElementById("progress-fill").style.width = totalProgress + "%";
 
+    document.getElementById("progress").innerText =
+      "Progreso total: " + Math.floor(totalProgress) + "%";
 
-    // 🔥 SOLO ENVÍA SI AVANZÓ 3%
+    // 🔥 ENVÍO CONTROLADO
     if (totalProgress - lastSent >= 3) {
 
       lastSent = totalProgress;
@@ -319,17 +362,23 @@
           "Authorization": "Bearer " + token
         },
         body: JSON.stringify({
-          progress: totalProgress
+          progress: maxTime,
+          videoIndex: currentVideoIndex
         })
-      }).catch(() => { }); // evita romper UI
+      }).catch(() => { });
     }
-
   }
 
   // 🧠 STATUS UX
   function updateStatus() {
-    document.getElementById("status").innerText =
-      `🎥 Video ${currentVideoIndex + 1} de ${videos.length}`;
+
+    let statusText = `🎥 Video ${currentVideoIndex + 1} de ${videos.length}`;
+
+    if (videoProgressMap[currentVideoIndex]?.completed) {
+      statusText += " ✔ Completado";
+    }
+
+    document.getElementById("status").innerText = statusText;
   }
 
   // 🚀 IR AL EXAMEN (VALIDADO)

@@ -192,6 +192,35 @@ app.post("/log-video", auth, async (req, res) => {
   }
 });
 
+app.get("/video-progress", auth, async (req, res) => {
+
+  const [rows] = await db.query(
+    "SELECT * FROM video_progress WHERE userId=?",
+    [req.userId]
+  );
+
+  res.json(rows);
+});
+
+
+app.post("/log-video-log", auth, async (req, res) => {
+
+  const userId = req.userId;
+  const { progress, videoIndex } = req.body;
+
+  const completed = progress >= 90;
+
+  await db.query(`
+    INSERT INTO video_progress (userId, videoIndex, progress, completed)
+    VALUES (?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      progress = GREATEST(progress, VALUES(progress)),
+      completed = VALUES(completed)
+  `, [userId, videoIndex, progress, completed]);
+
+  res.json({ ok: true });
+});
+
 
 // LOG EXAM SEGURO
 app.post("/log-exam", auth, async (req, res) => {
