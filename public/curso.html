@@ -245,25 +245,15 @@
     });
   }
 
-  // ▶️ READY
   async function onReady() {
 
     player.unMute();
     player.setVolume(100);
 
-    // 🔥 esperar a que el player esté listo
+    // 🔥 cargar progreso
     setTimeout(() => {
       loadProgress();
     }, 1000);
-
-
-    const savedTime = videoProgressMap[currentVideoIndex]?.progress || 0;
-    // 🔍 DEBUG AQUÍ
-    console.log("REANUDANDO EN (onReady):", savedTime);
-
-    if (savedTime > 0) {
-      player.seekTo(savedTime, true);
-    }
 
     setInterval(track, 5000);
     updateStatus();
