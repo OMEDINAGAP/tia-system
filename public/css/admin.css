@@ -1,0 +1,90 @@
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+}
+
+.layout {
+  display: flex;
+}
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px;
+  background: #020617;
+  padding: 20px;
+}
+
+.sidebar a {
+  display: block;
+  padding: 10px;
+  margin: 5px 0;
+  cursor: pointer;
+}
+
+.sidebar a.active {
+  background: #4f46e5;
+}
+
+/* MAIN */
+.main {
+  flex: 1;
+  padding: 20px;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* KPIs */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.card {
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.green { background: #065f46; }
+.yellow { background: #78350f; }
+.red { background: #7f1d1d; }
+
+/* PROGRESS */
+.bar {
+  height: 10px;
+  background: #1e293b;
+  border-radius: 5px;
+}
+
+#bar-fill {
+  height: 10px;
+  width: 0%;
+  background: #22c55e;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  background: #1e293b;
+  border-radius: 10px;
+}
+
+td, th {
+  padding: 10px;
+}
+
+/* ALERTS */
+.alerts, .activity {
+  margin-top: 20px;
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 10px;
+}

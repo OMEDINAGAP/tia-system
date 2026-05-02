@@ -1,455 +1,94 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 
 <head>
-  <title>Admin TIA PRO</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f1f5f9;
-      margin: 0;
-    }
-
-    /* HEADER */
-    .header {
-      background: #111827;
-      color: white;
-      padding: 12px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .logout {
-      background: #ef4444;
-      padding: 6px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    /* KPI */
-    .kpis {
-      display: flex;
-      gap: 15px;
-      padding: 15px;
-    }
-
-    .kpi {
-      flex: 1;
-      padding: 15px;
-      border-radius: 10px;
-      color: white;
-      font-size: 14px;
-    }
-
-    .kpi1 {
-      background: linear-gradient(45deg, #34d399, #059669);
-    }
-
-    .kpi2 {
-      background: linear-gradient(45deg, #60a5fa, #2563eb);
-    }
-
-    .kpi3 {
-      background: linear-gradient(45deg, #f87171, #dc2626);
-    }
-
-    /* TABLA */
-    .table {
-      width: 100%;
-      background: white;
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    .table th {
-      background: #e5e7eb;
-    }
-
-    .table td,
-    .table th {
-      padding: 10px;
-    }
-
-    /* BARRA */
-    .bar {
-      height: 8px;
-      background: #e5e7eb;
-      border-radius: 5px;
-      overflow: hidden;
-    }
-
-    .bar span {
-      display: block;
-      height: 100%;
-      background: #3b82f6;
-    }
-
-    /* BADGES */
-    .badge {
-      padding: 5px 10px;
-      border-radius: 20px;
-      color: white;
-      font-size: 12px;
-    }
-
-    .ok {
-      background: #22c55e;
-    }
-
-    .fail {
-      background: #ef4444;
-    }
-
-    /* BOTONES */
-    .btn {
-      background: #3b82f6;
-      color: white;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-  </style>
-
-
-
+  <meta charset="UTF-8">
+  <title>TIA Dashboard</title>
+  <link rel="stylesheet" href="/css/admin.css">
 </head>
 
 <body>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+  <div class="layout">
 
-      background: linear-gradient(135deg, #3b0764, #1e3a8a, #0f172a);
-    }
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <h2>✈️ TIA Dashboard</h2>
+      <nav>
+        <a class="active">Dashboard</a>
+        <a>Usuarios</a>
+        <a>Cursos</a>
+        <a>Exámenes</a>
+        <a>QR</a>
+        <a>Logs</a>
+      </nav>
+    </aside>
 
-    /* TARJETA */
-    .login-card {
-      width: 300px;
-      padding: 30px;
-      border-radius: 20px;
-      backdrop-filter: blur(15px);
-      background: rgba(255, 255, 255, 0.1);
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-      text-align: center;
-      color: white;
-    }
+    <!-- MAIN -->
+    <main class="main">
 
-    /* ICONO */
-    .avatar {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
-      margin: 0 auto 20px;
-    }
+      <!-- HEADER -->
+      <header class="header">
+        <h1>Centro de Control - Capacitación</h1>
+        <div class="header-right">
+          <span id="time"></span>
+          <span class="status">🟢 Online</span>
+        </div>
+      </header>
 
-    /* INPUTS */
-    .input-group {
-      position: relative;
-      margin: 15px 0;
-    }
+      <!-- KPIs -->
+      <section class="kpis">
+        <div class="card">Usuarios <strong id="users">0</strong></div>
+        <div class="card green">Completados <strong id="done">0</strong></div>
+        <div class="card yellow">En progreso <strong id="progress">0</strong></div>
+        <div class="card red">Reprobados <strong id="fail">0</strong></div>
+      </section>
 
-    .input-group input {
-      width: 100%;
-      padding: 10px 10px;
-      border: none;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-      background: transparent;
-      color: white;
-      outline: none;
-    }
-
-    /* BOTÓN */
-    .login-btn {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(90deg, #ef4444, #3b82f6);
-      color: white;
-      cursor: pointer;
-      margin-top: 20px;
-      font-weight: bold;
-    }
-
-    .login-btn:hover {
-      opacity: 0.9;
-    }
-
-    /* CONTENEDOR GENERAL */
-    .main {
-      display: grid;
-      grid-template-columns: 3fr 1fr;
-      gap: 20px;
-      padding: 20px;
-    }
-
-    /* TABLA */
-    .table-section {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-    }
-
-    /* PANEL DERECHO */
-    .side {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-
-    /* CARDS */
-    .card {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-    }
-
-    /* KPIs */
-    .kpis {
-      display: flex;
-      gap: 15px;
-      padding: 20px;
-    }
-
-    /* HEADER */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      padding: 15px 20px;
-      background: #111827;
-      color: white;
-    }
-  </style>
-
-  <div id="login" class="login-card">
-
-    <div class="avatar">
-      <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png" width="70">
-    </div>
-
-    <h3>Admin Login</h3>
-
-    <div class="input-group">
-      <input id="pin" placeholder="PIN">
-    </div>
-
-    <button class="login-btn" onclick="login()">ENTRAR</button>
-
-  </div>
-
-  <div id="dashboard" style="display:none;">
-
-    <!-- HEADER -->
-    <div class="header">
-      <b>✈️ TIA Dashboard</b>
-      <button class="logout" onclick="logout()">Salir</button>
-    </div>
-
-    <!-- KPIs -->
-    <div class="kpis">
-      <div class="kpi kpi1">Usuarios<br><b id="total">0</b></div>
-      <div class="kpi kpi2">Aprobados<br><b id="aprobados">0</b></div>
-      <div class="kpi kpi3">Reprobados<br><b id="reprobados">0</b></div>
-    </div>
-
-    <!-- CONTENIDO -->
-    <div class="main">
+      <!-- PROGRESO GLOBAL -->
+      <section class="global-progress">
+        <h3>Progreso general</h3>
+        <div class="bar">
+          <div id="bar-fill"></div>
+        </div>
+        <span id="bar-text">0%</span>
+      </section>
 
       <!-- TABLA -->
-      <div class="table-section">
-        <input id="search" placeholder="Buscar..." onkeyup="render()">
+      <section class="table-section">
+        <input type="text" placeholder="Buscar..." id="search">
 
-        <table class="table">
+        <table>
           <thead>
             <tr>
               <th>Nombre</th>
-              <th>Video</th>
-              <th>Examen</th>
-              <th>Status</th>
-              <th>QR</th>
+              <th>Folio</th>
+              <th>Progreso</th>
+              <th>Último video</th>
+              <th>Minuto</th>
+              <th>Estado</th>
             </tr>
           </thead>
-          <tbody id="tbody"></tbody>
+          <tbody id="table"></tbody>
         </table>
-      </div>
+      </section>
 
-      <!-- PANEL DERECHO -->
-      <div class="side">
+      <!-- ALERTAS -->
+      <section class="alerts">
+        <h3>Alertas</h3>
+        <ul id="alerts"></ul>
+      </section>
 
-        <div class="card">
-          <b>📂 Validar QR</b>
-          <input type="file" id="qrInput">
-          <button onclick="scanQR()">Escanear</button>
-          <div id="result"></div>
-        </div>
+      <!-- ACTIVIDAD -->
+      <section class="activity">
+        <h3>Actividad en tiempo real</h3>
+        <ul id="activity"></ul>
+      </section>
 
-        <div class="card">
-          <b>📷 Escaneo</b>
-          <video id="video" autoplay muted playsinline></video>
-          <button onclick="startCamera()">Iniciar</button>
-          <button onclick="stopCamera()">Detener</button>
-        </div>
-
-        <div class="card">
-          <b>🔐 Generar código TIA</b>
-          <button onclick="getCode()">Generar</button>
-          <h2 id="code"></h2>
-        </div>
-
-      </div>
-
-    </div>
+    </main>
 
   </div>
 
-  <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
-
-  <script>
-
-
-    let DATA = [];
-
-    async function login() {
-      const pin = document.getElementById("pin").value;
-
-      const res = await fetch("/admin-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin })
-      });
-
-      const data = await res.json();
-
-      if (!data.ok) {
-        alert("PIN incorrecto");
-        return;
-      }
-
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("adminName", data.name);
-
-      initDashboard();
-    }
-
-    async function initDashboard() {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        document.getElementById("login").style.display = "block";
-        document.getElementById("dashboard").style.display = "none";
-        return;
-      }
-
-      try {
-        const res = await fetch("/admin-data", {
-          headers: { "Authorization": token }
-        });
-
-        if (res.status !== 200) {
-          throw "No autorizado";
-        }
-
-        DATA = await res.json();
-
-        document.getElementById("login").style.display = "none";
-        document.getElementById("dashboard").style.display = "block";
-
-        render();
-
-      } catch (e) {
-        logout();
-      }
-    }
-
-    function logout() {
-      localStorage.removeItem("token");
-      location.reload();
-    }
-
-    function render() {
-      const tbody = document.getElementById("tbody");
-      tbody.innerHTML = "";
-
-      let total = 0, aprobados = 0, reprobados = 0;
-
-      DATA.forEach(u => {
-        total++;
-        const color = u.video > 80 ? "#22c55e" : u.video > 40 ? "#f59e0b" : "#ef4444";
-        if (u.aprobado) aprobados++;
-        else if (u.exam !== null) reprobados++;
-
-        tbody.innerHTML += `
-      <tr>
-        <td>${u.name}</td>
-
-        <td>
-          ${u.video || 0}%
-          <div class="bar">
-            <span style="width:${u.video}%; background:${color}"></span>
-          </div>
-        </td>
-
-        <td>${u.exam ?? "-"}</td>
-
-        <td>
-          ${u.aprobado
-            ? '<span class="badge ok">Aprobado</span>'
-            : '<span class="badge fail">No</span>'}
-        </td>
-
-        <td>
-          ${u.qr
-            ? `<a class="btn" href="${u.qr}" download="constancia.png">Descargar</a>`
-            : "-"}
-        </td>
-      </tr>
-    `;
-      });
-
-      document.getElementById("total").innerText = total;
-      document.getElementById("aprobados").innerText = aprobados;
-      document.getElementById("reprobados").innerText = reprobados;
-    }
-
-    // AUTO LOGIN
-    initDashboard();
-
-
-    async function getCode() {
-
-      const token = localStorage.getItem("token");
-
-      const res = await fetch("/admin-password", {
-        headers: {
-          "Authorization": token
-        }
-      });
-
-      if (res.status !== 200) {
-        alert("No autorizado");
-        return;
-      }
-
-      const code = await res.text();
-
-      document.getElementById("code").innerText = code;
-    }
-
-
-  </script>
-
+  <script src="/js/admin.js"></script>
 </body>
 
 </html>

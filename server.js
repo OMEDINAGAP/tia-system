@@ -391,23 +391,28 @@ app.get("/admin-password", auth, (req, res) => {
 
 // ADMIN DATA
 app.get("/admin-data", auth, async (req, res) => {
-  try {
 
-    // 🔐 SOLO ADMIN
-    if (!req.isAdmin) {
-      return res.status(403).json({ ok: false, error: "Acceso denegado" });
-    }
+  const [users] = await db.query(`
+    SELECT u.id, u.name, u.folio,
+    IFNULL(MAX(v.progress),0) as progress
+    FROM users u
+    LEFT JOIN video_progress v ON u.id = v.userId
+    GROUP BY u.id
+  `);
 
-    const [rows] = await db.query(
-      "SELECT * FROM users ORDER BY id DESC"
-    );
+  const formatted = users.map(u => ({
+    ...u,
+    video: "Video 1",
+    minute: Math.round(u.progress * 2) // ejemplo
+  }));
 
-    res.json(rows);
-
-  } catch (err) {
-    console.error("DB ERROR:", err);
-    res.status(500).json({ ok: false, error: "DB error" });
-  }
+  res.json({
+    users: formatted,
+    activity: [
+      "Usuario inició sesión",
+      "Progreso guardado"
+    ]
+  });
 });
 
 
