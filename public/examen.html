@@ -118,22 +118,33 @@
   <div class="main">
 
     <h2>Examen de Seguridad</h2>
+    <p class="subtitle">Responde todas las preguntas para continuar</p>
 
-    <div class="progress-bar">
-      <div id="progressFill" class="progress-fill"></div>
+    <!-- 📊 CARD PROGRESO -->
+    <div class="card">
+      <div class="progress-bar">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+      <p id="progressText"></p>
     </div>
 
-    <p id="progressText"></p>
-
+    <!-- ❓ CARD PREGUNTA -->
     <div id="questionBox" class="card"></div>
 
-    <button class="btn" onclick="next()">Siguiente</button>
+     <!-- 🎮 CARD ACCIONES -->
+    <div class="card actions">
+      <button class="btn-success" onclick="next()">Siguiente</button>
+      <button class="btn-back" onclick="goBack()">← Regresar</button>
+    </div>
 
   </div>
 
+  <!-- 📍 CARD NAVEGACIÓN -->
   <div class="right">
-    <h3>Navegación</h3>
-    <div id="nav" class="nav-box"></div>
+    <div class="card">
+      <h3>Navegación</h3>
+      <div id="nav" class="nav-box"></div>
+    </div>
   </div>
 
   <script>
