@@ -188,15 +188,24 @@ app.post("/log-login", async (req, res) => {
 
 
 app.post("/log-video", auth, async (req, res) => {
+  try {
 
-  const { progress } = req.body;
+    let { progress } = req.body;
 
-  await db.query(
-    "UPDATE users SET video=? WHERE id=?",
-    [progress, req.userId]
-  );
+    progress = parseFloat(progress);
+    if (isNaN(progress)) progress = 0;
 
-  res.json({ ok: true });
+    await db.query(
+      "UPDATE users SET video=? WHERE id=?",
+      [progress, req.userId]
+    );
+
+    res.json({ ok: true });
+
+  } catch (err) {
+    console.error("ERROR log-video:", err);
+    res.status(500).json({ ok: false });
+  }
 });
 
 

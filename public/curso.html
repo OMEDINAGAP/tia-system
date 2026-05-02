@@ -177,7 +177,7 @@
       // 🔊 FORZAR SONIDO
       player.unMute();
       player.setVolume(100);
-      setInterval(track, 1000);
+      setInterval(track, 5000);
       updateStatus();
     }
 
@@ -232,27 +232,23 @@
       const percentCurrentVideo = (maxTime / duration);
 
       // 🔥 PROGRESO TOTAL
-      const totalProgress =
-        ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
+      const totalProgress = ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
+      // 🔥 SOLO ENVÍA SI AVANZÓ 3%
+      if (totalProgress - lastSent >= 3) {
 
-      // UI
-      document.getElementById("progress").innerText =
-        "Progreso total: " + Math.floor(totalProgress) + "%";
+        lastSent = totalProgress;
 
-      document.getElementById("progress-fill").style.width =
-        totalProgress + "%";
-
-      // 📡 backend
-      fetch("/log-video", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + token
-        },
-        body: JSON.stringify({
-          progress: totalProgress
-        })
-      });
+        fetch("/log-video", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+          body: JSON.stringify({
+            progress: totalProgress
+          })
+        }).catch(() => { }); // evita romper UI
+      }
 
     }
 
