@@ -207,39 +207,46 @@ app.post("/log-login", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Datos requeridos" });
     }
 
-    // 🔍 Buscar usuario existente
     const [rows] = await db.query(
       "SELECT * FROM users WHERE name=? AND company=?",
       [name.trim(), company.trim()]
     );
 
     let userId;
+    let folio;
 
     if (rows.length > 0) {
-      // ✅ Usuario existente
+
       userId = rows[0].id;
+      folio = rows[0].folio;
 
       console.log("👤 Usuario existente:", userId);
 
     } else {
-      // 🆕 Crear nuevo usuario
+
       userId = Date.now();
+      folio = "TIA-" + Math.floor(100000 + Math.random() * 900000);
 
       await db.query(
-        "INSERT INTO users (id, name, loginTime, company) VALUES (?, ?, NOW(), ?)",
-        [userId, name.trim(), company.trim()]
+        `INSERT INTO users (id, name, company, folio, loginTime) 
+         VALUES (?, ?, ?, ?, NOW())`,
+        [userId, name.trim(), company.trim(), folio]
       );
 
       console.log("🆕 Usuario nuevo:", userId);
     }
 
-    // 🔥 Eliminar sesiones anteriores (IMPORTANTE)
+    // 🔥 limpiar sesiones viejas
     await db.query("DELETE FROM sessions WHERE userId=?", [userId]);
 
-    // 🔐 Crear nueva sesión
     const token = await createSession(userId);
 
-    res.json({ ok: true, token, userId });
+    res.json({
+      ok: true,
+      token,
+      userId,
+      folio   // 🔥 IMPORTANTE
+    });
 
   } catch (err) {
     console.error("❌ ERROR log-login:", err);
