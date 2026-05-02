@@ -65,7 +65,7 @@
     <p>Debes ver el video completo para continuar.</p>
 
     <div id="player"></div>
-
+    <p id="status"></p>
     <div class="progress-bar">
       <div id="progress-fill"></div>
     </div>
@@ -97,9 +97,22 @@
     if (!token) {
       location.href = "/";
     }
-    // 🎥 CONTROL DE PESTAÑA (UX PRO)
+
+    // 🎥 VIDEOS (ORDENADOS)
+    const videos = [
+      "qnpYpzOIN0c", // Video 1
+      "DpYySq7KIo"   // Video 2
+    ];
+
+    let currentVideoIndex = 0;
+
+    // 🎥 VARIABLES
+    let player;
+    let duration = 0;
+    let maxTime = 0;
     let wasPlaying = false;
 
+    // 🔒 CONTROL DE PESTAÑA
     document.addEventListener("visibilitychange", () => {
 
       if (!player || typeof player.getPlayerState !== "function") return;
@@ -119,28 +132,55 @@
 
     });
 
-    // 🎥 VARIABLES
-    let player;
-    let duration = 0;
-    let maxTime = 0;
-
-    // YOUTUBE READY
+    // 🎥 YOUTUBE READY
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
         height: '400',
         width: '100%',
-        videoId: 'qnpYpzOIN0c', /*CAPITULO 2>  DpYySq7KIo */
+        videoId: videos[currentVideoIndex],
         events: {
-          'onReady': onReady
+          'onReady': onReady,
+          'onStateChange': onStateChange
         }
       });
     }
 
+    // ▶️ READY
     function onReady() {
       setInterval(track, 1000);
+      updateStatus();
     }
 
-    // TRACKING
+    // 🔄 CAMBIO DE ESTADO (cuando termina video)
+    function onStateChange(event) {
+
+      if (event.data === YT.PlayerState.ENDED) {
+
+        if (currentVideoIndex < videos.length - 1) {
+
+          currentVideoIndex++;
+          resetTracking();
+
+          player.loadVideoById(videos[currentVideoIndex]);
+
+          updateStatus();
+
+        } else {
+
+          document.getElementById("status").innerText = "✅ Curso completado";
+          document.getElementById("btnExam").disabled = false;
+
+        }
+      }
+    }
+
+    // 🔁 RESET ENTRE VIDEOS
+    function resetTracking() {
+      duration = 0;
+      maxTime = 0;
+    }
+
+    // 📊 TRACKING
     function track() {
 
       if (!player || typeof player.getCurrentTime !== "function") return;
@@ -159,47 +199,45 @@
         maxTime = Math.max(maxTime, current);
       }
 
-      const percent = (maxTime / duration) * 100;
+      const percentCurrentVideo = (maxTime / duration);
+
+      // 🔥 PROGRESO TOTAL
+      const totalProgress =
+        ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
 
       // UI
       document.getElementById("progress").innerText =
-        "Progreso: " + Math.floor(percent) + "%";
+        "Progreso total: " + Math.floor(totalProgress) + "%";
 
       document.getElementById("progress-fill").style.width =
-        percent + "%";
-
-      let completed = false;
-
-      // 🔥 AQUI ESTA LA MAGIA
-      if (percent >= 92 && !completed) {
-        completed = true;
-
-        document.getElementById("status").innerText = "✅ Curso completado";
-        document.getElementById("btnExam").disabled = false;
-      }
+        totalProgress + "%";
 
       // 📡 backend
       fetch("/log-video", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": token
+          "Authorization": "Bearer " + token
         },
         body: JSON.stringify({
-          progress: percent
+          progress: totalProgress
         })
       });
+
     }
 
+    // 🧠 STATUS UX
+    function updateStatus() {
+      document.getElementById("status").innerText =
+        `🎥 Video ${currentVideoIndex + 1} de ${videos.length}`;
+    }
 
-    // IR AL EXAMEN
+    // 🚀 IR AL EXAMEN (VALIDADO)
     async function goExam() {
-
-      const token = localStorage.getItem("token");
 
       const res = await fetch("/can-take-exam", {
         headers: {
-          Authorization: token
+          Authorization: "Bearer " + token
         }
       });
 
@@ -209,18 +247,16 @@
         window.location.href = "/examen.html";
       } else {
         const progress = isNaN(data.progress) ? 0 : Math.floor(data.progress);
-        alert(`Debes completar al menos el 90% del video.
-        Progreso actual: ${progress}%`);
+        alert(`Debes completar al menos el 90% del curso.\nProgreso actual: ${progress}%`);
       }
     }
 
+    // ⚡ MODO PRUEBA
     function goExamTest() {
       localStorage.setItem("testMode", "true");
       window.location.href = "/examen.html";
     }
 
   </script>
-
-</body>
 
 </html>
