@@ -313,7 +313,7 @@
   function onStateChange(event) {
 
     // 🔥 REANUDAR EN EL MOMENTO CORRECTO
-    if (event.data === YT.PlayerState.BUFFERING) {
+    if (event.data === YT.PlayerState.PLAYING) {
 
       const saved = videoProgressMap[currentVideoIndex]?.progress || 0;
 
