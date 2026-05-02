@@ -10,22 +10,48 @@
       font-family: Arial;
       background: #0f172a;
       color: white;
-      text-align: center;
       padding: 20px;
     }
 
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: auto;
     }
 
+    .subtitle {
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+
+    /* CARD */
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    /* VIDEO */
+    #videoWrapper {
+      position: relative;
+      margin-bottom: 15px;
+    }
+
+    #blocker {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+    }
+
+    /* PROGRESS */
     .progress-bar {
       width: 100%;
-      height: 12px;
-      background: #1e293b;
+      height: 10px;
+      background: #334155;
       border-radius: 10px;
+      margin-top: 10px;
       overflow: hidden;
-      margin-top: 20px;
     }
 
     #progress-fill {
@@ -35,38 +61,63 @@
       transition: 0.3s;
     }
 
+    /* STATUS */
     .status {
       margin-top: 10px;
       font-weight: bold;
     }
 
-    .btn {
-      margin-top: 20px;
-      padding: 12px 20px;
+    /* BOTONES */
+    .btn-primary {
+      background: #2563eb;
       border: none;
-      border-radius: 10px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .btn-success {
       background: #22c55e;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      color: white;
+      width: 100%;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    .btn-secondary {
+      background: #3b82f6;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      color: white;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    /* ALERT */
+    .alert {
+      margin-top: 15px;
+      color: #f87171;
+      font-size: 14px;
+    }
+
+    /* BACK */
+    .btn-back {
+      background: #020617;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
       color: white;
       cursor: pointer;
     }
 
-    .alert {
-      margin-top: 20px;
-      color: #f87171;
-    }
-
-    #blocker {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      cursor: default;
-      z-index: 10;
-    }
-
-    body {
-      user-select: none;
+    .btn-back:hover {
+      background: #334155;
     }
   </style>
 </head>
@@ -76,238 +127,282 @@
   <div class="container">
 
     <h1>🎥 Curso de Seguridad Aeroportuaria</h1>
-    <p>Debes ver el video completo para continuar.</p>
-    <div id="videoWrapper" style="position:relative;">
-      <div id="player"></div>
-      <div id="blocker"></div>
+    <p class="subtitle">Debes ver los videos completos para continuar.</p>
+
+    <!-- 🎥 CARD VIDEO -->
+    <div class="card">
+
+      <div id="videoWrapper">
+        <div id="player"></div>
+        <div id="blocker"></div>
+      </div>
+
+      <button onclick="togglePlay()" class="btn-primary">
+        ▶ Reproducir / Pausar
+      </button>
+
+      <p id="status" class="status">Pendiente</p>
+
+      <div class="progress-bar">
+        <div id="progress-fill"></div>
+      </div>
+
+      <p id="progress">Progreso total: 0%</p>
+
     </div>
-    <button onclick="togglePlay()" class="btn">
-      ▶ Reproducir / Pausar
-    </button>
-    <p id="status"></p>
-    <div class="progress-bar">
-      <div id="progress-fill"></div>
+
+    <!-- 📊 CARD ACCIONES -->
+    <div class="card actions">
+
+      <button id="btnExam" class="btn-success" onclick="goExam()">
+        Ir al examen
+      </button>
+
+      <button class="btn-secondary" onclick="goExamTest()">
+        ⚡ Modo prueba
+      </button>
+
+      <div class="alert">
+        ⚠️ No puedes adelantar ni cambiar de pestaña.
+      </div>
+
     </div>
 
-    <p id="progress">Progreso: 0%</p>
-    <p id="status" class="status">Pendiente</p>
-
-    <button id="btnExam" class="btn" onclick="goExam()">
-      Ir al examen
-    </button>
-
-    <div class="alert">
-      ⚠️ No puedes adelantar ni cambiar de pestaña.
-    </div>
-
-    <button class="btn" style="background:#3b82f6;" onclick="goExamTest()">
-      ⚡ Modo prueba (directo)
-    </button>
+    <!-- 🔙 REGRESAR -->
+    <button class="btn-back" onclick="goBack()">← Regresar</button>
 
   </div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
+</body>
 
-  <script>
+<script src="https://www.youtube.com/iframe_api"></script>
 
-    // 🔐 TOKEN
-    const token = localStorage.getItem("token");
+<script>
 
-    if (!token) {
-      location.href = "/";
-    }
+  // 🔐 TOKEN
+  const token = localStorage.getItem("token");
 
-    // 🎥 VIDEOS (ORDENADOS)
-    const videos = [
-      "qnpYpzOIN0c", // Video 1
-      "DpYySq7KIo"   // Video 2
-    ];
+  if (!token) {
+    location.href = "/";
+  }
 
-    let currentVideoIndex = 0;
+  // 🎥 VIDEOS (ORDENADOS)
+  const videos = [
+    "qnpYpzOIN0c", // Video 1
+    "DpYySq7KIo"   // Video 2
+  ];
 
-    // 🎥 VARIABLES
-    let player;
-    let duration = 0;
-    let maxTime = 0;
-    let wasPlaying = false;
-    let lastSent = 0; // 🔥 ESTA FALTABA
+  let currentVideoIndex = 0;
 
-    // 🔒 CONTROL DE PESTAÑA
-    document.addEventListener("visibilitychange", () => {
+  // 🎥 VARIABLES
+  let player;
+  let duration = 0;
+  let maxTime = 0;
+  let wasPlaying = false;
+  let lastSent = 0; // 🔥 ESTA FALTABA
 
-
-
-      if (!player || typeof player.getPlayerState !== "function") return;
-
-      if (document.hidden) {
-        if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-          wasPlaying = true;
-          player.pauseVideo();
-        }
-        document.getElementById("status").innerText = "⏸ Video pausado";
-      } else {
-        if (wasPlaying) {
-          player.playVideo();
-          wasPlaying = false;
-        }
-      }
-
-    });
-
-    // 🎥 YOUTUBE READY
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        height: '400',
-        width: '100%',
-        videoId: videos[currentVideoIndex],
-        playerVars: {
-          controls: 0,       // ❌ quita controles
-          disablekb: 1,      // ❌ bloquea teclado
-          modestbranding: 1,
-          rel: 0
-        },
-        events: {
-          'onReady': onReady,
-          'onStateChange': onStateChange
-        }
-      });
-    }
-
-    // ▶️ READY
-    function onReady() {
-      // 🔊 FORZAR SONIDO
-      player.unMute();
-      player.setVolume(100);
-      setInterval(track, 5000);
-      updateStatus();
-    }
-
-    // 🔄 CAMBIO DE ESTADO (cuando termina video)
-    function onStateChange(event) {
-
-      if (event.data === YT.PlayerState.ENDED) {
-
-        if (currentVideoIndex < videos.length - 1) {
-
-          currentVideoIndex++;
-          resetTracking();
-
-          player.loadVideoById(videos[currentVideoIndex]);
-
-          updateStatus();
-
-        } else {
-
-          document.getElementById("status").innerText = "✅ Curso completado";
-          document.getElementById("btnExam").disabled = false;
-
-        }
-      }
-    }
-
-    // 🔁 RESET ENTRE VIDEOS
-    function resetTracking() {
-      duration = 0;
-      maxTime = 0;
-    }
-
-    // 📊 TRACKING
-    function track() {
-
-      if (!player || typeof player.getCurrentTime !== "function") return;
-
-      const state = player.getPlayerState();
-      if (state !== YT.PlayerState.PLAYING) return;
-
-      const current = player.getCurrentTime();
-
-      if (!duration || duration === 0) {
-        duration = player.getDuration();
-        return;
-      }
-
-      // 🚫 NO ADELANTAR (CORREGIDO)
-      if (current > maxTime + 8) {
-        player.seekTo(maxTime - 1);
-      } else {
-        maxTime = Math.max(maxTime, current);
-      }
-
-      const percentCurrentVideo = (maxTime / duration);
-      const totalProgress = ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
+  // 🔒 CONTROL DE PESTAÑA
+  document.addEventListener("visibilitychange", () => {
 
 
 
-      // 🔥 SOLO ENVÍA SI AVANZÓ 3%
-      if (totalProgress - lastSent >= 3) {
+    if (!player || typeof player.getPlayerState !== "function") return;
 
-        lastSent = totalProgress;
-
-        fetch("/log-video", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + token
-          },
-          body: JSON.stringify({
-            progress: totalProgress
-          })
-        }).catch(() => { }); // evita romper UI
-      }
-
-    }
-
-    // 🧠 STATUS UX
-    function updateStatus() {
-      document.getElementById("status").innerText =
-        `🎥 Video ${currentVideoIndex + 1} de ${videos.length}`;
-    }
-
-    // 🚀 IR AL EXAMEN (VALIDADO)
-    async function goExam() {
-
-      const res = await fetch("/can-take-exam", {
-        headers: {
-          Authorization: "Bearer " + token
-        }
-      });
-
-      const data = await res.json();
-
-      if (data.ok) {
-        window.location.href = "/examen.html";
-      } else {
-        const progress = isNaN(data.progress) ? 0 : Math.floor(data.progress);
-        alert(`Debes completar al menos el 90% del curso.\nProgreso actual: ${progress}%`);
-      }
-    }
-
-    // ⚡ MODO PRUEBA
-    function goExamTest() {
-      localStorage.setItem("testMode", "true");
-      window.location.href = "/examen.html";
-    }
-
-
-    function togglePlay() {
-      const state = player.getPlayerState();
-
-      if (state === YT.PlayerState.PLAYING) {
+    if (document.hidden) {
+      if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+        wasPlaying = true;
         player.pauseVideo();
-      } else {
+      }
+      document.getElementById("status").innerText = "⏸ Video pausado";
+    } else {
+      if (wasPlaying) {
         player.playVideo();
+        wasPlaying = false;
       }
     }
 
-    document.addEventListener("contextmenu", e => e.preventDefault());
+  });
+
+  // 🎥 YOUTUBE READY
+  function onYouTubeIframeAPIReady() {
+    player = new YT.Player('player', {
+      height: '400',
+      width: '100%',
+      videoId: videos[currentVideoIndex],
+      playerVars: {
+        controls: 0,       // ❌ quita controles
+        disablekb: 1,      // ❌ bloquea teclado
+        modestbranding: 1,
+        rel: 0
+      },
+      events: {
+        'onReady': onReady,
+        'onStateChange': onStateChange
+      }
+    });
+  }
+
+  // ▶️ READY
+  function onReady() {
+    // 🔊 FORZAR SONIDO
+    player.unMute();
+    player.setVolume(100);
+    setInterval(track, 5000);
+    updateStatus();
+  }
+
+  // 🔄 CAMBIO DE ESTADO (cuando termina video)
+  function onStateChange(event) {
+
+    if (event.data === YT.PlayerState.ENDED) {
+
+      if (currentVideoIndex < videos.length - 1) {
+
+        currentVideoIndex++;
+        resetTracking();
+
+        player.loadVideoById(videos[currentVideoIndex]);
+
+        updateStatus();
+
+      } else {
+
+        document.getElementById("status").innerText = "✅ Curso completado";
+        document.getElementById("btnExam").disabled = false;
+
+      }
+    }
+  }
+
+  // 🔁 RESET ENTRE VIDEOS
+  function resetTracking() {
+    duration = 0;
+    maxTime = 0;
+  }
+
+  // 📊 TRACKING
+  function track() {
+
+    if (!player || typeof player.getCurrentTime !== "function") return;
+
+    const state = player.getPlayerState();
+    if (state !== YT.PlayerState.PLAYING) return;
+
+    const current = player.getCurrentTime();
+
+    if (!duration || duration === 0) {
+      duration = player.getDuration();
+      return;
+    }
+
+    // 🚫 NO ADELANTAR (CORREGIDO)
+    if (current > maxTime + 8) {
+      player.seekTo(maxTime - 1);
+    } else {
+      maxTime = Math.max(maxTime, current);
+    }
+
+    const percentCurrentVideo = (maxTime / duration);
+    const totalProgress = ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
 
 
-    document.addEventListener("click", function (e) {
-      if (e.target.closest("a")) {
-        e.preventDefault();
+
+    // 🔥 SOLO ENVÍA SI AVANZÓ 3%
+    if (totalProgress - lastSent >= 3) {
+
+      lastSent = totalProgress;
+
+      fetch("/log-video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({
+          progress: totalProgress
+        })
+      }).catch(() => { }); // evita romper UI
+    }
+
+  }
+
+  // 🧠 STATUS UX
+  function updateStatus() {
+    document.getElementById("status").innerText =
+      `🎥 Video ${currentVideoIndex + 1} de ${videos.length}`;
+  }
+
+  // 🚀 IR AL EXAMEN (VALIDADO)
+  async function goExam() {
+
+    const res = await fetch("/can-take-exam", {
+      headers: {
+        Authorization: "Bearer " + token
       }
     });
 
-  </script>
+    const data = await res.json();
+
+    if (data.ok) {
+      window.location.href = "/examen.html";
+    } else {
+      const progress = isNaN(data.progress) ? 0 : Math.floor(data.progress);
+      alert(`Debes completar al menos el 90% del curso.\nProgreso actual: ${progress}%`);
+    }
+  }
+
+  // ⚡ MODO PRUEBA
+  function goExamTest() {
+    localStorage.setItem("testMode", "true");
+    window.location.href = "/examen.html";
+  }
+
+
+  function togglePlay() {
+    const state = player.getPlayerState();
+
+    if (state === YT.PlayerState.PLAYING) {
+      player.pauseVideo();
+    } else {
+      player.playVideo();
+    }
+  }
+
+  document.addEventListener("contextmenu", e => e.preventDefault());
+
+
+  document.addEventListener("click", function (e) {
+    if (e.target.closest("a")) {
+      e.preventDefault();
+    }
+  });
+
+</script>
+
+<script>
+  function goBack() {
+
+    const path = window.location.pathname;
+
+    if (path.includes("certificado")) {
+      window.location.href = "/examen.html";
+
+    } else if (path.includes("examen")) {
+      window.location.href = "/curso.html";
+
+    } else if (path.includes("curso")) {
+      window.location.href = "/portal.html";
+
+    } else if (path.includes("documentos")) {
+      window.location.href = "/portal.html";
+
+    } else if (path.includes("portal")) {
+      window.location.href = "/";
+
+    } else {
+      window.history.back(); // fallback
+    }
+  }
+</script>
 
 </html>
