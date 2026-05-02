@@ -249,7 +249,11 @@
     player.unMute();
     player.setVolume(100);
 
-    await loadProgress();
+    // 🔥 esperar a que el player esté listo
+    setTimeout(() => {
+      loadProgress();
+    }, 1000);
+
 
     const savedTime = videoProgressMap[currentVideoIndex]?.progress || 0;
     // 🔍 DEBUG AQUÍ
@@ -283,12 +287,29 @@
 
       videoProgressMap = {};
 
+      let lastVideoIndex = 0;
+
       data.forEach(row => {
+
         videoProgressMap[row.videoIndex] = {
           progress: row.progress,
           completed: row.completed
         };
+
+        // 🔥 detectar último video
+        if (!row.completed) {
+          lastVideoIndex = row.videoIndex;
+        } else {
+          lastVideoIndex = Math.max(lastVideoIndex, row.videoIndex);
+        }
       });
+
+      console.log("MAPA FINAL:", videoProgressMap);
+
+      // 🔥 cargar video correcto
+      currentVideoIndex = lastVideoIndex;
+
+      player.loadVideoById(videos[currentVideoIndex]);
 
     } catch (err) {
       console.error("ERROR loadProgress:", err);
@@ -296,20 +317,31 @@
   }
 
 
-  
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
 
     // 🔥 CUANDO CARGA VIDEO
     if (event.data === YT.PlayerState.CUED) {
 
-      const savedTime = videoProgressMap[currentVideoIndex]?.progress || 0;
-      // 🔍 DEBUG AQUÍ
-      console.log("REANUDANDO EN (cambio video):", savedTime);
+      const saved = videoProgressMap[currentVideoIndex]?.progress || 0;
 
-      if (savedTime > 0) {
-        player.seekTo(savedTime, true);
-      }
+      const waitSeek = () => {
+        const d = player.getDuration();
+
+        if (d && d > 0) {
+          const savedTime = (saved / 100) * d;
+
+          console.log("REANUDANDO EN:", savedTime);
+
+          if (savedTime > 0) {
+            player.seekTo(savedTime, true);
+          }
+        } else {
+          setTimeout(waitSeek, 400);
+        }
+      };
+
+      waitSeek();
     }
 
     // 🔥 CUANDO TERMINA
@@ -317,7 +349,7 @@
 
       videoProgressMap[currentVideoIndex] = {
         completed: true,
-        progress: duration
+        progress: 100 // ✅ corregido
       };
 
       if (currentVideoIndex < videos.length - 1) {
@@ -336,10 +368,11 @@
     }
   }
 
-  // 🔁 RESET ENTRE VIDEOS
+
   function resetTracking() {
     duration = 0;
     maxTime = 0;
+    lastSent = 0; // 🔥 ESTE ES EL QUE TE FALTABA
   }
 
 
@@ -352,32 +385,46 @@
 
     const current = player.getCurrentTime();
 
+    // 🔥 asegurar duración válida
     if (!duration || duration === 0) {
       duration = player.getDuration();
-      if (!duration) return; // 🔥 evita bug
+      if (!duration || duration === 0) return;
     }
 
-    // 🚫 NO ADELANTAR
+    // 🚫 BLOQUEO ANTI-SKIP
     if (current > maxTime + 8) {
-      player.seekTo(maxTime - 1);
+      player.seekTo(Math.max(0, maxTime - 1));
+      return;
     } else {
       maxTime = Math.max(maxTime, current);
     }
 
-    const percentCurrentVideo = (maxTime / duration);
+    // 🎯 PROGRESO REAL DEL VIDEO (0–100)
+    const percentCurrentVideo = Math.min(
+      100,
+      Math.max(0, (maxTime / duration) * 100)
+    );
+
+    // 📊 PROGRESO TOTAL (solo UI)
     const totalProgress =
-      ((currentVideoIndex + percentCurrentVideo) / videos.length) * 100;
+      ((currentVideoIndex + (percentCurrentVideo / 100)) / videos.length) * 100;
 
-    // 🔥 UI (ESTO TE FALTABA)
+    console.log("TRACK:", {
+      video: currentVideoIndex,
+      percentVideo: percentCurrentVideo.toFixed(2),
+      total: totalProgress.toFixed(2),
+      lastSent
+    });
+
+    // 🔥 UI
     document.getElementById("progress-fill").style.width = totalProgress + "%";
-
     document.getElementById("progress").innerText =
       "Progreso total: " + Math.floor(totalProgress) + "%";
 
-    // 🔥 ENVÍO CONTROLADO
-    if (totalProgress - lastSent >= 3) {
+    // 🚀 ENVÍO CONTROLADO (SOLO POR VIDEO, NO TOTAL)
+    if (percentCurrentVideo - lastSent >= 5) {
 
-      lastSent = totalProgress;
+      lastSent = percentCurrentVideo;
 
       fetch("/log-video", {
         method: "POST",
@@ -386,10 +433,13 @@
           "Authorization": "Bearer " + token
         },
         body: JSON.stringify({
-          progress: maxTime,
+          progress: percentCurrentVideo,   // ✅ porcentaje correcto
           videoIndex: currentVideoIndex
         })
-      }).catch(() => { });
+      })
+        .then(res => res.json())
+        .then(data => console.log("💾 guardado:", data))
+        .catch(err => console.error("❌ error log-video:", err));
     }
   }
 

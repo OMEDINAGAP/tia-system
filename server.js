@@ -120,8 +120,8 @@ function track() {
         videoIndex: currentVideoIndex
       })
     })
-      .then(r => r.text())
-      .then(console.log)
+      .then(r => r.json())
+      .then(data => console.log("RESPUESTA:", data))
       .catch(err => console.error("LOG VIDEO ERROR:", err));
   }
 }
@@ -219,27 +219,6 @@ app.post("/log-login", async (req, res) => {
 });
 
 
-/* 
-app.post("/log-video", auth, async (req, res) => {
-  try {
-
-    let { progress } = req.body;
-
-    progress = parseFloat(progress);
-    if (isNaN(progress)) progress = 0;
-
-    await db.query(
-      "UPDATE users SET video=? WHERE id=?",
-      [progress, req.userId]
-    );
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("ERROR log-video:", err);
-    res.status(500).json({ ok: false });
-  }
-}); */
 
 app.get("/video-progress", auth, async (req, res) => {
 
@@ -253,23 +232,69 @@ app.get("/video-progress", auth, async (req, res) => {
 
 
 app.post("/log-video", auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    let { progress, videoIndex } = req.body;
 
-  const userId = req.userId;
-  const { progress, videoIndex } = req.body;
+    console.log("📥 RECIBIDO:", { userId, videoIndex, progress });
+    
+    // 🔒 Validaciones
+    progress = parseFloat(progress);
+    videoIndex = parseInt(videoIndex);
 
-  const completed = progress >= 90;
+    if (isNaN(progress) || isNaN(videoIndex)) {
+      return res.status(400).json({ ok: false, error: "Datos inválidos" });
+    }
 
-  await db.query(`
-    INSERT INTO video_progress (userId, videoIndex, progress, completed)
-    VALUES (?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      progress = GREATEST(progress, VALUES(progress)),
-      completed = VALUES(completed)
-  `, [userId, videoIndex, progress, completed]);
+    // 🔥 limitar rango 0 - 100
+    progress = Math.max(0, Math.min(progress, 100));
 
-  res.json({ ok: true });
+    // ✅ completar si >= 90%
+    const completed = progress >= 90;
+
+    // 💾 guardar o actualizar progreso del video
+    await db.query(`
+      INSERT INTO video_progress (userId, videoIndex, progress, completed)
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        progress = GREATEST(progress, VALUES(progress)),
+        completed = VALUES(completed)
+    `, [userId, videoIndex, progress, completed]);
+
+    // 🔥 calcular progreso TOTAL del curso
+    const [rows] = await db.query(
+      "SELECT progress FROM video_progress WHERE userId=?",
+      [userId]
+    );
+
+    let total = 0;
+
+    for (let r of rows) {
+      total += parseFloat(r.progress) || 0;
+    }
+
+    const avg = rows.length ? total / rows.length : 0;
+
+    // 💾 guardar progreso global en users
+    await db.query(
+      "UPDATE users SET video=? WHERE id=?",
+      [avg, userId]
+    );
+
+    console.log("📊 PROGRESO:", {
+      userId,
+      videoIndex,
+      progress,
+      total: avg
+    });
+
+    res.json({ ok: true, total: avg });
+
+  } catch (err) {
+    console.error("❌ ERROR log-video:", err);
+    res.status(500).json({ ok: false });
+  }
 });
-
 
 // LOG EXAM SEGURO
 app.post("/log-exam", auth, async (req, res) => {
