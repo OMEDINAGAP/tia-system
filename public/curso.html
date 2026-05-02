@@ -54,6 +54,20 @@
       margin-top: 20px;
       color: #f87171;
     }
+
+    #blocker {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      cursor: default;
+      z-index: 10;
+    }
+
+    body {
+      user-select: none;
+    }
   </style>
 </head>
 
@@ -63,8 +77,13 @@
 
     <h1>🎥 Curso de Seguridad Aeroportuaria</h1>
     <p>Debes ver el video completo para continuar.</p>
-
-    <div id="player"></div>
+    <div id="videoWrapper" style="position:relative;">
+      <div id="player"></div>
+      <div id="blocker"></div>
+    </div>
+    <button onclick="togglePlay()" class="btn">
+      ▶ Reproducir / Pausar
+    </button>
     <p id="status"></p>
     <div class="progress-bar">
       <div id="progress-fill"></div>
@@ -115,6 +134,8 @@
     // 🔒 CONTROL DE PESTAÑA
     document.addEventListener("visibilitychange", () => {
 
+
+
       if (!player || typeof player.getPlayerState !== "function") return;
 
       if (document.hidden) {
@@ -138,6 +159,12 @@
         height: '400',
         width: '100%',
         videoId: videos[currentVideoIndex],
+        playerVars: {
+          controls: 0,       // ❌ quita controles
+          disablekb: 1,      // ❌ bloquea teclado
+          modestbranding: 1,
+          rel: 0
+        },
         events: {
           'onReady': onReady,
           'onStateChange': onStateChange
@@ -256,6 +283,26 @@
       localStorage.setItem("testMode", "true");
       window.location.href = "/examen.html";
     }
+
+
+    function togglePlay() {
+      const state = player.getPlayerState();
+
+      if (state === YT.PlayerState.PLAYING) {
+        player.pauseVideo();
+      } else {
+        player.playVideo();
+      }
+    }
+
+    document.addEventListener("contextmenu", e => e.preventDefault());
+
+
+    document.addEventListener("click", function (e) {
+      if (e.target.closest("a")) {
+        e.preventDefault();
+      }
+    });
 
   </script>
 
