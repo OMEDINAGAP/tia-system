@@ -208,7 +208,9 @@
       if (data.ok) {
         window.location.href = "/examen.html";
       } else {
-        alert("Debes completar al menos el 90% del video.\nProgreso actual: " + Math.floor(data.progress) + "%");
+        const progress = isNaN(data.progress) ? 0 : Math.floor(data.progress);
+        alert(`Debes completar al menos el 90% del video.
+        Progreso actual: ${progress}%`);
       }
     }
 
@@ -218,7 +220,7 @@
 
       const res = await fetch("/can-take-exam", {
         headers: {
-          Authorization: token,
+          "Authorization": "Bearer " + localStorage.getItem("token"),
           "x-test-mode": "true" // 🔥 bypass backend
         }
       });

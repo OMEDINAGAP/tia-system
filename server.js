@@ -192,7 +192,7 @@ app.post("/log-video", auth, async (req, res) => {
   const { progress } = req.body;
 
   await db.query(
-    "UPDATE users SET video_progress=? WHERE id=?",
+    "UPDATE users SET video=? WHERE id=?",
     [progress, req.userId]
   );
 
@@ -479,26 +479,40 @@ app.post("/submit-exam", async (req, res) => {
 
 app.get("/can-take-exam", auth, async (req, res) => {
   try {
-    // 👇 bypass de prueba
+
+    console.log("USER ID:", req.userId);
+    console.log("HEADERS:", req.headers);
+
+    // 🔥 MODO PRUEBA (SIEMPRE ENTRA)
     if (req.headers["x-test-mode"]) {
       return res.json({ ok: true, test: true });
     }
 
     const [rows] = await db.query(
-      "SELECT video_progress FROM users WHERE id=?",
+      "SELECT video FROM users WHERE id=?",
       [req.userId]
     );
 
-    const progress = rows[0]?.video_progress || 0;
+    if (!rows || rows.length === 0) {
+      return res.json({ ok: false, progress: 0 });
+    }
+
+    let progress = parseFloat(rows[0].video_progress);
+
+    if (isNaN(progress)) progress = 0;
 
     if (progress >= 90) {
-      return res.json({ ok: true });
+      return res.json({ ok: true, progress });
     }
 
     return res.json({ ok: false, progress });
 
   } catch (err) {
     console.error("ERROR can-take-exam:", err);
-    return res.status(500).json({ ok: false, error: "server error" });
+    return res.status(500).json({
+      ok: false,
+      progress: 0,
+      error: "server error"
+    });
   }
 });
