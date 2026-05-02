@@ -464,66 +464,49 @@ app.get("/questions", async (req, res) => {
 });
 
 app.post("/submit-exam", auth, async (req, res) => {
-  try {
 
-    const { answers } = req.body;
+  const userId = req.userId;
+  const answers = req.body.answers;
 
-    // 🔥 obtener respuestas correctas
-    const [questions] = await db.query("SELECT id, correct FROM questions");
+  let correct = 0;
 
-    let correct = 0;
-
-    answers.forEach(a => {
-      const q = questions.find(q => q.id == a.id);
-      if (q && q.correct === a.answer) correct++;
-    });
-
-    const score = Math.round((correct / questions.length) * 100);
-
-    // 🔥 obtener usuario
-    const [rows] = await db.query(
-      "SELECT intentos FROM users WHERE id=?",
-      [req.userId]
+  for (let a of answers) {
+    const [q] = await db.query(
+      "SELECT correct FROM questions WHERE id=?",
+      [a.id]
     );
 
-    let intentos = rows[0].intentos || 0;
-    intentos++;
-
-    let aprobado = score >= 70 ? 1 : 0;
-
-    // 🔥 actualizar usuario
-    await db.query(
-      `UPDATE users 
-       SET exam=?, intentos=?, aprobado=? 
-       WHERE id=?`,
-      [score, intentos, aprobado, req.userId]
-    );
-
-    // 🔥 si falló 3 veces → reset video
-    let resetVideo = false;
-
-    if (!aprobado && intentos >= 3) {
-      resetVideo = true;
-
-      await db.query(
-        `UPDATE users 
-         SET video=0, intentos=0 
-         WHERE id=?`,
-        [req.userId]
-      );
+    if (q.length && q[0].correct === a.answer) {
+      correct++;
     }
-
-    res.json({
-      score,
-      aprobado,
-      intentos,
-      resetVideo
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error en examen" });
   }
+
+  const score = Math.round((correct / answers.length) * 100);
+
+  // 🔥 obtener usuario
+  const [[user]] = await db.query(
+    "SELECT intentos FROM users WHERE id=?",
+    [userId]
+  );
+
+  const intento = (user.intentos || 0) + 1;
+
+  const aprobado = score >= 80;
+  const resetVideo = intento >= 3 && !aprobado;
+
+  // 🔥 guardar
+  await db.query(
+    "UPDATE users SET exam=?, intentos=?, aprobado=? WHERE id=?",
+    [score, intento, aprobado, userId]
+  );
+
+  res.json({
+    score,
+    aprobado,
+    intentos: intento,
+    resetVideo
+  });
+
 });
 
 app.get("/can-take-exam", auth, async (req, res) => {
@@ -574,16 +557,16 @@ app.post("/validate-new", async (req, res) => {
 
   // 🔥 crear usuario
   const id = Date.now(); // simple, luego puedes mejorar
-// 🔥 GENERAR FOLIO (AQUÍ VA)
+  // 🔥 GENERAR FOLIO (AQUÍ VA)
   const folio = "TIA-" + Math.floor(100000 + Math.random() * 900000);
-  
+
   await db.query(
     `INSERT INTO users (id, name, company, folio, loginTime) 
      VALUES (?, ?, ?, ?, NOW())`,
     [id, name.trim(), company.trim(), folio]
   );
 
-  res.json({ ok: true, id, folio});
+  res.json({ ok: true, id, folio });
 });
 
 app.post("/validate-id", async (req, res) => {

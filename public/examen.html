@@ -290,7 +290,9 @@
 
       const data = await res.json();
 
-      const score = data.score;
+      // 🔥 Fallbacks (AQUÍ VA)
+      const score = data.score ?? 0;
+      const intentos = data.intentos ?? 1;
 
       // ✅ APROBADO
       if (data.aprobado) {
@@ -321,7 +323,7 @@
           title: '⚠️ No aprobado',
           html: `
         <p>Resultado: <b>${score}%</b></p>
-        <p>Intento ${data.intentos} de 3</p>
+        <p>Intento ${intentos} de 3</p>
         <p><b>Puedes intentarlo nuevamente.</b></p>
       `,
           icon: 'warning',
