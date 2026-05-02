@@ -354,7 +354,10 @@
   // ⚡ MODO PRUEBA
   function goExamTest() {
     localStorage.setItem("testMode", "true");
-    window.location.href = "/examen.html";
+
+    setTimeout(() => {
+      window.location.href = "/examen.html";
+    }, 100);
   }
 
 

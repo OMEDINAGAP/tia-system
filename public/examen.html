@@ -307,6 +307,7 @@
           color: '#fff',
           confirmButtonColor: '#22c55e'
         }).then(() => {
+          localStorage.removeItem("testMode"); // 🔥 AQUÍ
           window.location.href = "/certificado.html";
         });
 
@@ -354,7 +355,7 @@
         color: '#fff',
         confirmButtonColor: '#ef4444'
       }).then(() => {
-
+        localStorage.removeItem("testMode"); // 🔥 AQUÍ
         window.location.href = "/curso.html";
 
       });
