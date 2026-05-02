@@ -244,54 +244,66 @@
   }
 
   // ▶️ READY
-  function onReady() {
-    // 🔊 FORZAR SONIDO
+  async function onReady() {
+
     player.unMute();
     player.setVolume(100);
-    loadProgress(); // 🔥 IMPORTANTE
+
+    await loadProgress();
+
+    const savedTime = videoProgressMap[currentVideoIndex]?.progress || 0;
+    // 🔍 DEBUG AQUÍ
+    console.log("REANUDANDO EN (onReady):", savedTime);
+
+    if (savedTime > 0) {
+      player.seekTo(savedTime, true);
+    }
+
     setInterval(track, 5000);
     updateStatus();
   }
 
   async function loadProgress() {
 
-    const res = await fetch("/video-progress", {
-      headers: {
-        Authorization: "Bearer " + token
-      }
-    });
+    try {
+      const res = await fetch("/video-progress", {
+        headers: {
+          Authorization: "Bearer " + token
+        }
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    data.forEach(v => {
-      videoProgressMap[v.videoIndex] = v;
-    });
+      if (!Array.isArray(data)) return;
 
-    // 🔥 reanudar video correcto
-    for (let i = 0; i < videos.length; i++) {
-      if (!videoProgressMap[i]?.completed) {
-        currentVideoIndex = i;
-        break;
-      }
+      // 🔥 convertir a mapa
+      data.forEach(v => {
+        videoProgressMap[v.videoIndex] = v.progress;
+      });
+
+      console.log("PROGRESO CARGADO:", videoProgressMap);
+
+    } catch (err) {
+      console.error("Error cargando progreso:", err);
     }
-
-    player.loadVideoById(videos[currentVideoIndex]);
-
-    // 🔥 reanudar tiempo
-    const saved = videoProgressMap[currentVideoIndex];
-    if (saved && saved.progress > 0) {
-      setTimeout(() => {
-        player.seekTo(saved.progress);
-      }, 1500);
-    }
-
-    updateStatus();
   }
-
 
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
 
+    // 🔥 CUANDO CARGA VIDEO
+    if (event.data === YT.PlayerState.CUED) {
+
+      const savedTime = videoProgressMap[currentVideoIndex]?.progress || 0;
+      // 🔍 DEBUG AQUÍ
+      console.log("REANUDANDO EN (cambio video):", savedTime);
+
+      if (savedTime > 0) {
+        player.seekTo(savedTime, true);
+      }
+    }
+
+    // 🔥 CUANDO TERMINA
     if (event.data === YT.PlayerState.ENDED) {
 
       videoProgressMap[currentVideoIndex] = {
@@ -300,16 +312,19 @@
       };
 
       if (currentVideoIndex < videos.length - 1) {
+
         currentVideoIndex++;
         resetTracking();
+
         player.loadVideoById(videos[currentVideoIndex]);
         updateStatus();
+
       } else {
+
         document.getElementById("status").innerText = "✅ Curso completado";
         document.getElementById("btnExam").disabled = false;
       }
     }
-
   }
 
   // 🔁 RESET ENTRE VIDEOS
