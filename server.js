@@ -463,27 +463,67 @@ app.get("/questions", async (req, res) => {
   res.json(rows);
 });
 
-app.post("/submit-exam", async (req, res) => {
+app.post("/submit-exam", auth, async (req, res) => {
+  try {
 
-  const { answers } = req.body;
+    const { answers } = req.body;
 
-  let correct = 0;
+    // 🔥 obtener respuestas correctas
+    const [questions] = await db.query("SELECT id, correct FROM questions");
 
-  for (let a of answers) {
+    let correct = 0;
 
-    const [row] = await db.query(
-      "SELECT correct FROM questions WHERE id=?",
-      [a.id]
+    answers.forEach(a => {
+      const q = questions.find(q => q.id == a.id);
+      if (q && q.correct === a.answer) correct++;
+    });
+
+    const score = Math.round((correct / questions.length) * 100);
+
+    // 🔥 obtener usuario
+    const [rows] = await db.query(
+      "SELECT intentos FROM users WHERE id=?",
+      [req.userId]
     );
 
-    if (row[0].correct === a.answer) {
-      correct++;
+    let intentos = rows[0].intentos || 0;
+    intentos++;
+
+    let aprobado = score >= 70 ? 1 : 0;
+
+    // 🔥 actualizar usuario
+    await db.query(
+      `UPDATE users 
+       SET exam=?, intentos=?, aprobado=? 
+       WHERE id=?`,
+      [score, intentos, aprobado, req.userId]
+    );
+
+    // 🔥 si falló 3 veces → reset video
+    let resetVideo = false;
+
+    if (!aprobado && intentos >= 3) {
+      resetVideo = true;
+
+      await db.query(
+        `UPDATE users 
+         SET video=0, intentos=0 
+         WHERE id=?`,
+        [req.userId]
+      );
     }
+
+    res.json({
+      score,
+      aprobado,
+      intentos,
+      resetVideo
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en examen" });
   }
-
-  const score = Math.round((correct / answers.length) * 100);
-
-  res.json({ score });
 });
 
 app.get("/can-take-exam", auth, async (req, res) => {
@@ -506,7 +546,7 @@ app.get("/can-take-exam", auth, async (req, res) => {
       return res.json({ ok: false, progress: 0 });
     }
 
-    let progress = parseFloat(rows[0].video_progress);
+    let progress = parseFloat(rows[0].video);
 
     if (isNaN(progress)) progress = 0;
 
