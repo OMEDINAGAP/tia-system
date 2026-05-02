@@ -203,6 +203,7 @@
   let wasPlaying = false;
   let lastSent = 0; // 🔥 ESTA FALTABA
   let videoProgressMap = {};
+  let allowTracking = false;
 
   // 🔒 CONTROL DE PESTAÑA
   document.addEventListener("visibilitychange", () => {
@@ -330,9 +331,16 @@
 
         player.seekTo(savedTime, true);
 
-        maxTime = savedTime; // 🔥 ESTA ES LA LÍNEA CLAVE
+        maxTime = savedTime;
 
         window._seekDone = true;
+
+        // 🔥 DAR TIEMPO PARA QUE EL SEEK SE APLIQUE
+        allowTracking = false;
+
+        setTimeout(() => {
+          allowTracking = true;
+        }, 2000); // 2 segundos es perfecto
       }
     }
 
@@ -389,9 +397,10 @@
     }
 
     // 🚫 BLOQUEO ANTI-SKIP
+    if (!allowTracking) return;
+
     if (current > maxTime + 8) {
       player.seekTo(Math.max(0, maxTime - 1));
-      return;
     } else {
       maxTime = Math.max(maxTime, current);
     }
