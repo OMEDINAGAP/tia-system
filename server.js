@@ -558,3 +558,54 @@ app.get("/can-take-exam", auth, async (req, res) => {
     res.status(500).json({ ok: false });
   }
 });
+
+app.post("/validate-new", async (req, res) => {
+
+  const { name, company, pass } = req.body;
+  const current = generatePassword();
+
+  if (pass !== current) {
+    return res.json({ ok: false, msg: "Contraseña incorrecta" });
+  }
+
+  if (!name || !company) {
+    return res.json({ ok: false, msg: "Datos incompletos" });
+  }
+
+  // 🔥 crear usuario
+  const id = Date.now(); // simple, luego puedes mejorar
+// 🔥 GENERAR FOLIO (AQUÍ VA)
+  const folio = "TIA-" + Math.floor(100000 + Math.random() * 900000);
+  
+  await db.query(
+    `INSERT INTO users (id, name, company, folio, loginTime) 
+     VALUES (?, ?, ?, ?, NOW())`,
+    [id, name.trim(), company.trim(), folio]
+  );
+
+  res.json({ ok: true, id, folio});
+});
+
+app.post("/validate-id", async (req, res) => {
+
+  const { id, pass } = req.body;
+  const current = generatePassword();
+
+  if (pass !== current) {
+    return res.json({ ok: false });
+  }
+
+  const [rows] = await db.query(
+    "SELECT * FROM users WHERE id=?",
+    [id]
+  );
+
+  if (!rows.length) {
+    return res.json({ ok: false });
+  }
+
+  res.json({
+    ok: true,
+    user: rows[0]
+  });
+});

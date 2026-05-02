@@ -3,36 +3,61 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Acceso</title>
+  <title>Acceso TIA</title>
+
+  <!-- SweetAlert -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <style>
     body {
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #141e30, #243b55);
+      background: linear-gradient(135deg, #0f172a, #1e293b);
       height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
+      color: white;
     }
 
     .container {
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(10px);
+      background: #1e293b;
       border-radius: 16px;
-      padding: 40px;
-      width: 320px;
-      box-shadow: 0 0 25px rgba(0, 0, 0, 0.3);
-      color: white;
+      padding: 30px;
+      width: 360px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px;
+      cursor: pointer;
+      background: #020617;
       text-align: center;
     }
 
-    .container h2 {
-      margin-bottom: 25px;
+    .tab.active {
+      background: #22c55e;
     }
 
-    .input-group {
-      margin-bottom: 15px;
+    .form {
+      display: none;
+    }
+
+    .form.active {
+      display: block;
     }
 
     input {
@@ -40,7 +65,7 @@
       padding: 12px;
       border-radius: 8px;
       border: none;
-      outline: none;
+      margin-bottom: 10px;
     }
 
     button {
@@ -48,109 +73,140 @@
       padding: 12px;
       border-radius: 8px;
       border: none;
-      background: #00c6ff;
+      background: #22c55e;
       color: white;
       font-weight: bold;
       cursor: pointer;
-      transition: 0.3s;
     }
 
     button:hover {
-      background: #0072ff;
+      background: #16a34a;
     }
 
     .footer {
       margin-top: 15px;
       font-size: 12px;
       opacity: 0.6;
+      text-align: center;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="container">
-    <h2>🔐 Acceso</h2>
+<div class="container">
 
-    <div class="input-group">
-      <input id="name" placeholder="Nombre Completo">
-      <label for="name">El nombre ingresado aparecerá en su Certificado</label>
-    </div>
-    <div class="input-group">
-      <input id="company" placeholder="Empresa">
-    </div>
+  <h2>✈️ Sistema TIA</h2>
 
-    <div class="input-group">
-      <input id="pass" type="password" placeholder="Contraseña">
-    </div>
-
-    <button onclick="login()">Entrar</button>
-
-    <div class="footer">
-      Sistema TIA
-    </div>
+  <!-- 🔘 TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(0)">Nuevo</div>
+    <div class="tab" onclick="switchTab(1)">Seguimiento</div>
   </div>
 
-  <script>
-    const API = "";
+  <!-- 🆕 NUEVO -->
+  <div class="form active" id="formNew">
 
-    async function login() {
-      const pass = document.getElementById("pass").value.trim();
-      const name = document.getElementById("name").value.trim();
-      const company = document.getElementById("company").value.trim();
+    <input id="name" placeholder="Nombre completo">
+    <input id="company" placeholder="Empresa">
+    <input id="pass" type="password" placeholder="Contraseña del día">
 
-      // 🔐 Validación básica
-      if (!name || !company || !pass) {
-        alert("Todos los campos son obligatorios");
-        return;
-      }
+    <button onclick="loginNew()">Iniciar / Registrarse</button>
 
-      try {
-        const res = await fetch(`/validate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            pass,
-            company
-          })
-        });
+  </div>
 
-        const data = await res.json();
+  <!-- 🔁 EXISTENTE -->
+  <div class="form" id="formOld">
 
-        if (data.ok) {
+    <input id="userId" placeholder="ID / Folio">
+    <input id="pass2" type="password" placeholder="Contraseña del día">
 
-          const u = await fetch("/log-login", {
-            method: "POST",
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name,
-              company
-            })
-          });
+    <button onclick="loginById()">Ingresar</button>
 
-          const user = await u.json();
+  </div>
 
-          localStorage.setItem("token", user.token);
+  <div class="footer">
+    Sistema de Capacitación Aeroportuaria
+  </div>
 
-          window.location.href = "/portal.html";
+</div>
 
-        } else {
-          alert("Acceso incorrecto");
-        }
+<script>
 
-      } catch (err) {
-        console.error(err);
-        alert("Error de conexión");
-      }
-    }
+function switchTab(index){
 
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        login();
-      }
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".form").forEach(f => f.classList.remove("active"));
+
+  document.querySelectorAll(".tab")[index].classList.add("active");
+  document.querySelectorAll(".form")[index].classList.add("active");
+}
+
+async function loginNew(){
+
+  const name = document.getElementById("name").value.trim();
+  const company = document.getElementById("company").value.trim();
+  const pass = document.getElementById("pass").value.trim();
+
+  if(!name || !company || !pass){
+    Swal.fire("⚠️", "Completa todos los campos", "warning");
+    return;
+  }
+
+  const res = await fetch("/validate-new", {
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name, company, pass })
+  });
+
+  const data = await res.json();
+
+  if(data.ok){
+
+    localStorage.setItem("userId", data.id);
+
+    Swal.fire({
+      title: "✅ Registro exitoso",
+      html: `Tu ID es:<br><b>${data.folio}</b>`,
+      confirmButtonText: "Continuar",
+      background:"#0f172a",
+      color:"#fff"
+    }).then(()=>{
+      window.location.href = "/portal.html";
     });
-  </script>
+
+  } else {
+    Swal.fire("❌", "Error al registrarse", "error");
+  }
+}
+
+async function loginById(){
+
+  const id = document.getElementById("userId").value.trim();
+  const pass = document.getElementById("pass2").value.trim();
+
+  if(!id || !pass){
+    Swal.fire("⚠️", "Completa todos los campos", "warning");
+    return;
+  }
+
+  const res = await fetch("/validate-id", {
+    method:"POST",
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id, pass })
+  });
+
+  const data = await res.json();
+
+  if(data.ok){
+    localStorage.setItem("userId", id);
+    window.location.href = "/portal.html";
+  } else {
+    Swal.fire("❌", "Acceso inválido", "error");
+  }
+}
+
+</script>
 
 </body>
-
 </html>
