@@ -9,11 +9,12 @@
     body {
       margin: 0;
       font-family: Arial;
-      background: linear-gradient(135deg, #020617, #0f172a);
+      background: #0f172a;
       color: white;
       display: flex;
     }
 
+    /* SIDEBAR */
     .sidebar {
       width: 220px;
       background: #020617;
@@ -25,28 +26,38 @@
       padding: 10px;
       margin: 10px 0;
       border-radius: 8px;
+      cursor: pointer;
     }
 
     .active {
       background: #22c55e;
     }
 
+    /* MAIN */
     .main {
       flex: 1;
       padding: 30px;
     }
 
-    .card {
-      background: #1e293b;
-      padding: 25px;
-      border-radius: 15px;
+    .subtitle {
+      color: #94a3b8;
     }
 
+    /* CARD */
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    /* OPCIONES */
     .option {
       display: block;
       margin: 10px 0;
       padding: 12px;
-      background: #0f172a;
+      background: #020617;
       border-radius: 10px;
       cursor: pointer;
     }
@@ -55,21 +66,12 @@
       border: 1px solid #22c55e;
     }
 
-    .btn {
-      margin-top: 20px;
-      padding: 12px 20px;
-      background: #22c55e;
-      border: none;
-      border-radius: 10px;
-      color: white;
-      cursor: pointer;
-    }
-
+    /* PROGRESS */
     .progress-bar {
       height: 10px;
-      background: #0f172a;
+      background: #334155;
       border-radius: 10px;
-      margin: 10px 0;
+      overflow: hidden;
     }
 
     .progress-fill {
@@ -78,20 +80,44 @@
       width: 0%;
     }
 
+    /* BOTONES */
+    .btn-success {
+      background: #22c55e;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      color: white;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .btn-back {
+      margin-top: 10px;
+      background: #020617;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    /* RIGHT PANEL */
     .right {
-      width: 200px;
+      width: 220px;
       padding: 20px;
     }
 
+    /* NAV */
     .nav-box {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 5px;
+      gap: 6px;
     }
 
     .nav-box div {
       padding: 10px;
-      background: #1e293b;
+      background: #0f172a;
       text-align: center;
       border-radius: 6px;
       cursor: pointer;
@@ -131,7 +157,7 @@
     <!-- ❓ CARD PREGUNTA -->
     <div id="questionBox" class="card"></div>
 
-     <!-- 🎮 CARD ACCIONES -->
+    <!-- 🎮 CARD ACCIONES -->
     <div class="card actions">
       <button class="btn-success" onclick="next()">Siguiente</button>
       <button class="btn-back" onclick="goBack()">← Regresar</button>
