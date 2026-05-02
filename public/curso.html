@@ -311,7 +311,7 @@
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
 
-    // 🔥 USAR BUFFERING (clave)
+    // 🔥 REANUDAR EN EL MOMENTO CORRECTO
     if (event.data === YT.PlayerState.BUFFERING) {
 
       const saved = videoProgressMap[currentVideoIndex]?.progress || 0;
@@ -325,13 +325,18 @@
 
       console.log("🎯 REANUDANDO EN:", savedTime);
 
+      // 🔥 AQUÍ VA LO QUE ME PREGUNTAS
       if (!window._seekDone) {
+
         player.seekTo(savedTime, true);
+
+        maxTime = savedTime; // 🔥 ESTA ES LA LÍNEA CLAVE
+
         window._seekDone = true;
       }
     }
 
-    // 🔥 RESET AL CAMBIAR VIDEO
+    // 🔥 CUANDO TERMINA EL VIDEO
     if (event.data === YT.PlayerState.ENDED) {
 
       window._seekDone = false;
@@ -346,7 +351,7 @@
         currentVideoIndex++;
         resetTracking();
 
-        // 🔥 RESET DEL SEEK
+        // 🔥 IMPORTANTE TAMBIÉN AQUÍ
         window._seekDone = false;
 
         player.loadVideoById(videos[currentVideoIndex]);
@@ -359,6 +364,8 @@
       }
     }
   }
+
+
   function resetTracking() {
     duration = 0;
     maxTime = 0;
