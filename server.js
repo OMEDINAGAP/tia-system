@@ -14,6 +14,7 @@ const db = mysql.createPool({
 });
 
 const app = express();
+const db = require("./db");
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
@@ -31,8 +32,44 @@ const SECRET = process.env.SECRET;
 // arriba
 const sessions = new Map(); // token -> userId
 
-// 👇 AQUÍ VA EL MIDDLEWARE
 let lastSent = 0;
+
+// 2️⃣ 🔐 AUTH (AQUÍ ARRIBA)
+async function auth(req, res, next) {
+  try {
+    const header = req.headers.authorization;
+
+    if (!header) {
+      return res.status(401).json({ ok: false });
+    }
+
+    const token = header.replace("Bearer", "").trim();
+
+    const [rows] = await db.query(
+      "SELECT * FROM sessions WHERE token=?",
+      [token]
+    );
+
+    const session = rows[0];
+
+    if (!session) {
+      return res.status(401).json({ ok: false });
+    }
+
+    if (session.expires < Date.now()) {
+      return res.status(401).json({ ok: false });
+    }
+
+    req.userId = session.userId;
+    req.isAdmin = String(session.userId).startsWith("admin-");
+
+    next();
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false });
+  }
+}
 
 function track() {
 
@@ -84,9 +121,9 @@ function track() {
         videoIndex: currentVideoIndex
       })
     })
-    .then(r => r.text())
-    .then(console.log)
-    .catch(err => console.error("LOG VIDEO ERROR:", err));
+      .then(r => r.text())
+      .then(console.log)
+      .catch(err => console.error("LOG VIDEO ERROR:", err));
   }
 }
 
