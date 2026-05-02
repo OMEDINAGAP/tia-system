@@ -25,7 +25,7 @@
       border-radius: 16px;
       padding: 30px;
       width: 360px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
     h2 {
@@ -94,119 +94,168 @@
 
 <body>
 
-<div class="container">
+  <div class="container">
 
-  <h2>✈️ Sistema TIA</h2>
+    <h2>✈️ Sistema TIA</h2>
 
-  <!-- 🔘 TABS -->
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab(0)">Nuevo</div>
-    <div class="tab" onclick="switchTab(1)">Seguimiento</div>
+    <!-- 🔘 TABS -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(0)">Nuevo</div>
+      <div class="tab" onclick="switchTab(1)">Seguimiento</div>
+    </div>
+
+    <!-- 🆕 NUEVO -->
+    <div class="form active" id="formNew">
+
+      <input id="name" placeholder="Nombre completo">
+      <input id="company" placeholder="Empresa">
+      <input id="pass" type="password" placeholder="Contraseña del día">
+
+      <button onclick="loginNew()">Iniciar / Registrarse</button>
+
+    </div>
+
+    <!-- 🔁 EXISTENTE -->
+    <div class="form" id="formOld">
+
+      <input id="userId" placeholder="ID o Folio (ej. TIA-123456)">
+      <input id="pass2" type="password" placeholder="Contraseña del día">
+
+      <button onclick="loginById()">Ingresar</button>
+
+    </div>
+
+    <div class="footer">
+      Sistema de Capacitación Aeroportuaria
+    </div>
+
   </div>
 
-  <!-- 🆕 NUEVO -->
-  <div class="form active" id="formNew">
+  <script>
 
-    <input id="name" placeholder="Nombre completo">
-    <input id="company" placeholder="Empresa">
-    <input id="pass" type="password" placeholder="Contraseña del día">
+    function switchTab(index) {
 
-    <button onclick="loginNew()">Iniciar / Registrarse</button>
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".form").forEach(f => f.classList.remove("active"));
 
-  </div>
+      document.querySelectorAll(".tab")[index].classList.add("active");
+      document.querySelectorAll(".form")[index].classList.add("active");
+    }
 
-  <!-- 🔁 EXISTENTE -->
-  <div class="form" id="formOld">
+    async function loginNew() {
 
-    <input id="userId" placeholder="ID / Folio">
-    <input id="pass2" type="password" placeholder="Contraseña del día">
+      const name = document.getElementById("name").value.trim();
+      const company = document.getElementById("company").value.trim();
+      const pass = document.getElementById("pass").value.trim();
 
-    <button onclick="loginById()">Ingresar</button>
+      if (!name || !company || !pass) {
+        Swal.fire("⚠️", "Completa todos los campos", "warning");
+        return;
+      }
 
-  </div>
+      const res = await fetch("/validate-new", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, company, pass })
+      });
 
-  <div class="footer">
-    Sistema de Capacitación Aeroportuaria
-  </div>
+      const data = await res.json();
 
-</div>
+      if (data.ok) {
 
-<script>
+        // 🔥 CREAR SESIÓN (AQUÍ VA)
+        const u = await fetch("/log-login", {
+          method: "POST",
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            company
+          })
+        });
 
-function switchTab(index){
+        const user = await u.json();
 
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-  document.querySelectorAll(".form").forEach(f => f.classList.remove("active"));
+        // 🔐 GUARDAR TOKEN
+        localStorage.setItem("token", user.token);
 
-  document.querySelectorAll(".tab")[index].classList.add("active");
-  document.querySelectorAll(".form")[index].classList.add("active");
-}
+        // (opcional pero útil)
+        localStorage.setItem("userId", data.id);
 
-async function loginNew(){
+        // 🎉 mensaje bonito
+        Swal.fire({
+          title: "✅ Registro exitoso",
+          html: `Tu folio es:<br><b>${data.folio}</b>`,
+          confirmButtonText: "Continuar",
+          background: "#0f172a",
+          color: "#fff"
+        }).then(() => {
+          window.location.href = "/portal.html";
+        });
 
-  const name = document.getElementById("name").value.trim();
-  const company = document.getElementById("company").value.trim();
-  const pass = document.getElementById("pass").value.trim();
+      }
+    }
 
-  if(!name || !company || !pass){
-    Swal.fire("⚠️", "Completa todos los campos", "warning");
-    return;
-  }
+    async function loginById() {
 
-  const res = await fetch("/validate-new", {
-    method:"POST",
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ name, company, pass })
-  });
+      const id = document.getElementById("userId").value.trim();
+      const pass = document.getElementById("pass2").value.trim();
 
-  const data = await res.json();
+      if (!id || !pass) {
+        Swal.fire("⚠️", "Completa todos los campos", "warning");
+        return;
+      }
 
-  if(data.ok){
+      try {
 
-    localStorage.setItem("userId", data.id);
+        // 🔐 validar usuario
+        const res = await fetch("/validate-id", {
+          method: "POST",
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, pass })
+        });
 
-    Swal.fire({
-      title: "✅ Registro exitoso",
-      html: `Tu ID es:<br><b>${data.folio}</b>`,
-      confirmButtonText: "Continuar",
-      background:"#0f172a",
-      color:"#fff"
-    }).then(()=>{
-      window.location.href = "/portal.html";
-    });
+        const data = await res.json();
 
-  } else {
-    Swal.fire("❌", "Error al registrarse", "error");
-  }
-}
+        if (!data.ok) {
+          Swal.fire("❌", "Acceso inválido", "error");
+          return;
+        }
 
-async function loginById(){
+        const userData = data.user;
 
-  const id = document.getElementById("userId").value.trim();
-  const pass = document.getElementById("pass2").value.trim();
+        // 🔥 CREAR SESIÓN (AQUÍ ESTÁ LA CLAVE)
+        const u = await fetch("/log-login", {
+          method: "POST",
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: userData.name,
+            company: userData.company
+          })
+        });
 
-  if(!id || !pass){
-    Swal.fire("⚠️", "Completa todos los campos", "warning");
-    return;
-  }
+        const session = await u.json();
 
-  const res = await fetch("/validate-id", {
-    method:"POST",
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ id, pass })
-  });
+        if (!session.token) {
+          Swal.fire("❌", "Error creando sesión", "error");
+          return;
+        }
 
-  const data = await res.json();
+        // 🔐 guardar token
+        localStorage.setItem("token", session.token);
 
-  if(data.ok){
-    localStorage.setItem("userId", id);
-    window.location.href = "/portal.html";
-  } else {
-    Swal.fire("❌", "Acceso inválido", "error");
-  }
-}
+        // opcional
+        localStorage.setItem("userId", userData.id);
 
-</script>
+        // 🚀 entrar
+        window.location.href = "/portal.html";
+
+      } catch (err) {
+        console.error(err);
+        Swal.fire("❌", "Error de conexión", "error");
+      }
+    }
+  </script>
 
 </body>
+
 </html>

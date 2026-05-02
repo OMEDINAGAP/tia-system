@@ -168,23 +168,7 @@ app.post("/log-login", async (req, res) => {
     res.status(500).json({ ok: false, error: "DB error" });
   }
 });
-// LOG VIDEO
-/* app.post("/log-video", auth, async (req, res) => {
-  try {
-    const userId = req.userId; // 🔐 del token
 
-    await db.query(
-      "UPDATE users SET video=? WHERE id=?",
-      [req.body.progress, userId]
-    );
-
-    res.json({ ok: true });
-
-  } catch (err) {
-    console.error("DB ERROR:", err);
-    res.status(500).json({ ok: false, error: "DB error" });
-  }
-}); */
 
 
 app.post("/log-video", auth, async (req, res) => {
@@ -484,10 +468,17 @@ app.post("/submit-exam", auth, async (req, res) => {
   const score = Math.round((correct / answers.length) * 100);
 
   // 🔥 obtener usuario
-  const [[user]] = await db.query(
+  const [rows] = await db.query(
     "SELECT intentos FROM users WHERE id=?",
     [userId]
   );
+
+  if (!rows.length) {
+    console.log("❌ Usuario no encontrado:", userId);
+    return res.status(401).json({ error: "Usuario no válido" });
+  }
+
+  const user = rows[0];
 
   const intento = (user.intentos || 0) + 1;
 
@@ -578,17 +569,20 @@ app.post("/validate-id", async (req, res) => {
     return res.json({ ok: false });
   }
 
+  // 🔥 BUSCAR POR ID O FOLIO
   const [rows] = await db.query(
-    "SELECT * FROM users WHERE id=?",
-    [id]
+    "SELECT * FROM users WHERE id=? OR folio=?",
+    [id, id]
   );
 
   if (!rows.length) {
     return res.json({ ok: false });
   }
 
+  const user = rows[0];
+
   res.json({
     ok: true,
-    user: rows[0]
+    user
   });
 });
