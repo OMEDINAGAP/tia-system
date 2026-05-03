@@ -1,94 +1,108 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8">
   <title>TIA Dashboard</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <link rel="stylesheet" href="/css/admin.css">
 </head>
-
 <body>
 
-  <div class="layout">
+<div class="layout">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <h2>✈️ TIA Dashboard</h2>
-      <nav>
-        <a class="active">Dashboard</a>
-        <a>Usuarios</a>
-        <a>Cursos</a>
-        <a>Exámenes</a>
-        <a>QR</a>
-        <a>Logs</a>
-      </nav>
-    </aside>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <h2>✈️ TIA</h2>
+    <a class="active">Dashboard</a>
+    <a>Usuarios</a>
+    <a>Reportes</a>
+    <a>QR</a>
+    <a>Logs</a>
+  </aside>
 
-    <!-- MAIN -->
-    <main class="main">
+  <!-- MAIN -->
+  <main class="main">
 
-      <!-- HEADER -->
-      <header class="header">
-        <h1>Centro de Control - Capacitación</h1>
-        <div class="header-right">
-          <span id="time"></span>
-          <span class="status">🟢 Online</span>
+    <!-- HEADER -->
+    <div class="header">
+      <h1>Centro de Control</h1>
+      <div class="header-right">
+        <span id="time"></span>
+        <span class="online">● Online</span>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="card">👥 Usuarios <strong id="users">0</strong></div>
+      <div class="card green">🎓 Completados <strong id="done">0</strong></div>
+      <div class="card yellow">⏳ En curso <strong id="progress">0</strong></div>
+      <div class="card red">❌ Fallidos <strong id="fail">0</strong></div>
+    </div>
+
+    <!-- GRID -->
+    <div class="grid">
+
+      <!-- LEFT -->
+      <div class="left">
+
+        <!-- PROGRESO -->
+        <div class="box">
+          <h3>Progreso global</h3>
+          <div class="bar">
+            <div id="bar-fill"></div>
+          </div>
+          <span id="bar-text"></span>
         </div>
-      </header>
 
-      <!-- KPIs -->
-      <section class="kpis">
-        <div class="card">Usuarios <strong id="users">0</strong></div>
-        <div class="card green">Completados <strong id="done">0</strong></div>
-        <div class="card yellow">En progreso <strong id="progress">0</strong></div>
-        <div class="card red">Reprobados <strong id="fail">0</strong></div>
-      </section>
-
-      <!-- PROGRESO GLOBAL -->
-      <section class="global-progress">
-        <h3>Progreso general</h3>
-        <div class="bar">
-          <div id="bar-fill"></div>
+        <!-- TABLA -->
+        <div class="box">
+          <h3>Usuarios</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Progreso</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="table"></tbody>
+          </table>
         </div>
-        <span id="bar-text">0%</span>
-      </section>
 
-      <!-- TABLA -->
-      <section class="table-section">
-        <input type="text" placeholder="Buscar..." id="search">
+      </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Folio</th>
-              <th>Progreso</th>
-              <th>Último video</th>
-              <th>Minuto</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody id="table"></tbody>
-        </table>
-      </section>
+      <!-- RIGHT -->
+      <div class="right">
 
-      <!-- ALERTAS -->
-      <section class="alerts">
-        <h3>Alertas</h3>
-        <ul id="alerts"></ul>
-      </section>
+        <!-- ALERTAS -->
+        <div class="box">
+          <h3>Alertas</h3>
+          <ul id="alerts"></ul>
+        </div>
 
-      <!-- ACTIVIDAD -->
-      <section class="activity">
-        <h3>Actividad en tiempo real</h3>
-        <ul id="activity"></ul>
-      </section>
+        <!-- GRÁFICA -->
+        <div class="box">
+          <h3>Usuarios por estado</h3>
+          <canvas id="chart"></canvas>
+        </div>
 
-    </main>
+        <!-- ACTIVIDAD -->
+        <div class="box">
+          <h3>Actividad</h3>
+          <ul id="activity"></ul>
+        </div>
 
-  </div>
+      </div>
 
-  <script src="/js/admin.js"></script>
+    </div>
+
+  </main>
+</div>
+
+<script src="/js/admin.js"></script>
 </body>
-
 </html>
