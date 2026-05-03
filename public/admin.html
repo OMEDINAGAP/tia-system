@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <title>TIA Dashboard</title>
@@ -9,100 +10,114 @@
 
   <link rel="stylesheet" href="/css/admin.css">
 </head>
+
 <body>
 
-<div class="layout">
+  <div class="layout">
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <h2>✈️ TIA</h2>
-    <a class="active">Dashboard</a>
-    <a>Usuarios</a>
-    <a>Reportes</a>
-    <a>QR</a>
-    <a>Logs</a>
-  </aside>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <h2>✈️ TIA</h2>
+      <a class="active">Dashboard</a>
+      <a>Usuarios</a>
+      <a>Reportes</a>
+      <a>QR</a>
+      <a>Logs</a>
+    </aside>
 
-  <!-- MAIN -->
-  <main class="main">
+    <!-- MAIN -->
+    <main class="main">
 
-    <!-- HEADER -->
-    <div class="header">
-      <h1>Centro de Control</h1>
-      <div class="header-right">
-        <span id="time"></span>
-        <span class="online">● Online</span>
+      <!-- HEADER -->
+      <div class="header">
+        <h1>Centro de Control</h1>
+        <div class="header-right">
+          <span id="time"></span>
+          <span class="online">● Online</span>
+        </div>
       </div>
-    </div>
 
-    <!-- KPIs -->
-    <div class="kpis">
-      <div class="card">👥 Usuarios <strong id="users">0</strong></div>
-      <div class="card green">🎓 Completados <strong id="done">0</strong></div>
-      <div class="card yellow">⏳ En curso <strong id="progress">0</strong></div>
-      <div class="card red">❌ Fallidos <strong id="fail">0</strong></div>
-    </div>
+      <!-- KPIs -->
+      <div class="kpis">
+        <div class="card">👥 Usuarios <strong id="users">0</strong></div>
+        <div class="card green">🎓 Completados <strong id="done">0</strong></div>
+        <div class="card yellow">⏳ En curso <strong id="progress">0</strong></div>
+        <div class="card red">❌ Fallidos <strong id="fail">0</strong></div>
+      </div>
 
-    <!-- GRID -->
-    <div class="grid">
+      <!-- GRID -->
+      <div class="grid">
 
-      <!-- LEFT -->
-      <div class="left">
+        <!-- LEFT -->
+        <div class="left">
 
-        <!-- PROGRESO -->
-        <div class="box">
-          <h3>Progreso global</h3>
-          <div class="bar">
-            <div id="bar-fill"></div>
+          <!-- PROGRESO -->
+          <div class="box">
+            <h3>Progreso global</h3>
+            <div class="bar">
+              <div id="bar-fill"></div>
+            </div>
+            <span id="bar-text"></span>
           </div>
-          <span id="bar-text"></span>
+
+          <!-- TABLA -->
+          <div class="box">
+            <h3>Usuarios</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Progreso</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="table"></tbody>
+            </table>
+          </div>
+
         </div>
 
-        <!-- TABLA -->
-        <div class="box">
-          <h3>Usuarios</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Progreso</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody id="table"></tbody>
-          </table>
+        <!-- RIGHT -->
+        <div class="right">
+
+          <!-- ALERTAS -->
+          <div class="box">
+            <h3>Alertas</h3>
+            <ul id="alerts"></ul>
+          </div>
+
+          <!-- GRÁFICA -->
+          <div class="box">
+            <h3>Usuarios por estado</h3>
+            <canvas id="chart"></canvas>
+          </div>
+
+          <!-- ACTIVIDAD -->
+          <div class="box">
+            <h3>Actividad</h3>
+            <ul id="activity"></ul>
+          </div>
+
+          <!-- CLAVE -->
+          <div class="box">
+            <h3>🔐 Código diario TIA</h3>
+
+            <div style="display:flex; gap:10px;">
+              <button onclick="generateCode()">Generar</button>
+              <button onclick="copyCode()">Copiar</button>
+            </div>
+
+            <h2 id="dailyCode" style="margin-top:15px;">----</h2>
+          </div>
+
         </div>
 
       </div>
 
-      <!-- RIGHT -->
-      <div class="right">
+    </main>
+  </div>
 
-        <!-- ALERTAS -->
-        <div class="box">
-          <h3>Alertas</h3>
-          <ul id="alerts"></ul>
-        </div>
-
-        <!-- GRÁFICA -->
-        <div class="box">
-          <h3>Usuarios por estado</h3>
-          <canvas id="chart"></canvas>
-        </div>
-
-        <!-- ACTIVIDAD -->
-        <div class="box">
-          <h3>Actividad</h3>
-          <ul id="activity"></ul>
-        </div>
-
-      </div>
-
-    </div>
-
-  </main>
-</div>
-
-<script src="/js/admin.js"></script>
+  <script src="/js/admin.js"></script>
 </body>
+
 </html>

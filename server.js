@@ -140,18 +140,23 @@ async function createSession(userId) {
 }
 
 
-
+app.get("/daily-code", auth, (req, res) => {
+  const code = generatePassword();
+  res.json({ code });
+});
 
 
 // PASSWORD DINÁMICA
 function generatePassword() {
+
   const now = new Date();
 
-  // FORZAR ZONA MÉXICO (UTC-7)
-  const offset = -7;
-  const local = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+  // 🇲🇽 Zona México (UTC-7 o UTC-6 dependiendo DST)
+  const mexicoTime = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/Mexico_City" })
+  );
 
-  const today = local.toISOString().split("T")[0];
+  const today = mexicoTime.toISOString().split("T")[0];
 
   const base = SECRET + today;
 
