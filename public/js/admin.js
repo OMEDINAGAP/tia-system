@@ -1,5 +1,12 @@
 const token = sessionStorage.getItem("token");
 
+
+
+if (!token || !token.startsWith("admin-")) {
+  window.location.href = "/admin-login.html";
+}
+
+
 function updateTime() {
     document.getElementById("time").innerText =
         new Date().toLocaleTimeString();

@@ -16,7 +16,7 @@ const db = mysql.createPool({
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(__dirname + "/public"));
 
 const fs = require("fs");
 
@@ -34,40 +34,27 @@ const sessions = new Map(); // token -> userId
 let lastSent = 0;
 
 // 2️⃣ 🔐 AUTH (AQUÍ ARRIBA)
-async function auth(req, res, next) {
-  try {
-    const header = req.headers.authorization;
+function auth(req, res, next) {
 
-    if (!header) {
-      return res.status(401).json({ ok: false });
-    }
+  const header = req.headers.authorization;
 
-    const token = header.replace("Bearer", "").trim();
+  if (!header) return res.status(401).json({ error: "No token" });
 
-    const [rows] = await db.query(
-      "SELECT * FROM sessions WHERE token=?",
-      [token]
-    );
+  const token = header.split(" ")[1];
 
-    const session = rows[0];
-
-    if (!session) {
-      return res.status(401).json({ ok: false });
-    }
-
-    if (session.expires < Date.now()) {
-      return res.status(401).json({ ok: false });
-    }
-
-    req.userId = session.userId;
-    req.isAdmin = String(session.userId).startsWith("admin-");
-
-    next();
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ ok: false });
+  // 🔥 ADMIN
+  if (token.startsWith("admin-")) {
+    req.isAdmin = true;
+    req.userId = null;
+    req.token = token;
+    return next();
   }
+
+  // 🔥 USUARIO NORMAL (tu lógica actual)
+  req.isAdmin = false;
+  req.userId = parseInt(token); // o como lo manejes
+
+  next();
 }
 
 function track() {
@@ -173,22 +160,24 @@ function generatePassword() {
 
 // ADMIN PASSWORD (PROTEGIDO)
 app.post("/admin-login", async (req, res) => {
+
+  const { pin } = req.body;
+
   try {
-    const { pin } = req.body;
 
     const [rows] = await db.query(
-      "SELECT * FROM admins WHERE pin=?",
+      "SELECT * FROM admins WHERE pin = ? LIMIT 1",
       [pin]
     );
 
-    const admin = rows[0];
-
-    if (!admin) {
-      return res.status(401).json({ ok: false });
+    if (rows.length === 0) {
+      return res.status(401).json({ ok: false, msg: "PIN incorrecto" });
     }
 
-    // 🔥 crear sesión como usuario
-    const token = await createSession("admin-" + admin.id);
+    const admin = rows[0];
+
+    // 🔥 generar token
+    const token = "admin-" + admin.id + "-" + Date.now();
 
     res.json({
       ok: true,
@@ -197,7 +186,7 @@ app.post("/admin-login", async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR admin-login:", err);
     res.status(500).json({ ok: false });
   }
 });
@@ -397,27 +386,46 @@ app.get("/admin-password", auth, (req, res) => {
 // ADMIN DATA
 app.get("/admin-data", auth, async (req, res) => {
 
-  const [users] = await db.query(`
-    SELECT u.id, u.name, u.folio,
-    IFNULL(MAX(v.progress),0) as progress
-    FROM users u
-    LEFT JOIN video_progress v ON u.id = v.userId
-    GROUP BY u.id
-  `);
+  if (!req.isAdmin) {
+    return res.status(403).json({ error: "No autorizado" });
+  }
 
-  const formatted = users.map(u => ({
-    ...u,
-    video: "Video 1",
-    minute: Math.round(u.progress * 2) // ejemplo
-  }));
+  try {
 
-  res.json({
-    users: formatted,
-    activity: [
-      "Usuario inició sesión",
-      "Progreso guardado"
-    ]
-  });
+    const [users] = await db.query(`
+      SELECT 
+        u.id, 
+        u.name, 
+        u.folio,
+        IFNULL(MAX(v.progress),0) as progress
+      FROM users u
+      LEFT JOIN video_progress v ON u.id = v.userId
+      GROUP BY u.id
+    `);
+
+    const formatted = users.map(u => ({
+      id: u.id,
+      name: u.name,
+      folio: u.folio,
+      progress: Number(u.progress),
+      video: "Video 1",
+      minute: Math.round((u.progress / 100) * 60),
+      status: u.progress >= 100 ? "completado" : "en progreso"
+    }));
+
+    res.json({
+      users: formatted,
+      activity: [
+        "Usuario inició sesión",
+        "Progreso guardado"
+      ]
+    });
+
+  } catch (err) {
+    console.error("❌ ERROR admin-data:", err);
+    res.status(500).json({ error: "Error servidor" });
+  }
+
 });
 
 
