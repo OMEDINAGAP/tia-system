@@ -180,7 +180,7 @@
 <script>
 
   // 🔐 TOKEN
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
 
 
   if (!token) {
@@ -486,7 +486,7 @@
 
   // ⚡ MODO PRUEBA
   function goExamTest() {
-    localStorage.setItem("testMode", "true");
+    sessionStorage.setItem("testMode", "true");
 
     setTimeout(() => {
       window.location.href = "/examen.html";

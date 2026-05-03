@@ -177,7 +177,7 @@
           .then(res => res.json())
           .then(data => {
 
-            localStorage.setItem("token", data.token); // 🔥 CLAVE
+            sessionStorage.setItem("token", data.token); // 🔥 CLAVE
 
             // 🎉 mensaje bonito
             Swal.fire({
@@ -245,10 +245,10 @@
         }
 
         // 🔐 guardar token
-        localStorage.setItem("token", session.token);
+        sessionStorage.setItem("token", session.token);
 
         // opcional
-        localStorage.setItem("userId", userData.id);
+        sessionStorage.setItem("userId", userData.id);
 
 
 

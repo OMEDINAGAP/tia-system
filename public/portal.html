@@ -199,7 +199,7 @@
 
 <script>
   // 🔐 TOKEN
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
 
 
   if (!token) location.href = "/";
@@ -219,7 +219,7 @@
   btn.disabled = true;
   btn.style.opacity = 0.5;
 
-  if (localStorage.getItem("fotoOK")) {
+  if (sessionStorage.getItem("fotoOK")) {
     document.getElementById("btnCurso").disabled = false;
     document.getElementById("overlay").classList.add("hidden");
   }
@@ -422,7 +422,7 @@
       const res = await fetch("/upload-photo", {
         method: "POST",
         headers: {
-          "Authorization": "Bearer " + localStorage.getItem("token").trim()
+          "Authorization": "Bearer " + sessionStorage.getItem("token").trim()
         },
         body: formData
       });

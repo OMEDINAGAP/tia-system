@@ -173,7 +173,7 @@
   </div>
 
   <script>
-    const token = localStorage.getItem("token");
+    const token = sessionStorage.getItem("token");
 
     let questions = [];
     let current = 0;
@@ -309,7 +309,7 @@
           color: '#fff',
           confirmButtonColor: '#22c55e'
         }).then(() => {
-          localStorage.removeItem("testMode"); // 🔥 AQUÍ
+          sessionStorage.removeItem("testMode"); // 🔥 AQUÍ
           window.location.href = "/certificado.html";
         });
 
@@ -357,7 +357,7 @@
         color: '#fff',
         confirmButtonColor: '#ef4444'
       }).then(() => {
-        localStorage.removeItem("testMode"); // 🔥 AQUÍ
+        sessionStorage.removeItem("testMode"); // 🔥 AQUÍ
         window.location.href = "/curso.html";
 
       });
@@ -369,8 +369,8 @@
 
     async function validateAccess() {
 
-      const token = localStorage.getItem("token");
-      const isTest = localStorage.getItem("testMode") === "true";
+      const token = sessionStorage.getItem("token");
+      const isTest = sessionStorage.getItem("testMode") === "true";
 
       const res = await fetch("/can-take-exam", {
         headers: {
