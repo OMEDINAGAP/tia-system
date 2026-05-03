@@ -9,10 +9,22 @@ setInterval(updateTime, 1000);
 let chart;
 
 async function loadDashboard() {
+    const token = sessionStorage.getItem("token");
+
+    if (!token) {
+        window.location.href = "/";
+    }
 
     const res = await fetch("/admin-data", {
         headers: { Authorization: "Bearer " + token }
     });
+
+    if (!res.ok) {
+        // 🔥 si no autorizado → regresar
+        window.location.href = "/";
+        return;
+    }
+
 
     const data = await res.json();
 
@@ -82,6 +94,11 @@ async function loadDashboard() {
     });
 }
 
+
+function logout() {
+    sessionStorage.removeItem("token"); // 🔥 destruye sesión
+    window.location.href = "/"; // regresar al login
+}
 
 function copyCode() {
     const code = document.getElementById("dailyCode").innerText;
