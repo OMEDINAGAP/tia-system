@@ -10,6 +10,65 @@
 
   <link rel="stylesheet" href="/css/admin.css">
 </head>
+<style>
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  #searchInput {
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+    width: 200px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 12px;
+    text-align: left;
+  }
+
+  tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .badge {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .badge.low {
+    background: #ef4444;
+  }
+
+  .badge.mid {
+    background: #f59e0b;
+  }
+
+  .badge.ok {
+    background: #22c55e;
+  }
+
+  .pagination {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+</style>
 
 <body>
 
@@ -55,21 +114,36 @@
             </div>
             <span id="bar-text"></span>
           </div>
-<br>
+          <br>
 
           <!-- TABLA -->
-          <div class="box">
-            <h3>Usuarios</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Progreso</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody id="table"></tbody>
-            </table>
+          <div class="card">
+
+            <div class="table-header">
+              <h3>Usuarios</h3>
+
+              <input type="text" id="searchInput" placeholder="Buscar usuario..." oninput="filterUsers()">
+            </div>
+
+            <div class="table-container">
+              <table id="usersTable">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Progreso</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="usersBody"></tbody>
+              </table>
+            </div>
+
+            <div class="pagination">
+              <button onclick="prevPage()">⬅</button>
+              <span id="pageInfo"></span>
+              <button onclick="nextPage()">➡</button>
+            </div>
+
           </div>
 
         </div>
@@ -82,21 +156,21 @@
             <h3>Alertas</h3>
             <ul id="alerts"></ul>
           </div>
-<br>
+          <br>
 
           <!-- GRÁFICA -->
           <div class="box">
             <h3>Usuarios por estado</h3>
             <canvas id="chart"></canvas>
           </div>
-<br>
+          <br>
 
           <!-- ACTIVIDAD -->
           <div class="box">
             <h3>Actividad</h3>
             <ul id="activity"></ul>
           </div>
-<br>
+          <br>
 
           <!-- CLAVE -->
           <div class="box">
