@@ -41,8 +41,6 @@ async function loadDashboard() {
 
     let done = 0, progress = 0, fail = 0;
 
-    let done = 0, progress = 0, fail = 0;
-
     allUsers = data.users;
     filteredUsers = [...allUsers];
 
