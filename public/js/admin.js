@@ -14,14 +14,13 @@ function updateTime() {
 setInterval(updateTime, 1000);
 
 let chart;
-let allUsers = [];
-let filteredUsers = [];
-let currentPage = 1;
-const perPage = 20;
-
 
 async function loadDashboard() {
     const token = sessionStorage.getItem("token");
+    let allUsers = [];
+    let filteredUsers = [];
+    let currentPage = 1;
+    const perPage = 20;
 
     if (!token) {
         window.location.href = "/";
@@ -42,10 +41,33 @@ async function loadDashboard() {
 
     let done = 0, progress = 0, fail = 0;
 
+    let done = 0, progress = 0, fail = 0;
+
     allUsers = data.users;
     filteredUsers = [...allUsers];
 
-    renderTable();
+
+    const table = document.getElementById("table");
+    table.innerHTML = "";
+
+    data.users.forEach(u => {
+
+        let badge = "warn";
+
+        if (u.progress >= 100) { done++; badge = "ok"; }
+        else if (u.progress < 10) { fail++; badge = "bad"; }
+        else progress++;
+
+        table.innerHTML += `
+      <tr>
+        <td>${u.name}</td>
+        <td>${u.progress.toFixed(1)}%</td>
+        <td><span class="badge ${badge}">
+          ${badge === "ok" ? "Completado" : badge === "warn" ? "En curso" : "Bajo"}
+        </span></td>
+      </tr>
+    `;
+    });
 
     document.getElementById("users").innerText = data.users.length;
     document.getElementById("done").innerText = done;
@@ -120,6 +142,11 @@ loadDailyCode();
 setInterval(loadDashboard, 5000);
 
 
+let allUsers = [];
+let filteredUsers = [];
+
+let currentPage = 1;
+const perPage = 20;
 
 function renderTable() {
 
