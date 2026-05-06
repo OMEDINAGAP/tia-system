@@ -97,8 +97,18 @@
 
       document.getElementById("folio").innerText = user.folio || "---";
 
+      const fecha = user.fecha
+        ? new Date(user.fecha)
+        : new Date();
+
       document.getElementById("fecha").innerText =
-        user.fecha ? new Date(user.fecha).toLocaleDateString() : "---";
+        fecha.toLocaleDateString("es-MX", {
+
+          year: "numeric",
+          month: "long",
+          day: "numeric"
+
+        });
 
       document.getElementById("qr").src = user.qr || "";
 
