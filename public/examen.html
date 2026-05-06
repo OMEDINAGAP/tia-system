@@ -274,96 +274,164 @@
     // 🔥 Enviar al backend
     async function finish() {
 
-      const payload = questions.map((q, i) => ({
-        id: q.id,
-        answer: answers[i]
-      }));
+      let correct = 0;
 
+      questions.forEach((q, i) => {
+
+        const picked =
+          document.querySelector(`input[name=q${i}]:checked`);
+
+        if (picked && Number(picked.value) === q.correct) {
+          correct++;
+        }
+
+      });
+
+      const score =
+        Math.round((correct / questions.length) * 100);
+
+      // 🔥 GUARDAR RESULTADO BASE
       const res = await fetch("/submit-exam", {
+
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer " + token
         },
-        body: JSON.stringify({ answers: payload })
+
+        body: JSON.stringify({
+          score
+        })
+
       });
 
       const data = await res.json();
 
-      // 🔥 Fallbacks (AQUÍ VA)
-      const score = data.score ?? 0;
-      const intentos = data.intentos ?? 1;
+      console.log("SUBMIT:", data);
+
+      // ❌ ERROR GENERAL
+      if (!data.ok) {
+
+        Swal.fire({
+
+          title: 'Error',
+
+          text: data.error || 'No se pudo guardar examen',
+
+          icon: 'error',
+
+          background: '#0f172a',
+
+          color: '#fff'
+
+        });
+
+        return;
+
+      }
 
       // ✅ APROBADO
       if (data.aprobado) {
 
+        // 🔥 GENERAR CERTIFICADO + QR
+        const save = await fetch("/log-exam", {
+
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+
+          body: JSON.stringify({
+            score
+          })
+
+        });
+
+        const cert = await save.json();
+
+        console.log("CERT:", cert);
+
+        // ❌ ERROR CERTIFICADO
+        if (!cert.ok) {
+
+          Swal.fire({
+
+            title: 'Error',
+
+            text: cert.error || 'No se pudo generar certificado',
+
+            icon: 'error',
+
+            background: '#0f172a',
+
+            color: '#fff'
+
+          });
+
+          return;
+
+        }
+
+        // 🎉 ÉXITO
         Swal.fire({
+
           title: '🎉 ¡Felicidades!',
+
           html: `
         <p>Has aprobado con <b>${score}%</b></p>
         <p>Tu conocimiento fortalece la seguridad aeroportuaria ✈️</p>
       `,
+
           icon: 'success',
+
           confirmButtonText: 'Ver certificado',
+
           background: '#0f172a',
+
           color: '#fff',
+
           confirmButtonColor: '#22c55e'
+
         }).then(() => {
-          sessionStorage.removeItem("testMode"); // 🔥 AQUÍ
+
+          sessionStorage.removeItem("testMode");
+
           window.location.href = "/certificado.html";
+
         });
 
-        return;
       }
 
-      // ❌ FALLÓ PERO AÚN TIENE INTENTOS
-      if (!data.resetVideo) {
+      // ❌ REPROBADO
+      else {
 
         Swal.fire({
-          title: '⚠️ No aprobado',
-          html: `
-        <p>Resultado: <b>${score}%</b></p>
-        <p>Intento ${intentos} de 3</p>
-        <p><b>Puedes intentarlo nuevamente.</b></p>
-      `,
-          icon: 'warning',
-          confirmButtonText: 'Reintentar',
-          background: '#0f172a',
-          color: '#fff',
-          confirmButtonColor: '#f59e0b'
-        }).then(() => {
 
-          // 🔁 reinicia examen
-          current = 0;
-          answers = new Array(questions.length).fill(null);
-          render();
+          title: '❌ No aprobaste',
+
+          html: `
+        <p>Obtuviste <b>${score}%</b></p>
+        <p>Necesitas mínimo 80%</p>
+      `,
+
+          icon: 'error',
+
+          confirmButtonText: 'Intentar de nuevo',
+
+          background: '#0f172a',
+
+          color: '#fff',
+
+          confirmButtonColor: '#ef4444'
 
         });
 
-        return;
       }
 
-      // 🚫 BLOQUEO (3 intentos)
-      Swal.fire({
-        title: '🚫 Reentrenamiento requerido',
-        html: `
-      <p>Has agotado los 3 intentos</p>
-      <p>Debes volver a ver el curso completo</p>
-      <p><b>La seguridad aeroportuaria no permite errores.</b></p>
-    `,
-        icon: 'error',
-        confirmButtonText: 'Ir al curso',
-        background: '#0f172a',
-        color: '#fff',
-        confirmButtonColor: '#ef4444'
-      }).then(() => {
-        sessionStorage.removeItem("testMode"); // 🔥 AQUÍ
-        window.location.href = "/curso.html";
-
-      });
-
     }
-
 
     loadExam();
 
