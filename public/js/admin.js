@@ -155,7 +155,21 @@ function renderTable() {
         table.innerHTML += `
         <tr>
             <td>${u.name}</td>
-            <td>${u.progress.toFixed(1)}%</td>
+            <td>
+  <div class="mini-progress">
+    <div class="mini-fill green"
+      style="width:${u.video1}%"></div>
+  </div>
+  ${Number(u.video1).toFixed(0)}%
+</td>
+
+<td>
+  <div class="mini-progress">
+    <div class="mini-fill blue"
+      style="width:${u.video2}%"></div>
+  </div>
+  ${Number(u.video2).toFixed(0)}%
+</td>
             <td><span class="badge ${badge}">
                 ${badge === "ok" ? "Completado" : badge === "warn" ? "En curso" : "Bajo"}
             </span></td>

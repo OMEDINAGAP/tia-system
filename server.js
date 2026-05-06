@@ -507,7 +507,7 @@ app.get("/admin-data", auth, async (req, res) => {
 
   try {
 
-    const [users] = await db.query(`
+    /* const [users] = await db.query(`
       SELECT 
         u.id, 
         u.name, 
@@ -516,9 +516,26 @@ app.get("/admin-data", auth, async (req, res) => {
       FROM users u
       LEFT JOIN video_progress v ON u.id = v.userId
       GROUP BY u.id
-    `);
+    `); */
+    const [users] = await db.query(`
+  SELECT 
+    u.id,
+    u.name,
+    u.folio,
 
-    const formatted = users.map(u => ({
+    MAX(CASE WHEN v.videoIndex = 0 THEN v.progress ELSE 0 END) as video1,
+
+    MAX(CASE WHEN v.videoIndex = 1 THEN v.progress ELSE 0 END) as video2
+
+  FROM users u
+
+  LEFT JOIN video_progress v 
+    ON u.id = v.userId
+
+  GROUP BY u.id
+`);
+
+    /* const formatted = users.map(u => ({
       id: u.id,
       name: u.name,
       folio: u.folio,
@@ -526,8 +543,26 @@ app.get("/admin-data", auth, async (req, res) => {
       video: "Video 1",
       minute: Math.round((u.progress / 100) * 60),
       status: u.progress >= 100 ? "completado" : "en progreso"
-    }));
+    })); */
 
+    const formatted = users.map(u => {
+
+      const total =
+        ((Number(u.video1) + Number(u.video2)) / 2);
+
+      return {
+        ...u,
+        total
+      };
+    });
+
+    res.json({
+      users: formatted,
+      activity: [
+        "Usuario inició sesión",
+        "Progreso guardado"
+      ]
+    });
 
     /*  console.log("USERS:", users); */
 
