@@ -413,18 +413,25 @@ app.post("/log-video", auth, async (req, res) => {
 });
 
 // LOG EXAM SEGURO
+// LOG EXAM SEGURO
 app.post("/log-exam", auth, async (req, res) => {
 
   try {
 
-    const userId = req.userId; // 🔐 viene del token
-    const score = req.body.score;
+    const userId = req.userId;
+    const score = Number(req.body.score);
 
-    // VALIDACIÓN BÁSICA
-    if (score === undefined) {
-      return res.json({ ok: false, error: "Score requerido" });
+    // 🔒 validar score
+    if (score === undefined || isNaN(score)) {
+
+      return res.json({
+        ok: false,
+        error: "Score requerido"
+      });
+
     }
 
+    // 🔍 buscar usuario
     const [rows] = await db.query(
       "SELECT * FROM users WHERE id=?",
       [userId]
@@ -432,62 +439,174 @@ app.post("/log-exam", auth, async (req, res) => {
 
     const user = rows[0];
 
-    if (!user) return res.json({ ok: false });
+    if (!user) {
 
-    // 🔒 BLOQUEO POR INTENTOS
+      return res.json({
+        ok: false,
+        error: "Usuario no encontrado"
+      });
+
+    }
+
+    // 🔒 límite intentos
     if (user.intentos >= 3) {
-      return res.json({ ok: false, error: "Intentos agotados" });
+
+      return res.json({
+        ok: false,
+        error: "Intentos agotados"
+      });
+
     }
 
-    // 🔒 BLOQUEO: no permitir examen si no terminó video
-    if (user.video < 90) {
-      return res.json({ ok: false, error: "Curso no completado" });
+    // 🎥 VALIDAR VIDEOS COMPLETOS
+    const [videos] = await db.query(
+
+      `SELECT
+        videoIndex,
+        MAX(progress) as progress
+       FROM video_progress
+       WHERE userId=?
+       GROUP BY videoIndex`,
+
+      [userId]
+
+    );
+
+    let v1 = 0;
+    let v2 = 0;
+
+    videos.forEach(v => {
+
+      if (v.videoIndex == 0) {
+        v1 = Number(v.progress);
+      }
+
+      if (v.videoIndex == 1) {
+        v2 = Number(v.progress);
+      }
+
+    });
+
+    // 📊 promedio real
+    const totalProgress = (v1 + v2) / 2;
+
+    console.log("VIDEOS:", {
+      v1,
+      v2,
+      totalProgress
+    });
+
+    // 🔒 bloquear examen si no terminó
+    if (totalProgress < 90) {
+
+      return res.json({
+        ok: false,
+        error: "Curso no completado",
+        progress: totalProgress
+      });
+
     }
 
+    // 🎯 aprobado
+    const passed = score >= 80;
+
+    // 🔥 generar datos certificado
     const folio = generarFolio();
+
     const fecha = new Date();
 
-    // 🔐 FIRMA (como ya lo haces)
-    const base = `${folio}|${user.name}|${fecha.toISOString()}`;
+    // 🔐 firma
+    const base =
+      `${folio}|${user.name}|${fecha.toISOString()}`;
+
     const firma = generarFirma(base);
 
+    // 🔥 payload QR
     const payload = encodeURIComponent(JSON.stringify({
+
       folio,
       nombre: user.name,
       fecha,
       firma
+
     }));
 
-    const urlValidacion = `${process.env.BASE_URL}/validar.html?data=${payload}`;
+    // 🔗 url validación
+    const urlValidacion =
+      `${process.env.BASE_URL}/validar.html?data=${payload}`;
 
+    // 🔳 generar QR
     const QRCode = require("qrcode");
-    const qr = await QRCode.toDataURL(urlValidacion);
 
-    // 💾 GUARDAR TODO
-    await db.query(`
-      UPDATE users 
-      SET exam=?, 
-          intentos=intentos+1, 
-          aprobado=?, 
-          folio=?, 
-          fecha=?, 
-          qr=? 
-      WHERE id=?`,
-      [score, score >= 80, folio, fecha, qr, userId]
+    const qr =
+      await QRCode.toDataURL(urlValidacion);
+
+    // 💾 guardar historial examen
+    await db.query(
+
+      `INSERT INTO exam_attempts
+      (userId, score, passed, attemptNumber)
+      VALUES (?, ?, ?, ?)`,
+
+      [
+        userId,
+        score,
+        passed ? 1 : 0,
+        user.intentos + 1
+      ]
+
     );
 
+    // 💾 actualizar usuario
+    await db.query(
+
+      `UPDATE users 
+       SET 
+         exam=?,
+         intentos=intentos+1,
+         aprobado=?,
+         folio=?,
+         fecha=?,
+         qr=?
+       WHERE id=?`,
+
+      [
+        score,
+        passed ? 1 : 0,
+        folio,
+        fecha,
+        qr,
+        userId
+      ]
+
+    );
+
+    // ✅ respuesta
     res.json({
+
       ok: true,
       folio,
-      qr
+      qr,
+      passed,
+      score
+
     });
 
   } catch (err) {
-    console.error("LOG-EXAM ERROR:", err);
-    res.status(500).json({ ok: false });
+
+    console.error(
+      "❌ LOG-EXAM ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      ok: false
+    });
+
   }
 
 });
+
 
 app.get("/admin-password", auth, (req, res) => {
 
