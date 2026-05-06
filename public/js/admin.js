@@ -16,14 +16,12 @@ setInterval(updateTime, 1000);
 let chart;
 
 async function loadDashboard() {
+
     const token = sessionStorage.getItem("token");
-    let allUsers = [];
-    let filteredUsers = [];
-    let currentPage = 1;
-    const perPage = 20;
 
     if (!token) {
         window.location.href = "/";
+        return;
     }
 
     const res = await fetch("/admin-data", {
@@ -31,68 +29,61 @@ async function loadDashboard() {
     });
 
     if (!res.ok) {
-        // 🔥 si no autorizado → regresar
         window.location.href = "/";
         return;
     }
 
-
     const data = await res.json();
 
-    let done = 0, progress = 0, fail = 0;
+    // 🔥 NORMALIZAR DATOS
+    allUsers = data.users.map(u => ({
+        ...u,
+        progress: parseFloat(u.progress) || 0
+    }));
 
-    allUsers = data.users;
     filteredUsers = [...allUsers];
+    currentPage = 1;
 
+    // 🔥 CONTADORES CORRECTOS
+    let done = 0, progressCount = 0, fail = 0;
 
-    const table = document.getElementById("table");
-    table.innerHTML = "";
-
-    data.users.forEach(u => {
-
-        let badge = "warn";
-
-        if (u.progress >= 100) { done++; badge = "ok"; }
-        else if (u.progress < 10) { fail++; badge = "bad"; }
-        else progress++;
-
-        table.innerHTML += `
-      <tr>
-        <td>${u.name}</td>
-        <td>${u.progress.toFixed(1)}%</td>
-        <td><span class="badge ${badge}">
-          ${badge === "ok" ? "Completado" : badge === "warn" ? "En curso" : "Bajo"}
-        </span></td>
-      </tr>
-    `;
+    allUsers.forEach(u => {
+        if (u.progress >= 100) done++;
+        else if (u.progress < 10) fail++;
+        else progressCount++;
     });
 
-    document.getElementById("users").innerText = data.users.length;
+    // 🔥 KPIs
+    document.getElementById("users").innerText = allUsers.length;
     document.getElementById("done").innerText = done;
-    document.getElementById("progress").innerText = progress;
+    document.getElementById("progress").innerText = progressCount;
     document.getElementById("fail").innerText = fail;
 
-    const avg = data.users.reduce((a, b) => a + b.progress, 0) / data.users.length || 0;
+    // 🔥 BARRA GLOBAL
+    const avg = allUsers.reduce((a, b) => a + b.progress, 0) / allUsers.length || 0;
     document.getElementById("bar-fill").style.width = avg + "%";
     document.getElementById("bar-text").innerText = avg.toFixed(1) + "%";
 
-    // ALERTAS
+    // 🔥 ALERTAS
     const alerts = document.getElementById("alerts");
     alerts.innerHTML = "";
-    data.users.forEach(u => {
+    allUsers.forEach(u => {
         if (u.progress < 10) {
             alerts.innerHTML += `<li>⚠ ${u.name} no avanza</li>`;
         }
     });
 
-    // ACTIVIDAD
+    // 🔥 ACTIVIDAD
     const activity = document.getElementById("activity");
     activity.innerHTML = "";
     data.activity.forEach(a => {
         activity.innerHTML += `<li>${a}</li>`;
     });
 
-    // CHART
+    // 🔥 TABLA
+    renderTable();
+
+    // 🔥 CHART
     const ctx = document.getElementById("chart");
 
     if (chart) chart.destroy();
@@ -102,13 +93,12 @@ async function loadDashboard() {
         data: {
             labels: ['Completado', 'En curso', 'Bajo'],
             datasets: [{
-                data: [done, progress, fail],
+                data: [done, progressCount, fail],
                 backgroundColor: ['#22c55e', '#eab308', '#ef4444']
             }]
         }
     });
 }
-
 
 function logout() {
     sessionStorage.removeItem("token"); // 🔥 destruye sesión
@@ -145,6 +135,7 @@ let filteredUsers = [];
 
 let currentPage = 1;
 const perPage = 20;
+let chart;
 
 function renderTable() {
 
@@ -153,25 +144,25 @@ function renderTable() {
 
     const usersToShow = filteredUsers.slice(start, end);
 
-    const tbody = document.getElementById("usersBody");
-    tbody.innerHTML = "";
+    const table = document.getElementById("table");
+    table.innerHTML = "";
 
     usersToShow.forEach(u => {
 
-        let statusClass = "low";
+        let badge = "warn";
 
-        if (u.progress >= 80) statusClass = "ok";
-        else if (u.progress >= 40) statusClass = "mid";
+        if (u.progress >= 100) badge = "ok";
+        else if (u.progress < 10) badge = "bad";
 
-        tbody.innerHTML += `
-      <tr>
-        <td>${u.name}</td>
-        <td>${u.progress.toFixed(1)}%</td>
-        <td><span class="badge ${statusClass}">
-          ${statusClass === "ok" ? "Alto" : statusClass === "mid" ? "Medio" : "Bajo"}
-        </span></td>
-      </tr>
-    `;
+        table.innerHTML += `
+        <tr>
+            <td>${u.name}</td>
+            <td>${u.progress.toFixed(1)}%</td>
+            <td><span class="badge ${badge}">
+                ${badge === "ok" ? "Completado" : badge === "warn" ? "En curso" : "Bajo"}
+            </span></td>
+        </tr>
+        `;
     });
 
     document.getElementById("pageInfo").innerText =
@@ -189,6 +180,8 @@ function filterUsers() {
     currentPage = 1;
     renderTable();
 }
+
+
 
 function nextPage() {
     if (currentPage < Math.ceil(filteredUsers.length / perPage)) {
