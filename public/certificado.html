@@ -38,6 +38,21 @@
       margin-top: 40px;
       font-size: 12px;
     }
+
+    .qr-box {
+
+      margin-top: 40px;
+      text-align: center;
+
+    }
+
+    #qr {
+
+      width: 140px;
+      height: 140px;
+      object-fit: contain;
+
+    }
   </style>
 </head>
 
@@ -65,7 +80,11 @@
     <p><b>Folio:</b> <span id="folio"></span></p>
     <p><b>Fecha:</b> <span id="fecha"></span></p>
 
-    <img id="qr" class="qr">
+    <div class="qr-box">
+
+      <img id="qr" />
+
+    </div>
 
     <div class="footer">
       Documento válido únicamente con código QR verificable.
@@ -73,7 +92,9 @@
 
   </div>
 
-  <button onclick="descargar()">Descargar PDF</button>
+  <button onclick="descargar()">
+    Descargar PDF
+  </button>
 
   <script>
 
@@ -115,8 +136,12 @@
       // 🔥 auto descargar
       setTimeout(() => {
         descargar();
-      }, 800);
+      }, 1200);
+
+
     }
+
+
     function descargar() {
       function descargar() {
         html2pdf().from(document.getElementById("cert")).save();
@@ -127,6 +152,48 @@
 
   </script>
 
+  <script>
+
+    function descargar() {
+
+      const element =
+        document.getElementById("cert");
+
+      const opt = {
+
+        margin: 0,
+
+        filename:
+          "Certificado-TIA.pdf",
+
+        image: {
+          type: "jpeg",
+          quality: 1
+        },
+
+        html2canvas: {
+          scale: 3
+        },
+
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "landscape"
+        }
+
+      };
+
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save();
+
+    }
+
+  </script>
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
 
 </html>
