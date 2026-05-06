@@ -80,7 +80,7 @@
     async function load() {
 
       const res = await fetch("/me", {
-        headers: { AAuthorization: "Bearer " + sessionStorage.getItem("token") }
+        headers: { Authorization: "Bearer " + sessionStorage.getItem("token") }
       });
 
       const user = await res.json(); // 🔥 ya no es array
