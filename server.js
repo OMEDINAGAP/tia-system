@@ -739,54 +739,46 @@ app.get("/questions", async (req, res) => {
 
 app.post("/submit-exam", auth, async (req, res) => {
 
-  const userId = req.userId;
-  const answers = req.body.answers;
+  try {
 
-  let correct = 0;
+    const userId = req.userId;
 
-  for (let a of answers) {
-    const [q] = await db.query(
-      "SELECT correct FROM questions WHERE id=?",
-      [a.id]
-    );
+    const score =
+      Number(req.body.score || 0);
 
-    if (q.length && q[0].correct === a.answer) {
-      correct++;
-    }
+    console.log("SCORE:", score);
+
+    const aprobado =
+      score >= 80;
+
+    // 🔥 GUARDAR SCORE BÁSICO
+    await db.query(`
+      UPDATE users
+      SET exam=?,
+          aprobado=?
+      WHERE id=?
+    `, [
+      score,
+      aprobado,
+      userId
+    ]);
+
+    res.json({
+      ok: true,
+      aprobado,
+      score
+    });
+
+  } catch (err) {
+
+    console.error("SUBMIT ERROR:", err);
+
+    res.status(500).json({
+      ok: false,
+      error: err.message
+    });
+
   }
-
-  const score = Math.round((correct / answers.length) * 100);
-
-  // 🔥 obtener usuario
-  const [rows] = await db.query(
-    "SELECT intentos FROM users WHERE id=?",
-    [userId]
-  );
-
-  if (!rows.length) {
-    console.log("❌ Usuario no encontrado:", userId);
-    return res.status(401).json({ error: "Usuario no válido" });
-  }
-
-  const user = rows[0];
-
-  const intento = (user.intentos || 0) + 1;
-
-  const aprobado = score >= 80;
-  const resetVideo = intento >= 3 && !aprobado;
-
-  // 🔥 guardar
-  await db.query(
-    "UPDATE users SET exam=?, intentos=?, aprobado=? WHERE id=?",
-    [score, intento, aprobado, userId]
-  );
-
-  res.json({
-    score,
-    aprobado,
-    intentos: intento,
-    resetVideo
-  });
 
 });
 
