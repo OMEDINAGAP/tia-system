@@ -142,6 +142,63 @@
       document.querySelectorAll(".form")[index].classList.add("active");
     }
 
+    /*  async function loginNew() {
+ 
+       const name = document.getElementById("name").value.trim();
+       const company = document.getElementById("company").value.trim();
+       const pass = document.getElementById("pass").value.trim();
+ 
+       if (!name || !company || !pass) {
+         Swal.fire("⚠️", "Completa todos los campos", "warning");
+         return;
+       }
+ 
+       const res = await fetch("/validate-new", {
+         method: "POST",
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ name, company, pass })
+       });
+ 
+       const data = await res.json();
+ 
+       if (data.ok) {
+ 
+         // 🔥 CREAR SESIÓN (AQUÍ VA)
+         const u = await fetch("/log-login", {
+           method: "POST",
+           headers: {
+             "Content-Type": "application/json"
+           },
+           body: JSON.stringify({
+             name,
+             company
+           })
+         })
+           .then(res => res.json())
+           .then(data => {
+ 
+             sessionStorage.setItem("token", data.token); // 🔥 CLAVE
+ 
+             // 🎉 mensaje bonito
+             Swal.fire({
+               title: "✅ Registro exitoso",
+               html: `Tu folio es:<br><b>${data.folio}</b>`,
+               confirmButtonText: "Continuar",
+               background: "#0f172a",
+               color: "#fff"
+             }).then(() => {
+               window.location.href = "/portal.html";
+             });
+ 
+           });
+ 
+ 
+ 
+ 
+       }
+     }
+  */
+
     async function loginNew() {
 
       const name = document.getElementById("name").value.trim();
@@ -149,54 +206,86 @@
       const pass = document.getElementById("pass").value.trim();
 
       if (!name || !company || !pass) {
-        Swal.fire("⚠️", "Completa todos los campos", "warning");
+
+        Swal.fire(
+          "??",
+          "Completa todos los campos",
+          "warning"
+        );
+
         return;
       }
 
+      // ?? VALIDAR Y CREAR USUARIO
       const res = await fetch("/validate-new", {
         method: "POST",
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, company, pass })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name,
+          company,
+          pass
+        })
       });
 
       const data = await res.json();
 
       if (data.ok) {
 
-        // 🔥 CREAR SESIÓN (AQUÍ VA)
-        const u = await fetch("/log-login", {
+        // ? GUARDAR FOLIO ORIGINAL
+        const folio = data.folio;
+
+        // ?? CREAR SESIÓN
+        await fetch("/log-login", {
+
           method: "POST",
+
           headers: {
             "Content-Type": "application/json"
           },
+
           body: JSON.stringify({
             name,
             company
           })
+
         })
           .then(res => res.json())
-          .then(data => {
+          .then(session => {
 
-            sessionStorage.setItem("token", data.token); // 🔥 CLAVE
+            // ? TOKEN
+            sessionStorage.setItem(
+              "token",
+              session.token
+            );
 
-            // 🎉 mensaje bonito
+            // ?? MENSAJE
             Swal.fire({
-              title: "✅ Registro exitoso",
-              html: `Tu folio es:<br><b>${data.folio}</b>`,
+
+              title: "? Registro exitoso",
+
+              html: `
+          Tu folio es:<br>
+          <b>${folio}</b>
+        `,
+
               confirmButtonText: "Continuar",
+
               background: "#0f172a",
               color: "#fff"
+
             }).then(() => {
+
               window.location.href = "/portal.html";
+
             });
 
           });
 
-
-
-
       }
     }
+
 
     async function loginById() {
 
