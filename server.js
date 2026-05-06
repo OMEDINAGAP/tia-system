@@ -533,16 +533,12 @@ app.post("/log-exam", auth, async (req, res) => {
     const urlValidacion =
       `https://tia-system-production.up.railway.app/validar.html?data=${payload}`;
 
-    const qr = await QRCode.toDataURL(urlValidacion);
-
-    // 🔳 generar QR
-    const QRCode = require("qrcode");
-
+  
     const qr =
       await QRCode.toDataURL(urlValidacion);
 
       console.log("QR GENERADO:", qr.substring(0, 80));
-      
+
     // 💾 guardar historial examen
     await db.query(
 
