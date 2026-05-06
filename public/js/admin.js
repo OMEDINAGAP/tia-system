@@ -146,11 +146,16 @@ function renderTable() {
     table.innerHTML = "";
 
     usersToShow.forEach(u => {
-
+        const total =
+            (Number(u.video1) + Number(u.video2)) / 2;
         let badge = "warn";
 
-        if (u.progress >= 100) badge = "ok";
-        else if (u.progress < 10) badge = "bad";
+        if (total >= 92) {
+            badge = "ok";
+        }
+        else if (total < 30) {
+            badge = "bad";
+        }
 
         table.innerHTML += `
         <tr>
