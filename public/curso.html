@@ -386,7 +386,11 @@
     if (!player || typeof player.getCurrentTime !== "function") return;
 
     const state = player.getPlayerState();
-    if (state !== YT.PlayerState.PLAYING) return;
+
+    if (
+      state !== YT.PlayerState.PLAYING &&
+      state !== YT.PlayerState.PAUSED
+    ) return;
 
     const current = player.getCurrentTime();
 
@@ -396,8 +400,9 @@
       if (!duration || duration === 0) return;
     }
 
+console.log("allowTracking:", allowTracking);
     // 🚫 BLOQUEO ANTI-SKIP
-    if (!allowTracking) return;
+    /* if (!allowTracking) return; */
 
     if (current > maxTime + 8) {
       player.seekTo(Math.max(0, maxTime - 1));
@@ -406,11 +411,11 @@
     }
 
     // 🎯 PROGRESO REAL DEL VIDEO (0–100)
-    /*  const percentCurrentVideo = Math.min(
+     const percentCurrentVideo = Math.min(
        100,
        Math.max(0, (maxTime / duration) * 100)
-     ); */
-    const percentCurrentVideo = (maxTime / duration) * 100;
+     );
+    /* const percentCurrentVideo = (maxTime / duration) * 100; */
     // 🎯 PROGRESO REAL DEL VIDEO (0–100)
 
 
@@ -439,7 +444,7 @@
 
 
     // 🚀 ENVÍO CONTROLADO (SOLO POR VIDEO, NO TOTAL)
-    if (percentCurrentVideo - lastSent >= 5) {
+    if (percentCurrentVideo - lastSent >= 3) {
 
       lastSent = percentCurrentVideo;
 
