@@ -13,8 +13,6 @@ function updateTime() {
 }
 setInterval(updateTime, 1000);
 
-let chart;
-
 async function loadDashboard() {
 
     const token = sessionStorage.getItem("token");
