@@ -460,7 +460,7 @@ app.get("/admin-data", auth, async (req, res) => {
 
 
     console.log("USERS:", users);
-    
+
     res.json({
       users: formatted,
       activity: [
@@ -709,7 +709,7 @@ app.get("/can-take-exam", auth, async (req, res) => {
   }
 });
 
-app.post("/validate-new", async (req, res) => {
+/* app.post("/validate-new", async (req, res) => {
 
   const { name, company, pass } = req.body;
   const current = generatePassword();
@@ -734,6 +734,53 @@ app.post("/validate-new", async (req, res) => {
   );
 
   res.json({ ok: true, id, folio });
+}); */
+
+app.post("/validate-new", async (req, res) => {
+
+  const { name, company, pass } = req.body;
+
+  const current = generatePassword();
+
+  if (pass !== current) {
+    return res.json({
+      ok: false,
+      msg: "Contraseña incorrecta"
+    });
+  }
+
+  if (!name || !company) {
+    return res.json({
+      ok: false,
+      msg: "Datos incompletos"
+    });
+  }
+
+  // 🔥 FOLIO
+  const folio = "TIA-" + Math.floor(
+    100000 + Math.random() * 900000
+  );
+
+  // ✅ INSERT SIN ID
+  const [result] = await db.query(
+    `INSERT INTO users 
+    (name, company, folio, loginTime)
+    VALUES (?, ?, ?, NOW())`,
+    [
+      name.trim(),
+      company.trim(),
+      folio
+    ]
+  );
+
+  // ✅ ID REAL MYSQL
+  const userId = result.insertId;
+
+  res.json({
+    ok: true,
+    id: userId,
+    folio
+  });
 });
 
 app.post("/validate-id", async (req, res) => {
