@@ -192,7 +192,7 @@ app.post("/admin-login", async (req, res) => {
 });
 
 
-app.post("/log-login", async (req, res) => {
+/* app.post("/log-login", async (req, res) => {
   try {
 
     const { name, company } = req.body;
@@ -246,8 +246,51 @@ app.post("/log-login", async (req, res) => {
     console.error("❌ ERROR log-login:", err);
     res.status(500).json({ ok: false });
   }
-});
+}); */
 
+app.post("/log-login", async (req, res) => {
+
+  const { name, company } = req.body;
+
+  // 🔍 BUSCAR USUARIO
+  const [rows] = await db.query(
+    "SELECT * FROM users WHERE name=? AND company=?",
+    [name, company]
+  );
+
+  let user;
+
+  if (rows.length === 0) {
+    // 🔥 CREAR USUARIO
+    const [result] = await db.query(
+      "INSERT INTO users (name, company) VALUES (?, ?)",
+      [name, company]
+    );
+
+    user = { id: result.insertId };
+
+  } else {
+    user = rows[0];
+  }
+
+  // 🔥 ESTE ES EL BUENO
+  const userId = user.id;
+
+  // 🔥 TOKEN
+  const token = crypto.randomBytes(32).toString("hex");
+
+  await db.query(
+    "INSERT INTO sessions (token, userId, expires) VALUES (?, ?, ?)",
+    [token, userId, Date.now() + 86400000]
+  );
+
+  res.json({
+    ok: true,
+    token,
+    folio: "TIA-" + userId
+  });
+
+});
 
 app.get("/video-progress", auth, async (req, res) => {
 
@@ -288,6 +331,8 @@ app.post("/log-video", auth, async (req, res) => {
         progress = GREATEST(progress, VALUES(progress)),
         completed = VALUES(completed)
     `, [userId, videoIndex, progress, completed]);
+
+    console.log("GUARDANDO PARA USER:", req.userId);
 
     res.json({ ok: true });
 
@@ -413,6 +458,9 @@ app.get("/admin-data", auth, async (req, res) => {
       status: u.progress >= 100 ? "completado" : "en progreso"
     }));
 
+
+    console.log("USERS:", users);
+    
     res.json({
       users: formatted,
       activity: [
