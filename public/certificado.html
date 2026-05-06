@@ -96,63 +96,84 @@
     Descargar PDF
   </button>
 
+
   <script>
 
     async function load() {
 
       const res = await fetch("/me", {
-        headers: { Authorization: "Bearer " + sessionStorage.getItem("token") }
+        headers: {
+          Authorization:
+            "Bearer " + sessionStorage.getItem("token")
+        }
       });
 
-      const user = await res.json(); // 🔥 ya no es array
+      const user = await res.json();
+
+      console.log("USER:", user);
 
       if (!user || !user.name) {
+
         alert("Error cargando certificado");
         return;
+
       }
 
-      document.getElementById("nombre").innerText = user.name;
+      // ✅ DATOS
+      document.getElementById("nombre").innerText =
+        user.name || "---";
 
       document.getElementById("empresa").innerText =
-        user.company ? "Empresa: " + user.company : "";
+        user.company
+          ? "Empresa: " + user.company
+          : "";
 
-      document.getElementById("folio").innerText = user.folio || "---";
+      document.getElementById("folio").innerText =
+        user.folio || "---";
 
-      const fecha = user.fecha
-        ? new Date(user.fecha)
-        : new Date();
+      // ✅ FECHA
+      if (user.fecha) {
 
-      document.getElementById("fecha").innerText =
-        fecha.toLocaleDateString("es-MX", {
+        const fecha = new Date(user.fecha);
 
-          year: "numeric",
-          month: "long",
-          day: "numeric"
+        document.getElementById("fecha").innerText =
+          fecha.toLocaleDateString("es-MX", {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+          });
 
-        });
+      } else {
 
-      document.getElementById("qr").src = user.qr || "";
+        document.getElementById("fecha").innerText = "---";
 
-      // 🔥 auto descargar
-      setTimeout(() => {
-        descargar();
-      }, 1200);
-
-
-    }
-
-
-    function descargar() {
-      function descargar() {
-        html2pdf().from(document.getElementById("cert")).save();
       }
+
+      // ✅ QR
+      const qr = document.getElementById("qr");
+
+      qr.crossOrigin = "anonymous";
+
+      qr.onload = () => {
+
+        console.log("✅ QR cargado");
+
+        // 🔥 ESPERAR UN POCO MÁS
+        setTimeout(() => {
+          descargar();
+        }, 800);
+
+      };
+
+      qr.onerror = () => {
+
+        console.log("❌ Error QR");
+
+      };
+
+      qr.src = user.qr || "";
+
     }
-
-    load();
-
-  </script>
-
-  <script>
 
     function descargar() {
 
@@ -172,13 +193,21 @@
         },
 
         html2canvas: {
-          scale: 3
+
+          scale: 3,
+
+          useCORS: true
+
         },
 
         jsPDF: {
+
           unit: "mm",
+
           format: "a4",
+
           orientation: "landscape"
+
         }
 
       };
@@ -190,7 +219,10 @@
 
     }
 
+    load();
+
   </script>
+
 
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
