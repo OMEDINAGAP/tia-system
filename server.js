@@ -534,12 +534,12 @@ app.post("/log-exam", auth, async (req, res) => {
     const urlValidacion =
       `https://tia-system-production.up.railway.app/validar.html?data=${payload}`;
 
-  console.log("URL VALIDACION:", urlValidacion);
+    console.log("URL VALIDACION:", urlValidacion);
 
     const qr =
       await QRCode.toDataURL(urlValidacion);
 
-      console.log("QR GENERADO:", qr.substring(0, 50));
+   
 
     // 💾 guardar historial examen
     await db.query(
@@ -557,31 +557,26 @@ app.post("/log-exam", auth, async (req, res) => {
 
     );
 
-    console.log("ANTES UPDATE log-exam");
+    console.log("QR REAL:", qr.substring(0, 100));
 
     // 💾 actualizar usuario
-    await db.query(
-
-      `UPDATE users 
-       SET 
-         exam=?,
-         intentos=intentos+1,
-         aprobado=?,
-         folio=?,
-         fecha=?,
-         qr=?
-       WHERE id=?`,
-
-      [
-        score,
-        passed ? 1 : 0,
-        folio,
-        fecha,
-        qr,
-        userId
-      ]
-
-    );
+    await db.query(`
+  UPDATE users 
+  SET exam=?,
+      intentos=intentos+1,
+      aprobado=?,
+      folio=?,
+      fecha=?,
+      qr=?
+  WHERE id=?
+`, [
+      score,
+      score >= 80,
+      folio,
+      fecha,
+      qr,
+      userId
+    ]);
 
     console.log("DESPUES UPDATE log-exam");
 
