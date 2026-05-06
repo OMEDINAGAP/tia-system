@@ -782,36 +782,83 @@ app.post("/submit-exam", auth, async (req, res) => {
 });
 
 app.get("/can-take-exam", auth, async (req, res) => {
+
   try {
 
-    const isTest = req.headers["x-test-mode"] === "true";
+    const isTest =
+      req.headers["x-test-mode"] === "true";
 
-    // 🔥 MODO PRUEBA (BYPASS TOTAL)
+    // 🔥 MODO PRUEBA
     if (isTest) {
+
       return res.json({
         ok: true,
         test: true
       });
+
     }
 
-    // 🔒 VALIDACIÓN NORMAL
+    // 🔥 OBTENER TODOS LOS VIDEOS
     const [rows] = await db.query(
-      "SELECT video FROM users WHERE id=?",
+
+      `SELECT progress
+       FROM video_progress
+       WHERE userId=?`,
+
       [req.userId]
+
     );
 
-    const progress = rows[0]?.video || 0;
+    // 🚫 SIN VIDEOS
+    if (!rows.length) {
 
-    if (progress >= 90) {
-      return res.json({ ok: true, progress });
+      return res.json({
+        ok: false,
+        progress: 0
+      });
+
     }
 
-    res.json({ ok: false, progress });
+    // 🔥 PROMEDIO REAL
+    const total =
+      rows.reduce(
+        (acc, r) => acc + Number(r.progress || 0),
+        0
+      ) / rows.length;
+
+    console.log(
+      "TOTAL EXAM:",
+      total
+    );
+
+    // ✅ VALIDAR
+    if (total >= 90) {
+
+      return res.json({
+        ok: true,
+        progress: total
+      });
+
+    }
+
+    res.json({
+      ok: false,
+      progress: total
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ ok: false });
+
+    console.error(
+      "❌ ERROR can-take-exam:",
+      err
+    );
+
+    res.status(500).json({
+      ok: false
+    });
+
   }
+
 });
 
 /* app.post("/validate-new", async (req, res) => {
