@@ -34,7 +34,7 @@ const sessions = new Map(); // token -> userId
 let lastSent = 0;
 
 // 2️⃣ 🔐 AUTH (AQUÍ ARRIBA)
-function auth(req, res, next) {
+/* function auth(req, res, next) {
 
   const header = req.headers.authorization;
 
@@ -56,6 +56,88 @@ function auth(req, res, next) {
 
   next();
 }
+ */
+
+
+// 🔐 AUTH
+async function auth(req, res, next) {
+
+  try {
+
+    const header = req.headers.authorization;
+
+    if (!header) {
+
+      return res.status(401).json({
+        error: "No token"
+      });
+
+    }
+
+    const token = header.split(" ")[1];
+
+    // 🔥 ADMIN
+    if (token.startsWith("admin-")) {
+
+      req.isAdmin = true;
+      req.userId = null;
+      req.token = token;
+
+      return next();
+    }
+
+    // 🔥 USER NORMAL
+    req.isAdmin = false;
+
+    // 🔍 BUSCAR SESIÓN
+    const [rows] = await db.query(
+      `SELECT * FROM sessions
+       WHERE token=?
+       LIMIT 1`,
+      [token]
+    );
+
+    if (!rows.length) {
+
+      return res.status(401).json({
+        error: "Sesión inválida"
+      });
+
+    }
+
+    const session = rows[0];
+
+    console.log("AUTH SESSION:", session);
+
+    // ✅ USER REAL
+    req.userId = Number(session.userId);
+
+    console.log("AUTH USER:", req.userId);
+
+    if (!req.userId || isNaN(req.userId)) {
+
+      return res.status(401).json({
+        error: "User inválido"
+      });
+
+    }
+
+    req.token = token;
+
+    next();
+
+  } catch (err) {
+
+    console.error("AUTH ERROR:", err);
+
+    res.status(500).json({
+      error: "Auth error"
+    });
+
+  }
+}
+
+
 
 function track() {
 
@@ -113,7 +195,7 @@ function track() {
   }
 }
 
-async function createSession(userId) {
+/* async function createSession(userId) {
   const token = crypto.randomBytes(24).toString("hex");
 
   const expires = Date.now() + (1000 * 60 * 60);
@@ -125,7 +207,7 @@ async function createSession(userId) {
 
   return token;
 }
-
+ */
 
 app.get("/daily-code", auth, (req, res) => {
   const code = generatePassword();
@@ -191,106 +273,6 @@ app.post("/admin-login", async (req, res) => {
   }
 });
 
-
-/* app.post("/log-login", async (req, res) => {
-  try {
-
-    const { name, company } = req.body;
-
-    if (!name || !company) {
-      return res.status(400).json({ ok: false, error: "Datos requeridos" });
-    }
-
-    const [rows] = await db.query(
-      "SELECT * FROM users WHERE name=? AND company=?",
-      [name.trim(), company.trim()]
-    );
-
-    let userId;
-    let folio;
-
-    if (rows.length > 0) {
-
-      userId = rows[0].id;
-      folio = rows[0].folio;
-
-      console.log("👤 Usuario existente:", userId);
-
-    } else {
-
-      userId = Date.now();
-      folio = "TIA-" + Math.floor(100000 + Math.random() * 900000);
-
-      await db.query(
-        `INSERT INTO users (id, name, company, folio, loginTime) 
-         VALUES (?, ?, ?, ?, NOW())`,
-        [userId, name.trim(), company.trim(), folio]
-      );
-
-      console.log("🆕 Usuario nuevo:", userId);
-    }
-
-    // 🔥 limpiar sesiones viejas
-    await db.query("DELETE FROM sessions WHERE userId=?", [userId]);
-
-    const token = await createSession(userId);
-
-    res.json({
-      ok: true,
-      token,
-      userId,
-      folio   // 🔥 IMPORTANTE
-    });
-
-  } catch (err) {
-    console.error("❌ ERROR log-login:", err);
-    res.status(500).json({ ok: false });
-  }
-}); */
-
-/* app.post("/log-login", async (req, res) => {
-
-  const { name, company } = req.body;
-
-  // 🔍 BUSCAR USUARIO
-  const [rows] = await db.query(
-    "SELECT * FROM users WHERE name=? AND company=?",
-    [name, company]
-  );
-
-  let user;
-
-  if (rows.length === 0) {
-    // 🔥 CREAR USUARIO
-    const [result] = await db.query(
-      "INSERT INTO users (name, company) VALUES (?, ?)",
-      [name, company]
-    );
-
-    user = { id: result.insertId };
-
-  } else {
-    user = rows[0];
-  }
-
-  // 🔥 ESTE ES EL BUENO
-  const userId = user.id;
-
-  // 🔥 TOKEN
-  const token = crypto.randomBytes(32).toString("hex");
-
-  await db.query(
-    "INSERT INTO sessions (token, userId, expires) VALUES (?, ?, ?)",
-    [token, userId, Date.now() + 86400000]
-  );
-
-  res.json({
-    ok: true,
-    token,
-    folio: "TIA-" + userId
-  });
-
-}); */
 
 app.post("/log-login", async (req, res) => {
 
@@ -378,6 +360,8 @@ app.post("/log-login", async (req, res) => {
   }
 
 });
+
+
 app.get("/video-progress", auth, async (req, res) => {
 
   console.log("📥 GET USER:", req.userId);
@@ -387,7 +371,7 @@ app.get("/video-progress", auth, async (req, res) => {
     [req.userId]
   );
 
-  console.log("📊 RESULTADOS BD:", rows);
+  /* console.log("📊 RESULTADOS BD:", rows); */
 
   res.json(rows);
 });
@@ -545,7 +529,7 @@ app.get("/admin-data", auth, async (req, res) => {
     }));
 
 
-    console.log("USERS:", users);
+    /*  console.log("USERS:", users); */
 
     res.json({
       users: formatted,
