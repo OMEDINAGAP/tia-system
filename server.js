@@ -418,21 +418,14 @@ app.post("/log-exam", auth, async (req, res) => {
 
   try {
 
-    const userId = req.userId;
+    const QRCode = require("qrcode");
 
+    const userId = req.userId;
     const score = Number(req.body.score);
 
-    // 🔒 validar score
-    if (score === undefined || isNaN(score)) {
+    console.log("USER:", userId);
+    console.log("SCORE:", score);
 
-      return res.json({
-        ok: false,
-        error: "Score requerido"
-      });
-
-    }
-
-    // 🔍 buscar usuario
     const [rows] = await db.query(
       "SELECT * FROM users WHERE id=?",
       [userId]
@@ -449,127 +442,34 @@ app.post("/log-exam", auth, async (req, res) => {
 
     }
 
-    // 🔒 límite intentos
-    if (user.intentos >= 3) {
-
-      return res.json({
-        ok: false,
-        error: "Intentos agotados"
-      });
-
-    }
-
-    // 🎥 VALIDAR VIDEOS COMPLETOS
-    const [videos] = await db.query(
-
-      `SELECT
-        videoIndex,
-        MAX(progress) as progress
-       FROM video_progress
-       WHERE userId=?
-       GROUP BY videoIndex`,
-
-      [userId]
-
-    );
-
-    let v1 = 0;
-    let v2 = 0;
-
-    videos.forEach(v => {
-
-      if (v.videoIndex == 0) {
-        v1 = Number(v.progress);
-      }
-
-      if (v.videoIndex == 1) {
-        v2 = Number(v.progress);
-      }
-
-    });
-
-    // 📊 promedio real
-    const totalProgress = (v1 + v2) / 2;
-
-    console.log("VIDEOS:", {
-      v1,
-      v2,
-      totalProgress
-    });
-
-    // 🔒 bloquear examen si no terminó
-    if (totalProgress < 90) {
-
-      return res.json({
-        ok: false,
-        error: "Curso no completado",
-        progress: totalProgress
-      });
-
-    }
-
-    // 🎯 aprobado
-    const passed = score >= 80;
-
-    // 🔥 generar datos certificado
-    const folio = generarFolio();
+    const folio =
+      "TIA-" + Math.floor(100000 + Math.random() * 900000);
 
     const fecha = new Date();
 
-    // 🔐 firma
-    const base =
-      `${folio}|${user.name}|${fecha.toISOString()}`;
-
-    const firma = generarFirma(base);
-
-    // 🔥 payload QR
-    const payload = encodeURIComponent(JSON.stringify({
-      folio,
-      nombre: user.name,
-      fecha,
-      firma
-    }));
-
-    // 🔗 url validación
+    // ✅ URL SIMPLE
     const urlValidacion =
-      `https://tia-system-production.up.railway.app/validar.html?data=${payload}`;
+      `https://tia-system-production.up.railway.app/validar.html?folio=${folio}`;
 
-    console.log("URL VALIDACION:", urlValidacion);
+    console.log("URL:", urlValidacion);
 
+    // ✅ GENERAR QR
     const qr =
       await QRCode.toDataURL(urlValidacion);
 
-   
+    console.log("QR OK");
 
-    // 💾 guardar historial examen
-    await db.query(
-
-      `INSERT INTO exam_attempts
-      (userId, score, passed, attemptNumber)
-      VALUES (?, ?, ?, ?)`,
-
-      [
-        userId,
-        score,
-        passed ? 1 : 0,
-        user.intentos + 1
-      ]
-
-    );
-
-    console.log("QR REAL:", qr.substring(0, 100));
-
-    // 💾 actualizar usuario
+    // ✅ UPDATE
     await db.query(`
-  UPDATE users 
-  SET exam=?,
-      intentos=intentos+1,
-      aprobado=?,
-      folio=?,
-      fecha=?,
-      qr=?
-  WHERE id=?
-`, [
+      UPDATE users
+      SET exam=?,
+          intentos=intentos+1,
+          aprobado=?,
+          folio=?,
+          fecha=?,
+          qr=?
+      WHERE id=?
+    `, [
       score,
       score >= 80,
       folio,
@@ -578,28 +478,21 @@ app.post("/log-exam", auth, async (req, res) => {
       userId
     ]);
 
-    console.log("DESPUES UPDATE log-exam");
+    console.log("UPDATE OK");
 
-    // ✅ respuesta
     res.json({
-
       ok: true,
       folio,
-      qr,
-      passed,
-      score
-
+      qr
     });
 
   } catch (err) {
 
-    console.error(
-      "❌ LOG-EXAM ERROR:",
-      err
-    );
+    console.error("ERROR REAL:", err);
 
     res.status(500).json({
-      ok: false
+      ok: false,
+      error: err.message
     });
 
   }
