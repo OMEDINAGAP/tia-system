@@ -272,138 +272,150 @@
     }
 
     // 🔥 Enviar al backend
-    async function finish() {
+  async function finish() {
 
-      let correct = 0;
+  let correct = 0;
 
-      questions.forEach((q, index) => {
+  questions.forEach((q, index) => {
 
-        const selected = answers[index];
+    const selected = answers[index];
 
-        console.log(
-          "Pregunta:",
-          index,
-          "Seleccionada:",
-          selected,
-          "Correcta:",
-          q.answer
-        );
+    console.log(
+      "Pregunta:",
+      index,
+      "Seleccionada:",
+      selected,
+      "Correcta:",
+      q.correct
+    );
 
-        if (selected === q.answer) {
-          correct++;
-        }
-
-      });
-
-      const score = Math.round(
-        (correct / questions.length) * 100
-      );
-
-      console.log("CORRECTAS:", correct);
-      console.log("TOTAL:", questions.length);
-      console.log("SCORE:", score);
-
-      const res = await fetch("/submit-exam", {
-
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + token
-        },
-
-        body: JSON.stringify({
-          score
-        })
-
-      });
-
-      const data = await res.json();
-
-      console.log("SUBMIT:", data);
-
-      if (score >= 80) {
-
-        await fetch("/log-exam", {
-
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + token
-          },
-
-          body: JSON.stringify({
-            score
-          })
-
-        });
-
-        Swal.fire({
-
-          icon: "success",
-
-          title: "🎉 ¡Aprobaste!",
-
-          html: `
-      <div style="font-size:18px;">
-        Obtuviste:
-        <br><br>
-        <b style="font-size:42px;color:#22c55e;">
-          ${score}%
-        </b>
-        <br><br>
-        Excelente trabajo ✈️
-      </div>
-    `,
-
-          confirmButtonText: "Ver certificado",
-
-          background: "#0f172a",
-
-          color: "#fff",
-
-          confirmButtonColor: "#22c55e"
-
-        }).then(() => {
-
-          window.location.href =
-            "/certificado.html";
-
-        });
-
-      } else {
-
-        Swal.fire({
-
-          icon: "error",
-
-          title: "❌ No aprobaste",
-
-          html: `
-      <div style="font-size:18px;">
-        Obtuviste:
-        <br><br>
-        <b style="font-size:42px;color:#ef4444;">
-          ${score}%
-        </b>
-        <br><br>
-        Necesitas mínimo 80%
-      </div>
-    `,
-
-          background: "#0f172a",
-
-          color: "#fff",
-
-          confirmButtonColor: "#ef4444"
-
-        });
-
-      }
-
+    // 🔥 VALIDAR
+    if (selected === q.correct) {
+      correct++;
     }
 
+  });
+
+  const score = Math.round(
+    (correct / questions.length) * 100
+  );
+
+  console.log("CORRECTAS:", correct);
+  console.log("TOTAL:", questions.length);
+  console.log("SCORE:", score);
+
+  // 🚀 GUARDAR RESULTADO
+  const res = await fetch("/submit-exam", {
+
+    method: "POST",
+
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    },
+
+    body: JSON.stringify({
+      score
+    })
+
+  });
+
+  const data = await res.json();
+
+  console.log("SUBMIT:", data);
+
+  // ✅ APROBADO
+  if (score >= 80) {
+
+    // 🔥 GENERAR CERTIFICADO
+    await fetch("/log-exam", {
+
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+
+      body: JSON.stringify({
+        score
+      })
+
+    });
+
+    Swal.fire({
+
+      icon: "success",
+
+      title: "🎉 ¡Aprobaste!",
+
+      html: `
+        <div style="font-size:18px;">
+          Obtuviste:
+          <br><br>
+          <b style="
+            font-size:42px;
+            color:#22c55e;
+          ">
+            ${score}%
+          </b>
+          <br><br>
+          Excelente trabajo ✈️
+        </div>
+      `,
+
+      confirmButtonText: "Ver certificado",
+
+      background: "#0f172a",
+
+      color: "#fff",
+
+      confirmButtonColor: "#22c55e"
+
+    }).then(() => {
+
+      window.location.href =
+        "/certificado.html";
+
+    });
+
+  }
+
+  // ❌ REPROBADO
+  else {
+
+    Swal.fire({
+
+      icon: "error",
+
+      title: "❌ No aprobaste",
+
+      html: `
+        <div style="font-size:18px;">
+          Obtuviste:
+          <br><br>
+          <b style="
+            font-size:42px;
+            color:#ef4444;
+          ">
+            ${score}%
+          </b>
+          <br><br>
+          Necesitas mínimo 80%
+        </div>
+      `,
+
+      background: "#0f172a",
+
+      color: "#fff",
+
+      confirmButtonColor: "#ef4444"
+
+    });
+
+  }
+
+}
 
 
 
