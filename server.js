@@ -248,7 +248,7 @@ app.post("/admin-login", async (req, res) => {
   }
 }); */
 
-app.post("/log-login", async (req, res) => {
+/* app.post("/log-login", async (req, res) => {
 
   const { name, company } = req.body;
 
@@ -290,8 +290,94 @@ app.post("/log-login", async (req, res) => {
     folio: "TIA-" + userId
   });
 
-});
+}); */
 
+app.post("/log-login", async (req, res) => {
+
+  try {
+
+    const { name, company } = req.body;
+
+    // 🔍 BUSCAR USUARIO
+    const [rows] = await db.query(
+      `SELECT * FROM users
+       WHERE name=? AND company=?
+       ORDER BY id DESC
+       LIMIT 1`,
+      [name, company]
+    );
+
+    let user;
+
+    if (rows.length === 0) {
+
+      // 🔥 CREAR USUARIO
+      const [result] = await db.query(
+        `INSERT INTO users
+        (name, company)
+        VALUES (?, ?)`,
+        [name, company]
+      );
+
+      user = {
+        id: result.insertId,
+        folio: "SIN-FOLIO"
+      };
+
+    } else {
+
+      user = rows[0];
+
+    }
+
+    // ✅ FORZAR NÚMERO
+    const userId = Number(user.id);
+
+    console.log("LOGIN USER:", userId);
+
+    // 🚨 VALIDAR
+    if (!userId || isNaN(userId)) {
+
+      return res.status(500).json({
+        error: "UserId inválido"
+      });
+
+    }
+
+    // 🔥 TOKEN
+    const token = crypto
+      .randomBytes(32)
+      .toString("hex");
+
+    // 🔥 EXPIRACIÓN
+    const expires = Date.now() + 86400000;
+
+    // 💾 SESIÓN
+    await db.query(
+      `INSERT INTO sessions
+      (token, userId, expires)
+      VALUES (?, ?, ?)`,
+      [token, userId, expires]
+    );
+
+    // ✅ RESPUESTA
+    res.json({
+      ok: true,
+      token,
+      folio: user.folio || ("TIA-" + userId)
+    });
+
+  } catch (err) {
+
+    console.error("❌ ERROR log-login:", err);
+
+    res.status(500).json({
+      error: "Error login"
+    });
+
+  }
+
+});
 app.get("/video-progress", auth, async (req, res) => {
 
   console.log("📥 GET USER:", req.userId);
