@@ -276,18 +276,25 @@
 
       let correct = 0;
 
-      // 🔥 VALIDAR RESPUESTAS
       questions.forEach((q, index) => {
 
         const selected = answers[index];
 
-        if (selected === q.correct) {
+        console.log(
+          "Pregunta:",
+          index,
+          "Seleccionada:",
+          selected,
+          "Correcta:",
+          q.answer
+        );
+
+        if (selected === q.answer) {
           correct++;
         }
 
       });
 
-      // 🔥 CALCULAR SCORE
       const score = Math.round(
         (correct / questions.length) * 100
       );
@@ -296,7 +303,6 @@
       console.log("TOTAL:", questions.length);
       console.log("SCORE:", score);
 
-      // 🚀 GUARDAR EXAMEN
       const res = await fetch("/submit-exam", {
 
         method: "POST",
@@ -316,10 +322,8 @@
 
       console.log("SUBMIT:", data);
 
-      // ✅ APROBADO
       if (score >= 80) {
 
-        // 🔥 GENERAR CERTIFICADO
         await fetch("/log-exam", {
 
           method: "POST",
@@ -336,10 +340,31 @@
         });
 
         Swal.fire({
+
           icon: "success",
-          title: "✅ Aprobaste",
-          text: `Obtuviste ${score}%`,
-          confirmButtonText: "Ver certificado"
+
+          title: "🎉 ¡Aprobaste!",
+
+          html: `
+      <div style="font-size:18px;">
+        Obtuviste:
+        <br><br>
+        <b style="font-size:42px;color:#22c55e;">
+          ${score}%
+        </b>
+        <br><br>
+        Excelente trabajo ✈️
+      </div>
+    `,
+
+          confirmButtonText: "Ver certificado",
+
+          background: "#0f172a",
+
+          color: "#fff",
+
+          confirmButtonColor: "#22c55e"
+
         }).then(() => {
 
           window.location.href =
@@ -347,23 +372,41 @@
 
         });
 
-      }
-
-      // ❌ REPROBADO
-      else {
+      } else {
 
         Swal.fire({
+
           icon: "error",
+
           title: "❌ No aprobaste",
+
           html: `
-        <h2>Obtuviste ${score}%</h2>
-        <p>Necesitas mínimo 80%</p>
-      `
+      <div style="font-size:18px;">
+        Obtuviste:
+        <br><br>
+        <b style="font-size:42px;color:#ef4444;">
+          ${score}%
+        </b>
+        <br><br>
+        Necesitas mínimo 80%
+      </div>
+    `,
+
+          background: "#0f172a",
+
+          color: "#fff",
+
+          confirmButtonColor: "#ef4444"
+
         });
 
       }
 
     }
+
+
+
+
     loadExam();
 
     async function validateAccess() {
