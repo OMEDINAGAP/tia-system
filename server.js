@@ -620,82 +620,80 @@ app.get("/admin-password", auth, (req, res) => {
 // ADMIN DATA
 app.get("/admin-data", auth, async (req, res) => {
 
-  if (!req.isAdmin) {
-    return res.status(403).json({ error: "No autorizado" });
-  }
-
   try {
 
-    /* const [users] = await db.query(`
-      SELECT 
-        u.id, 
-        u.name, 
-        u.folio,
-        IFNULL(MAX(v.progress),0) as progress
-      FROM users u
-      LEFT JOIN video_progress v ON u.id = v.userId
-      GROUP BY u.id
-    `); */
+    if (!req.isAdmin) {
+
+      return res.status(403).json({
+        error: "No autorizado"
+      });
+
+    }
+
     const [users] = await db.query(`
-  SELECT 
-    u.id,
-    u.name,
-    u.folio,
 
-    MAX(CASE WHEN v.videoIndex = 0 THEN v.progress ELSE 0 END) as video1,
+      SELECT 
+        u.id,
+        u.name,
+        u.folio,
 
-    MAX(CASE WHEN v.videoIndex = 1 THEN v.progress ELSE 0 END) as video2
+        MAX(CASE WHEN vp.videoIndex = 0 
+          THEN vp.progress ELSE 0 END) as video1,
 
-  FROM users u
+        MAX(CASE WHEN vp.videoIndex = 1 
+          THEN vp.progress ELSE 0 END) as video2
 
-  LEFT JOIN video_progress v 
-    ON u.id = v.userId
+      FROM users u
 
-  GROUP BY u.id
-`);
+      LEFT JOIN video_progress vp
+      ON u.id = vp.userId
 
-    /* const formatted = users.map(u => ({
-      id: u.id,
-      name: u.name,
-      folio: u.folio,
-      progress: Number(u.progress),
-      video: "Video 1",
-      minute: Math.round((u.progress / 100) * 60),
-      status: u.progress >= 100 ? "completado" : "en progreso"
-    })); */
+      GROUP BY u.id
+
+    `);
 
     const formatted = users.map(u => {
 
-      const total =
-        ((Number(u.video1) + Number(u.video2)) / 2);
+      const v1 = Number(u.video1 || 0);
+      const v2 = Number(u.video2 || 0);
+
+      const total = (v1 + v2) / 2;
 
       return {
+
         ...u,
-        total
+
+        video1: v1,
+        video2: v2,
+        progress: total
+
       };
+
     });
 
-    res.json({
+    // ✅ SOLO UNA RESPUESTA
+    return res.json({
+
       users: formatted,
+
       activity: [
         "Usuario inició sesión",
         "Progreso guardado"
       ]
-    });
 
-    /*  console.log("USERS:", users); */
-
-    res.json({
-      users: formatted,
-      activity: [
-        "Usuario inició sesión",
-        "Progreso guardado"
-      ]
     });
 
   } catch (err) {
-    console.error("❌ ERROR admin-data:", err);
-    res.status(500).json({ error: "Error servidor" });
+
+    console.error(
+      "❌ ERROR admin-data:",
+      err
+    );
+
+    return res.status(500).json({
+      error: "Error servidor"
+    });
+
   }
 
 });
