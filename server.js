@@ -729,12 +729,23 @@ app.get("/questions", async (req, res) => {
 
   const group = Math.floor(Math.random() * 3) + 1;
 
-  const [rows] = await db.query(
-    "SELECT id, question, option_a, option_b, option_c, option_d FROM questions WHERE exam_group=? ORDER BY RAND() LIMIT 15",
-    [group]
-  );
+  const [rows] = await db.query(`
+    SELECT
+      id,
+      question,
+      option_a,
+      option_b,
+      option_c,
+      option_d,
+      correct
+    FROM questions
+    WHERE exam_group=?
+    ORDER BY RAND()
+    LIMIT 15
+  `, [group]);
 
   res.json(rows);
+
 });
 
 app.post("/submit-exam", auth, async (req, res) => {
