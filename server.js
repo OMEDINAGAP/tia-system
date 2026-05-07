@@ -442,48 +442,115 @@ app.post("/log-exam", auth, async (req, res) => {
 
     }
 
-    const folio =
-      "TIA-" + Math.floor(100000 + Math.random() * 900000);
+    // 🔥 NUEVO INTENTO
+    const intentoActual = (user.intentos || 0) + 1;
 
-    const fecha = new Date();
+    // ✅ APROBADO
+    if (score >= 80) {
 
-    // ✅ URL SIMPLE
-    const urlValidacion =
-      `https://tia-system-production.up.railway.app/validar.html?folio=${folio}`;
+      const folio =
+        "TIA-" + Math.floor(100000 + Math.random() * 900000);
 
-    console.log("URL:", urlValidacion);
+      const fecha = new Date();
 
-    // ✅ GENERAR QR
-    const qr =
-      await QRCode.toDataURL(urlValidacion);
+      // ✅ URL VALIDACIÓN
+      const urlValidacion =
+        `https://tia-system-production.up.railway.app/validar.html?folio=${folio}`;
 
-    console.log("QR OK");
+      // ✅ QR
+      const qr =
+        await QRCode.toDataURL(urlValidacion);
 
-    // ✅ UPDATE
-    await db.query(`
-      UPDATE users
-      SET exam=?,
-          intentos=intentos+1,
-          aprobado=?,
+      // ✅ GUARDAR
+      await db.query(`
+        UPDATE users
+        SET
+          exam=?,
+          intentos=?,
+          aprobado=1,
           folio=?,
           fecha=?,
           qr=?
+        WHERE id=?
+      `, [
+        score,
+        intentoActual,
+        folio,
+        fecha,
+        qr,
+        userId
+      ]);
+
+      console.log("APROBADO OK");
+
+      return res.json({
+        ok: true,
+        aprobado: true,
+        score,
+        folio,
+        qr
+      });
+
+    }
+
+    // ❌ REPROBADO
+
+    // 🔥 SI YA AGOTÓ LOS 3
+    if (intentoActual >= 3) {
+
+      console.log("REINICIANDO CURSO");
+
+      // 🔥 RESET USER
+      await db.query(`
+        UPDATE users
+        SET
+          exam=0,
+          intentos=0,
+          aprobado=0,
+          folio=NULL,
+          fecha=NULL,
+          qr=NULL,
+          video=0
+        WHERE id=?
+      `, [userId]);
+
+      // 🔥 BORRAR VIDEOS
+      await db.query(
+        "DELETE FROM video_progress WHERE userId=?",
+        [userId]
+      );
+
+      return res.json({
+        ok: true,
+        aprobado: false,
+        blocked: true,
+        score
+      });
+
+    }
+
+    // 🔥 SOLO GUARDAR INTENTO
+    await db.query(`
+      UPDATE users
+      SET
+        exam=?,
+        intentos=?,
+        aprobado=0
       WHERE id=?
     `, [
       score,
-      score >= 80,
-      folio,
-      fecha,
-      qr,
+      intentoActual,
       userId
     ]);
 
-    console.log("UPDATE OK");
+    console.log("REPROBADO");
 
-    res.json({
+    return res.json({
       ok: true,
-      folio,
-      qr
+      aprobado: false,
+      blocked: false,
+      score,
+      left: 3 - intentoActual
     });
 
   } catch (err) {

@@ -272,84 +272,84 @@
     }
 
     // 🔥 Enviar al backend
-  async function finish() {
+    async function finish() {
 
-  let correct = 0;
+      let correct = 0;
 
-  questions.forEach((q, index) => {
+      questions.forEach((q, index) => {
 
-    const selected = answers[index];
+        const selected = answers[index];
 
-    console.log(
-      "Pregunta:",
-      index,
-      "Seleccionada:",
-      selected,
-      "Correcta:",
-      q.correct
-    );
+        console.log(
+          "Pregunta:",
+          index,
+          "Seleccionada:",
+          selected,
+          "Correcta:",
+          q.correct
+        );
 
-    // 🔥 VALIDAR
-    if (selected === q.correct) {
-      correct++;
-    }
+        // 🔥 VALIDAR
+        if (selected === q.correct) {
+          correct++;
+        }
 
-  });
+      });
 
-  const score = Math.round(
-    (correct / questions.length) * 100
-  );
+      const score = Math.round(
+        (correct / questions.length) * 100
+      );
 
-  console.log("CORRECTAS:", correct);
-  console.log("TOTAL:", questions.length);
-  console.log("SCORE:", score);
+      console.log("CORRECTAS:", correct);
+      console.log("TOTAL:", questions.length);
+      console.log("SCORE:", score);
 
-  // 🚀 GUARDAR RESULTADO
-  const res = await fetch("/submit-exam", {
+      // 🚀 GUARDAR RESULTADO
+      const res = await fetch("/submit-exam", {
 
-    method: "POST",
+        method: "POST",
 
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + token
-    },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
 
-    body: JSON.stringify({
-      score
-    })
+        body: JSON.stringify({
+          score
+        })
 
-  });
+      });
 
-  const data = await res.json();
+      const data = await res.json();
 
-  console.log("SUBMIT:", data);
+      console.log("SUBMIT:", data);
 
-  // ✅ APROBADO
-  if (score >= 80) {
+      // ✅ APROBADO
+      if (score >= 80) {
 
-    // 🔥 GENERAR CERTIFICADO
-    await fetch("/log-exam", {
+        // 🔥 GENERAR CERTIFICADO
+        await fetch("/log-exam", {
 
-      method: "POST",
+          method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + token
-      },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
 
-      body: JSON.stringify({
-        score
-      })
+          body: JSON.stringify({
+            score
+          })
 
-    });
+        });
 
-    Swal.fire({
+        Swal.fire({
 
-      icon: "success",
+          icon: "success",
 
-      title: "🎉 ¡Aprobaste!",
+          title: "🎉 ¡Aprobaste!",
 
-      html: `
+          html: `
         <div style="font-size:18px;">
           Obtuviste:
           <br><br>
@@ -364,58 +364,144 @@
         </div>
       `,
 
-      confirmButtonText: "Ver certificado",
+          confirmButtonText: "Ver certificado",
 
-      background: "#0f172a",
+          background: "#0f172a",
 
-      color: "#fff",
+          color: "#fff",
 
-      confirmButtonColor: "#22c55e"
+          confirmButtonColor: "#22c55e"
 
-    }).then(() => {
+        }).then(() => {
 
-      window.location.href =
-        "/certificado.html";
+          window.location.href =
+            "/certificado.html";
 
-    });
+        });
 
-  }
+      }
 
-  // ❌ REPROBADO
-  else {
+      // ❌ REPROBADO
+      else {
 
-    Swal.fire({
+        // 🔥 GENERAR INTENTO
+        const examRes = await fetch("/log-exam", {
 
-      icon: "error",
+          method: "POST",
 
-      title: "❌ No aprobaste",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
 
-      html: `
-        <div style="font-size:18px;">
-          Obtuviste:
-          <br><br>
-          <b style="
-            font-size:42px;
-            color:#ef4444;
-          ">
-            ${score}%
-          </b>
-          <br><br>
-          Necesitas mínimo 80%
+          body: JSON.stringify({
+            score
+          })
+
+        });
+
+        const examData = await examRes.json();
+
+        console.log(examData);
+
+        // 🔥 BLOQUEADO
+        if (examData.blocked) {
+
+          await Swal.fire({
+
+            icon: "warning",
+
+            title: "⚠️ Intentos agotados",
+
+            html: `
+      <div style="
+        font-size:18px;
+        line-height:1.7;
+      ">
+
+        Has alcanzado el máximo de intentos permitidos.
+
+        <br><br>
+
+        Debes volver a visualizar el curso completo
+        antes de presentar nuevamente el examen.
+
+        <br><br>
+
+        <div style="
+          color:#facc15;
+          font-size:16px;
+        ">
+          Recuerda:
+          <br>
+          La seguridad aeroportuaria es responsabilidad de todos ✈️
         </div>
-      `,
 
-      background: "#0f172a",
+      </div>
+    `,
 
-      color: "#fff",
+            background: "#0f172a",
 
-      confirmButtonColor: "#ef4444"
+            color: "#fff",
 
-    });
+            confirmButtonColor: "#eab308",
 
-  }
+            confirmButtonText: "Volver al curso"
 
-}
+          });
+
+          // 🔥 REGRESAR AL CURSO
+          window.location.href = "/curso.html";
+
+          return;
+
+        }
+
+        // 🔥 REPROBADO NORMAL
+        Swal.fire({
+
+          icon: "error",
+
+          title: "❌ No aprobaste",
+
+          html: `
+      <div style="font-size:18px;">
+        Obtuviste:
+        <br><br>
+
+        <b style="
+          font-size:42px;
+          color:#ef4444;
+        ">
+          ${score}%
+        </b>
+
+        <br><br>
+
+        Necesitas mínimo 80%
+
+        <br><br>
+
+        <span style="
+          color:#facc15;
+          font-size:16px;
+        ">
+          Intentos restantes:
+          ${examData.left}
+        </span>
+      </div>
+    `,
+
+          background: "#0f172a",
+
+          color: "#fff",
+
+          confirmButtonColor: "#ef4444"
+
+        });
+
+      }
+    }
 
 
 
