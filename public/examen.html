@@ -458,6 +458,7 @@
         }
 
         // 🔥 REPROBADO NORMAL
+        // 🔥 REPROBADO NORMAL
         Swal.fire({
 
           icon: "error",
@@ -465,38 +466,57 @@
           title: "❌ No aprobaste",
 
           html: `
-      <div style="font-size:18px;">
-        Obtuviste:
-        <br><br>
+    <div style="font-size:18px;">
+      Obtuviste:
+      <br><br>
 
-        <b style="
-          font-size:42px;
-          color:#ef4444;
-        ">
-          ${score}%
-        </b>
+      <b style="
+        font-size:42px;
+        color:#ef4444;
+      ">
+        ${score}%
+      </b>
 
-        <br><br>
+      <br><br>
 
-        Necesitas mínimo 80%
+      Necesitas mínimo 80%
 
-        <br><br>
+      <br><br>
 
-        <span style="
-          color:#facc15;
-          font-size:16px;
-        ">
-          Intentos restantes:
-          ${examData.left}
-        </span>
-      </div>
-    `,
+      <span style="
+        color:#facc15;
+        font-size:16px;
+      ">
+        Intentos restantes:
+        ${examData.left}
+      </span>
+    </div>
+  `,
 
           background: "#0f172a",
 
           color: "#fff",
 
-          confirmButtonColor: "#ef4444"
+          confirmButtonColor: "#ef4444",
+
+          confirmButtonText: "Intentar nuevamente"
+
+        }).then(() => {
+
+          // 🔥 REINICIAR RESPUESTAS
+          answers = [];
+
+          // 🔥 VOLVER A PRIMERA PREGUNTA
+          current = 0;
+
+          // 🔥 RECARGAR UI
+          render();
+
+          // 🔥 SUBIR ARRIBA
+          window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+          });
 
         });
 
