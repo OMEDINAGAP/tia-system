@@ -1,230 +1,498 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
-  <title>Certificado TIA</title>
-  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Certificado GAP</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
-    body {
-      font-family: Georgia;
-      background: #e5e7eb;
+
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
     }
 
-    .cert {
-      width: 800px;
-      margin: auto;
-      background: white;
-      padding: 40px;
-      border: 8px solid #1e3a8a;
-      text-align: center;
+    body{
+      background:#dfe3ea;
+      font-family: 'Georgia', serif;
+      padding:40px;
     }
 
-    h1 {
-      color: #1e3a8a;
+    .cert-wrapper{
+      width:1123px;
+      height:794px;
+      margin:auto;
+      position:relative;
+      overflow:hidden;
+      background:white;
+
+      border:12px solid #0d2b5c;
+
+      box-shadow:
+      0 10px 40px rgba(0,0,0,.25);
     }
 
-    .logo {
-      font-size: 30px;
-      margin-bottom: 10px;
+    /* FONDO */
+    .background-layer{
+      position:absolute;
+      inset:0;
+      background:url('./assets/fondo-certificado.jpg');
+      background-size:cover;
+      background-position:center;
+      opacity:.16;
+      z-index:1;
     }
 
-    .qr {
-      width: 120px;
-      margin-top: 20px;
+    /* BORDES DECORATIVOS */
+    .inner-border{
+      position:absolute;
+      inset:14px;
+      border:2px solid #c7a64d;
+      z-index:2;
     }
 
-    .footer {
-      margin-top: 40px;
-      font-size: 12px;
+    .inner-border-2{
+      position:absolute;
+      inset:22px;
+      border:1px solid rgba(199,166,77,.5);
+      z-index:2;
     }
 
-    .qr-box {
+    /* BARRA LATERAL */
+    .security-bar{
+      position:absolute;
+      top:0;
+      right:0;
+      width:260px;
+      height:100%;
 
-      margin-top: 40px;
-      text-align: center;
+      background:
+      linear-gradient(
+      180deg,
+      #08224a,
+      #0d2b5c,
+      #081c38
+      );
 
+      z-index:3;
+
+      border-left:4px solid #c7a64d;
+
+      color:white;
+
+      padding:40px 25px;
     }
 
-    #qr {
-
-      width: 140px;
-      height: 140px;
-      object-fit: contain;
-
+    .security-title{
+      text-align:center;
+      font-size:18px;
+      font-weight:bold;
+      line-height:1.5;
+      letter-spacing:1px;
+      margin-top:20px;
     }
+
+    .security-sub{
+      text-align:center;
+      margin-top:20px;
+      line-height:1.5;
+      font-size:15px;
+      opacity:.9;
+    }
+
+    .security-code{
+      margin-top:25px;
+      text-align:center;
+      letter-spacing:3px;
+      font-size:20px;
+    }
+
+    .verify-link{
+      margin-top:35px;
+      font-size:14px;
+      text-align:center;
+      line-height:1.6;
+      opacity:.9;
+    }
+
+    .security-qr{
+      width:180px;
+      height:180px;
+      object-fit:contain;
+      background:white;
+      padding:10px;
+      margin:30px auto;
+      display:block;
+      border-radius:8px;
+    }
+
+    .hologram{
+      width:140px;
+      margin:25px auto;
+      display:block;
+      opacity:.95;
+    }
+
+    /* CONTENIDO */
+    .content{
+      position:relative;
+      z-index:5;
+      width:calc(100% - 260px);
+      height:100%;
+      padding:55px 70px;
+    }
+
+    .top-logo{
+      width:380px;
+      display:block;
+      margin:auto;
+    }
+
+    .divider{
+      width:100%;
+      height:2px;
+      background:linear-gradient(to right,
+      transparent,
+      #c7a64d,
+      transparent);
+      margin:30px 0;
+    }
+
+    .title{
+      text-align:center;
+      color:#0d2b5c;
+      font-size:56px;
+      letter-spacing:2px;
+      margin-bottom:40px;
+      font-weight:bold;
+    }
+
+    .subtitle{
+      text-align:center;
+      font-size:24px;
+      color:#333;
+      margin-bottom:25px;
+    }
+
+    .name{
+      text-align:center;
+      font-size:58px;
+      color:#0d2b5c;
+      font-weight:bold;
+      text-transform:uppercase;
+      margin-bottom:25px;
+    }
+
+    .empresa{
+      text-align:center;
+      font-size:24px;
+      margin-bottom:45px;
+    }
+
+    .description{
+      text-align:center;
+      font-size:30px;
+      line-height:1.8;
+      color:#222;
+      width:90%;
+      margin:auto;
+    }
+
+    .course{
+      font-weight:bold;
+      color:#0d2b5c;
+    }
+
+    .bottom-area{
+      position:absolute;
+      left:70px;
+      right:330px;
+      bottom:55px;
+
+      display:flex;
+      justify-content:space-between;
+      align-items:end;
+    }
+
+    .folio-block{
+      font-size:24px;
+      line-height:2;
+    }
+
+    .folio-block b{
+      color:#0d2b5c;
+    }
+
+    .firma-box{
+      text-align:center;
+    }
+
+    .firma{
+      width:220px;
+      margin-bottom:5px;
+    }
+
+    .firma-line{
+      width:250px;
+      height:2px;
+      background:#1f2937;
+      margin:auto;
+    }
+
+    .firma-text{
+      margin-top:10px;
+      color:#0d2b5c;
+      font-weight:bold;
+      line-height:1.5;
+    }
+
+    .watermark{
+      position:absolute;
+      width:420px;
+      opacity:.08;
+      left:50%;
+      top:50%;
+      transform:translate(-50%,-50%);
+      z-index:2;
+    }
+
+    .footer{
+      position:absolute;
+      bottom:15px;
+      left:0;
+      width:calc(100% - 260px);
+      text-align:center;
+      color:#555;
+      z-index:5;
+      font-size:14px;
+    }
+
   </style>
 </head>
 
 <body>
 
-  <div class="cert" id="cert">
+<div class="cert-wrapper" id="cert">
 
-    <div class="logo">✈️ AEROPUERTO INTERNACIONAL</div>
+  <div class="background-layer"></div>
 
-    <h1>CONSTANCIA DE ACREDITACIÓN</h1>
+  <div class="inner-border"></div>
+  <div class="inner-border-2"></div>
 
-    <p>Se certifica que:</p>
+  <img
+    src="./assets/marca-agua.png"
+    class="watermark"
+  />
 
-    <h2 id="nombre">---</h2>
+  <!-- BARRA LATERAL -->
+  <div class="security-bar">
 
-    <span id="empresa"></span><br><br>
-
-
-    <p>Ha completado satisfactoriamente el</p>
-
-    <b>CURSO DE SEGURIDAD AEROPORTUARIA</b>
-
-    <p>cumpliendo con los lineamientos de seguridad establecidos.</p>
-
-    <p><b>Folio:</b> <span id="folio"></span></p>
-    <p><b>Fecha:</b> <span id="fecha"></span></p>
-
-    <div class="qr-box">
-
-      <img id="qr" />
-
+    <div class="security-title">
+      DOCUMENTO<br>
+      OFICIAL
     </div>
 
-    <div class="footer">
-      Documento válido únicamente con código QR verificable.
+    <div class="security-sub">
+      VÁLIDO ÚNICAMENTE
+      CON CÓDIGO QR
+    </div>
+
+    <img id="qr" class="security-qr" />
+
+    <div class="security-code" id="folio2">
+      TIA-000000
+    </div>
+
+    <img
+      src="./assets/sello-holografico.png"
+      class="hologram"
+    />
+
+    <div class="verify-link">
+      VERIFICACIÓN EN LÍNEA
+      <br>
+      tia-system-production.up.railway.app
     </div>
 
   </div>
 
-  <button onclick="descargar()">
-    Descargar PDF
-  </button>
+  <!-- CONTENIDO -->
+  <div class="content">
 
+    <img
+      src="./assets/logo-gap.png"
+      class="top-logo"
+    />
 
-  <script>
+    <div class="divider"></div>
 
-    async function load() {
+    <div class="title">
+      CONSTANCIA DE ACREDITACIÓN
+    </div>
 
-      const res = await fetch("/me", {
-        headers: {
-          Authorization:
-            "Bearer " + sessionStorage.getItem("token")
-        }
-      });
+    <div class="subtitle">
+      Se certifica que:
+    </div>
 
-      const user = await res.json();
+    <div class="name" id="nombre">
+      PEDRO MONTES
+    </div>
 
-      console.log("USER:", user);
+    <div class="empresa" id="empresa">
+      Empresa: RED & RED
+    </div>
 
-      if (!user || !user.name) {
+    <div class="description">
+      Ha completado satisfactoriamente el
+      <span class="course">
+        CURSO DE SEGURIDAD AEROPORTUARIA
+      </span>
+      cumpliendo con los lineamientos
+      de seguridad establecidos.
+    </div>
 
-        alert("Error cargando certificado");
-        return;
+    <div class="bottom-area">
 
-      }
+      <div class="folio-block">
 
-      // ✅ DATOS
-      document.getElementById("nombre").innerText =
-        user.name || "---";
+        <div>
+          <b>FOLIO:</b>
+          <span id="folio">TIA-208855</span>
+        </div>
 
-      document.getElementById("empresa").innerText =
-        user.company
-          ? "Empresa: " + user.company
-          : "";
+        <div>
+          <b>FECHA:</b>
+          <span id="fecha">
+            7 de mayo de 2026
+          </span>
+        </div>
 
-      document.getElementById("folio").innerText =
-        user.folio || "---";
+      </div>
 
-      // ✅ FECHA
-      if (user.fecha) {
+      <div class="firma-box">
 
-        const fecha = new Date(user.fecha);
+        <img
+          src="./assets/firma.png"
+          class="firma"
+        />
 
-        document.getElementById("fecha").innerText =
-          fecha.toLocaleDateString("es-MX", {
-            day: "numeric",
-            month: "long",
-            year: "numeric"
-          });
+        <div class="firma-line"></div>
 
-      } else {
+        <div class="firma-text">
+          COORDINACIÓN DE SEGURIDAD
+          <br>
+          AEROPORTUARIA
+        </div>
 
-        document.getElementById("fecha").innerText = "---";
+      </div>
 
-      }
+    </div>
 
-      // ✅ QR
-      const qr = document.getElementById("qr");
+  </div>
 
+  <div class="footer">
+    Documento válido únicamente con código QR verificable.
+  </div>
 
-      qr.onload = () => {
+</div>
 
-        console.log("✅ QR cargado");
+<script>
 
-        // 🔥 ESPERAR UN POCO MÁS
-        setTimeout(() => {
-          descargar();
-        }, 800);
+async function load(){
 
-      };
+  const res = await fetch('/me',{
+    headers:{
+      Authorization:
+      'Bearer ' + sessionStorage.getItem('token')
+    }
+  });
 
-      qr.onerror = () => {
+  const user = await res.json();
 
-        console.log("❌ Error QR");
+  document.getElementById('nombre').innerText =
+  (user.name || '---').toUpperCase();
 
-      };
+  document.getElementById('empresa').innerText =
+  user.company
+  ? 'Empresa: ' + user.company
+  : '';
 
-      qr.src = user.qr || "";
+  document.getElementById('folio').innerText =
+  user.folio || '---';
 
+  document.getElementById('folio2').innerText =
+  user.folio || '---';
+
+  if(user.fecha){
+
+    const fecha = new Date(user.fecha);
+
+    document.getElementById('fecha').innerText =
+    fecha.toLocaleDateString('es-MX',{
+      day:'numeric',
+      month:'long',
+      year:'numeric'
+    });
+  }
+
+  const qr = document.getElementById('qr');
+
+  qr.onload = ()=>{
+
+    setTimeout(()=>{
+      descargar();
+    },700);
+
+  };
+
+  qr.src = user.qr || '';
+
+}
+
+function descargar(){
+
+  const element =
+  document.getElementById('cert');
+
+  const opt = {
+
+    margin:0,
+
+    filename:
+    'Certificado-GAP.pdf',
+
+    image:{
+      type:'jpeg',
+      quality:1
+    },
+
+    html2canvas:{
+      scale:4,
+      useCORS:true
+    },
+
+    jsPDF:{
+      unit:'mm',
+      format:'a4',
+      orientation:'landscape'
     }
 
-    function descargar() {
+  };
 
-      const element =
-        document.getElementById("cert");
+  html2pdf()
+  .set(opt)
+  .from(element)
+  .save();
 
-      const opt = {
+}
 
-        margin: 0,
+load();
 
-        filename:
-          "Certificado-TIA.pdf",
+</script>
 
-        image: {
-          type: "jpeg",
-          quality: 1
-        },
-
-        html2canvas: {
-
-          scale: 3,
-
-          useCORS: true
-
-        },
-
-        jsPDF: {
-
-          unit: "mm",
-
-          format: "a4",
-
-          orientation: "landscape"
-
-        }
-
-      };
-
-      html2pdf()
-        .set(opt)
-        .from(element)
-        .save();
-
-    }
-
-    load();
-
-  </script>
-
-
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
-
 </html>

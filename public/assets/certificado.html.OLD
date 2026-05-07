@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Certificado TIA</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js"></script>
+
+  <style>
+    body {
+      font-family: Georgia;
+      background: #e5e7eb;
+    }
+
+    .cert {
+      width: 800px;
+      margin: auto;
+      background: white;
+      padding: 40px;
+      border: 8px solid #1e3a8a;
+      text-align: center;
+    }
+
+    h1 {
+      color: #1e3a8a;
+    }
+
+    .logo {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+
+    .qr {
+      width: 120px;
+      margin-top: 20px;
+    }
+
+    .footer {
+      margin-top: 40px;
+      font-size: 12px;
+    }
+
+    .qr-box {
+
+      margin-top: 40px;
+      text-align: center;
+
+    }
+
+    #qr {
+
+      width: 140px;
+      height: 140px;
+      object-fit: contain;
+
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="cert" id="cert">
+
+    <div class="logo">✈️ AEROPUERTO INTERNACIONAL</div>
+
+    <h1>CONSTANCIA DE ACREDITACIÓN</h1>
+
+    <p>Se certifica que:</p>
+
+    <h2 id="nombre">---</h2>
+
+    <span id="empresa"></span><br><br>
+
+
+    <p>Ha completado satisfactoriamente el</p>
+
+    <b>CURSO DE SEGURIDAD AEROPORTUARIA</b>
+
+    <p>cumpliendo con los lineamientos de seguridad establecidos.</p>
+
+    <p><b>Folio:</b> <span id="folio"></span></p>
+    <p><b>Fecha:</b> <span id="fecha"></span></p>
+
+    <div class="qr-box">
+
+      <img id="qr" />
+
+    </div>
+
+    <div class="footer">
+      Documento válido únicamente con código QR verificable.
+    </div>
+
+  </div>
+
+  <button onclick="descargar()">
+    Descargar PDF
+  </button>
+
+
+  <script>
+
+    async function load() {
+
+      const res = await fetch("/me", {
+        headers: {
+          Authorization:
+            "Bearer " + sessionStorage.getItem("token")
+        }
+      });
+
+      const user = await res.json();
+
+      console.log("USER:", user);
+
+      if (!user || !user.name) {
+
+        alert("Error cargando certificado");
+        return;
+
+      }
+
+      // ✅ DATOS
+      document.getElementById("nombre").innerText =
+        user.name || "---";
+
+      document.getElementById("empresa").innerText =
+        user.company
+          ? "Empresa: " + user.company
+          : "";
+
+      document.getElementById("folio").innerText =
+        user.folio || "---";
+
+      // ✅ FECHA
+      if (user.fecha) {
+
+        const fecha = new Date(user.fecha);
+
+        document.getElementById("fecha").innerText =
+          fecha.toLocaleDateString("es-MX", {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+          });
+
+      } else {
+
+        document.getElementById("fecha").innerText = "---";
+
+      }
+
+      // ✅ QR
+      const qr = document.getElementById("qr");
+
+
+      qr.onload = () => {
+
+        console.log("✅ QR cargado");
+
+        // 🔥 ESPERAR UN POCO MÁS
+        setTimeout(() => {
+          descargar();
+        }, 800);
+
+      };
+
+      qr.onerror = () => {
+
+        console.log("❌ Error QR");
+
+      };
+
+      qr.src = user.qr || "";
+
+    }
+
+    function descargar() {
+
+      const element =
+        document.getElementById("cert");
+
+      const opt = {
+
+        margin: 0,
+
+        filename:
+          "Certificado-TIA.pdf",
+
+        image: {
+          type: "jpeg",
+          quality: 1
+        },
+
+        html2canvas: {
+
+          scale: 3,
+
+          useCORS: true
+
+        },
+
+        jsPDF: {
+
+          unit: "mm",
+
+          format: "a4",
+
+          orientation: "landscape"
+
+        }
+
+      };
+
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save();
+
+    }
+
+    load();
+
+  </script>
+
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</body>
+
+</html>
