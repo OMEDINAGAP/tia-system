@@ -6,19 +6,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js"></script>
 
   <style>
-    /* body {
-      font-family: Georgia;
-      background: #e5e7eb;
-    }
-
-    .cert {
-      width: 800px;
-      margin: auto;
-      background: white;
-      padding: 40px;
-      border: 8px solid #1e3a8a;
-      text-align: center;
-    } */
+  
 
     body {
       font-family: Georgia;
@@ -78,18 +66,39 @@
 
     .qr-box {
 
-      margin-top: 40px;
-      text-align: center;
+  position: absolute;
 
-    }
+  right: 58px;
+
+  top: 205px;
+
+  width: 180px;
+
+  height: 260px;
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  z-index: 20;
+}
 
     #qr {
 
-      width: 140px;
-      height: 140px;
-      object-fit: contain;
+  width: 150px;
 
-    }
+  height: 150px;
+
+  object-fit: contain;
+
+  background: white;
+
+  padding: 8px;
+
+  border-radius: 8px;
+}
   </style>
 </head>
 
