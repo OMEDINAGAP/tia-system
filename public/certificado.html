@@ -35,42 +35,26 @@
 
       overflow: hidden;
 
+      background: white;
+
       text-align: center;
 
-      /* 🔥 NUEVO FONDO */
-      background-image: url('./assets/fondo-certificado.png');
+      padding: 0;
 
-      background-size: cover;
+      border: none;
+
+      background-image:
+        url('./assets/fondo-certificado.png');
+
+      background-size: 100% 100%;
 
       background-position: center;
 
       background-repeat: no-repeat;
     }
 
-    /* 🔥 CAPA BLANCA PARA QUE EL TEXTO SE VEA */
-
-    .cert::before {
-
-      content: "";
-
-      position: absolute;
-
-      inset: 0;
-
-      background:
-        rgba(255, 255, 255, .72);
-
-      z-index: 1;
-    }
-
-    /* 🔥 TODO EL CONTENIDO ARRIBA DEL FONDO */
-
-    .cert>* {
-
-      position: relative;
-
-      z-index: 5;
-    }
+   
+ 
 
 
     h1 {
@@ -113,7 +97,7 @@
 
   <div class="cert" id="cert">
 
-    <div class="logo">✈️ AEROPUERTO INTERNACIONAL</div>
+    <div class="logo">✈️ AEROPUERTO INTERNACIONAL DE SAN JOSE DEL CABO</div>
 
     <h1>CONSTANCIA DE ACREDITACIÓN</h1>
 
