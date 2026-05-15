@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="styles.css">
 
   <!-- ✅ FACE API -->
-   
+
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 
@@ -81,10 +81,19 @@
 
         <!-- PASO 4 -->
         <div class="step-card highlight">
+
           <div class="step-number">4</div>
-          <h3>Curso</h3>
-          <p>Completa el curso obligatorio de seguridad.</p>
-          <button id="btnCurso" onclick="goCurso()">Ir al curso</button>
+
+          <h3 id="cursoTitulo">Curso</h3>
+
+          <p id="cursoTexto">
+            Completa el curso obligatorio de seguridad.
+          </p>
+
+          <button id="btnCurso" onclick="goCurso()">
+            Ir al curso
+          </button>
+
         </div>
 
         <!-- PASO 5 -->
@@ -203,6 +212,67 @@
 
 
   if (!token) location.href = "/";
+
+
+
+  async function validateCourseCompleted() {
+
+    try {
+
+      const res = await fetch("/me", {
+        headers: {
+          Authorization: "Bearer " + token
+        }
+      });
+
+      if (!res.ok) return;
+
+      const user = await res.json();
+
+      console.log("USER PORTAL:", user);
+
+      // ✅ VALIDACIÓN REAL
+      const completed =
+        Number(user.aprobado) === 1;
+
+      const btn = document.getElementById("btnCurso");
+      const title = document.getElementById("cursoTitulo");
+      const text = document.getElementById("cursoTexto");
+
+      if (completed) {
+
+        title.innerText = "Constancia";
+
+        text.innerText =
+          "Tu curso ya fue completado correctamente.";
+
+        btn.innerText =
+          "📄 Descargar constancia";
+
+        btn.onclick = () => {
+
+          window.location.href =
+            "/certificado.html";
+
+        };
+
+        // 🎨 OPCIONAL
+        btn.style.background = "#16a34a";
+      }
+
+    } catch (err) {
+
+      console.error(
+        "ERROR VALIDANDO CURSO:",
+        err
+      );
+
+    }
+  }
+
+  validateCourseCompleted();
+
+
 
   function goDocs() {
     window.location.href = "/documentos.html";
