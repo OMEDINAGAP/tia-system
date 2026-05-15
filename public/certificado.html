@@ -103,136 +103,152 @@
     ">
       Descargar PDF
     </button>
+    <br>
+
+    <button onclick="volverInicio()" class="btn btn-outline-secondary px-5 py-3 rounded-4 shadow mt-3" style="
+      font-size:18px;
+      font-weight:600;
+      letter-spacing:.5px;
+    ">
+      ⬅ Volver al inicio
+    </button>
+
+  </div>
 
 
-    <script>
+  <script>
 
-      async function load() {
+    function volverInicio() {
+      window.location.href = "/portal.html";
+    }
 
-        const res = await fetch("/me", {
-          headers: {
-            Authorization:
-              "Bearer " + sessionStorage.getItem("token")
-          }
-        });
 
-        const user = await res.json();
+    async function load() {
 
-        console.log("USER:", user);
-
-        if (!user || !user.name) {
-
-          alert("Error cargando certificado");
-          return;
-
+      const res = await fetch("/me", {
+        headers: {
+          Authorization:
+            "Bearer " + sessionStorage.getItem("token")
         }
+      });
 
-        // ✅ DATOS
-        document.getElementById("nombre").innerText =
-          user.name || "---";
+      const user = await res.json();
 
-        document.getElementById("empresa").innerText =
-          user.company
-            ? "Empresa: " + user.company
-            : "";
+      console.log("USER:", user);
 
-        document.getElementById("folio").innerText =
-          user.folio || "---";
+      if (!user || !user.name) {
 
-        // ✅ FECHA
-        if (user.fecha) {
-
-          const fecha = new Date(user.fecha);
-
-          document.getElementById("fecha").innerText =
-            fecha.toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "long",
-              year: "numeric"
-            });
-
-        } else {
-
-          document.getElementById("fecha").innerText = "---";
-
-        }
-
-        // ✅ QR
-        const qr = document.getElementById("qr");
-
-
-        qr.onload = () => {
-
-          console.log("✅ QR cargado");
-
-          // 🔥 ESPERAR UN POCO MÁS
-          setTimeout(() => {
-            descargar();
-          }, 800);
-
-        };
-
-        qr.onerror = () => {
-
-          console.log("❌ Error QR");
-
-        };
-
-        qr.src = user.qr || "";
+        alert("Error cargando certificado");
+        return;
 
       }
 
-      function descargar() {
+      // ✅ DATOS
+      document.getElementById("nombre").innerText =
+        user.name || "---";
 
-        const element =
-          document.getElementById("cert");
+      document.getElementById("empresa").innerText =
+        user.company
+          ? "Empresa: " + user.company
+          : "";
 
-        const opt = {
+      document.getElementById("folio").innerText =
+        user.folio || "---";
 
-          margin: 0,
+      // ✅ FECHA
+      if (user.fecha) {
 
-          filename:
-            "Certificado-TIA.pdf",
+        const fecha = new Date(user.fecha);
 
-          image: {
-            type: "jpeg",
-            quality: 1
-          },
+        document.getElementById("fecha").innerText =
+          fecha.toLocaleDateString("es-MX", {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+          });
 
-          html2canvas: {
+      } else {
 
-            scale: 3,
-
-            useCORS: true
-
-          },
-
-          jsPDF: {
-
-            unit: "mm",
-
-            format: "a4",
-
-            orientation: "landscape"
-
-          }
-
-        };
-
-        html2pdf()
-          .set(opt)
-          .from(element)
-          .save();
+        document.getElementById("fecha").innerText = "---";
 
       }
 
-      load();
-
-    </script>
-
+      // ✅ QR
+      const qr = document.getElementById("qr");
 
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+      qr.onload = () => {
+
+        console.log("✅ QR cargado");
+
+        // 🔥 ESPERAR UN POCO MÁS
+        setTimeout(() => {
+          descargar();
+        }, 800);
+
+      };
+
+      qr.onerror = () => {
+
+        console.log("❌ Error QR");
+
+      };
+
+      qr.src = user.qr || "";
+
+    }
+
+    function descargar() {
+
+      const element =
+        document.getElementById("cert");
+
+      const opt = {
+
+        margin: 0,
+
+        filename:
+          "Certificado-TIA.pdf",
+
+        image: {
+          type: "jpeg",
+          quality: 1
+        },
+
+        html2canvas: {
+
+          scale: 3,
+
+          useCORS: true
+
+        },
+
+        jsPDF: {
+
+          unit: "mm",
+
+          format: "a4",
+
+          orientation: "landscape"
+
+        }
+
+      };
+
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save();
+
+    }
+
+    load();
+
+  </script>
+
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
 
 </html>
