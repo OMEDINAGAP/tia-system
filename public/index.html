@@ -107,8 +107,20 @@
     <!-- 🆕 NUEVO -->
     <div class="form active" id="formNew">
 
-      <input id="name" placeholder="Nombre completo">
+      <input id="apellidoPaterno" placeholder="Apellido paterno">
+
+      <input id="apellidoMaterno" placeholder="Apellido materno">
+
+      <input id="nombre" placeholder="Nombre(s)">
+
       <input id="company" placeholder="Empresa">
+
+      <input id="puesto" placeholder="Puesto">
+
+      <input id="telefono" placeholder="Teléfono">
+
+      <input id="correo" type="email" placeholder="Correo electrónico">
+
       <input id="pass" type="password" placeholder="Contraseña del día">
 
       <button onclick="loginNew()">Iniciar / Registrarse</button>
@@ -201,11 +213,44 @@
 
     async function loginNew() {
 
-      const name = document.getElementById("name").value.trim();
-      const company = document.getElementById("company").value.trim();
-      const pass = document.getElementById("pass").value.trim();
+      const apellidoPaterno =
+        document.getElementById("apellidoPaterno").value.trim();
 
-      if (!name || !company || !pass) {
+      const apellidoMaterno =
+        document.getElementById("apellidoMaterno").value.trim();
+
+      const nombre =
+        document.getElementById("nombre").value.trim();
+
+      const company =
+        document.getElementById("company").value.trim();
+
+      const puesto =
+        document.getElementById("puesto").value.trim();
+
+      const telefono =
+        document.getElementById("telefono").value.trim();
+
+      const correo =
+        document.getElementById("correo").value.trim();
+
+      const pass =
+        document.getElementById("pass").value.trim();
+
+      // 🔥 nombre completo final
+      const name =
+        `${apellidoPaterno} ${apellidoMaterno} ${nombre}`;
+
+      if (
+        !apellidoPaterno ||
+        !apellidoMaterno ||
+        !nombre ||
+        !company ||
+        !puesto ||
+        !telefono ||
+        !correo ||
+        !pass
+      ) {
 
         Swal.fire(
           "??",
@@ -225,6 +270,9 @@
         body: JSON.stringify({
           name,
           company,
+          puesto,
+          telefono,
+          correo,
           pass
         })
       });
@@ -247,7 +295,10 @@
 
           body: JSON.stringify({
             name,
-            company
+            company,
+            puesto,
+            telefono,
+            correo
           })
 
         })

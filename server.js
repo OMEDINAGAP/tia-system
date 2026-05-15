@@ -969,7 +969,14 @@ app.get("/can-take-exam", auth, async (req, res) => {
 
 app.post("/validate-new", async (req, res) => {
 
-  const { name, company, pass } = req.body;
+  const {
+    name,
+    company,
+    puesto,
+    telefono,
+    correo,
+    pass
+  } = req.body;
 
   const current = generatePassword();
 
@@ -995,11 +1002,14 @@ app.post("/validate-new", async (req, res) => {
   // ✅ INSERT SIN ID
   const [result] = await db.query(
     `INSERT INTO users 
-    (name, company, folio, loginTime)
-    VALUES (?, ?, ?, NOW())`,
+    (name, company, puesto, telefono, correo, folio, loginTime)
+    VALUES (?, ?, ?, ?, ?, ?, NOW())`,
     [
       name.trim(),
       company.trim(),
+      puesto.trim(),
+      telefono.trim(),
+      correo.trim(),
       folio
     ]
   );
