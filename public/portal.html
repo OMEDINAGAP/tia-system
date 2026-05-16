@@ -85,29 +85,15 @@
           <div class="step-number">3</div>
           <div class="card camera-card">
 
-            <h3>📸 Tómate la foto</h3>
-            <p class="hint">Coloca tu rostro dentro del marco</p>
+            <h3>📸 Fotografía</h3>
 
-            <div class="camera-container">
+            <p>
+              Captura tu fotografía oficial para la TIA.
+            </p>
 
-              <div class="camera-wrapper">
-                <video id="video" autoplay playsinline></video>
-                <canvas id="canvas"></canvas>
-
-                <!-- 🎯 AQUÍ VA -->
-                <div class="face-guide"></div>
-
-                <!-- overlay -->
-                <div id="overlay" class="overlay"></div>
-
-              </div>
-
-            </div>
-            <button id="btnFoto" onclick="takePhoto()">📸 Tomar foto</button>
-            <div id="photoActions" style="display:none; margin-top:10px;">
-              <button onclick="savePhoto()">✅ Guardar</button>
-              <button onclick="retakePhoto()">🔄 Nueva foto</button>
-            </div>
+            <button onclick="openCameraModal()">
+              📸 Abrir cámara
+            </button>
 
             <p id="status"></p>
 
@@ -154,7 +140,122 @@
 
   </div>
 
+  <!-- 📸 MODAL CÁMARA -->
+  <div id="cameraModal" class="camera-modal">
 
+    <div class="camera-modal-content">
+
+      <!-- HEADER -->
+      <div class="camera-header">
+
+        <div>
+          <h2>📸 Fotografía para TIA</h2>
+
+          <p>
+            Sigue las indicaciones para capturar una fotografía válida.
+          </p>
+        </div>
+
+        <button class="close-camera" onclick="closeCameraModal()">
+          ✖
+        </button>
+
+      </div>
+
+      <!-- BODY -->
+      <div class="camera-body">
+
+        <!-- IZQUIERDA -->
+        <div class="camera-left">
+
+          <div class="camera-container">
+
+            <div class="camera-wrapper">
+
+              <video id="video" autoplay playsinline></video>
+
+              <canvas id="canvas"></canvas>
+
+              <div class="face-guide"></div>
+
+              <div id="overlay" class="overlay"></div>
+
+            </div>
+
+          </div>
+
+          <div class="camera-actions">
+
+            <button id="btnFoto" onclick="takePhoto()">
+              📸 Tomar foto
+            </button>
+
+            <div id="photoActions" style="display:none;">
+
+              <button onclick="savePhoto()">
+                ✅ Guardar
+              </button>
+
+              <button onclick="retakePhoto()">
+                🔄 Nueva foto
+              </button>
+
+            </div>
+
+            <p id="status"></p>
+
+          </div>
+
+        </div>
+
+        <!-- DERECHA -->
+        <div class="camera-right">
+
+          <div class="tips-card">
+
+            <h3>⚠️ Recomendaciones importantes</h3>
+
+            <ul>
+
+              <li>
+                ❌ No usar gorras y/o sombreros
+              </li>
+
+              <li>
+                ❌ No usar lentes o gafas
+              </li>
+
+              <li>
+                ❌ No usar audífonos
+              </li>
+
+              <li>
+                ✅ Rostro completamente descubierto
+              </li>
+
+              <li>
+                ✅ Mirar directamente a la cámara
+              </li>
+
+              <li>
+                ✅ Buena iluminación
+              </li>
+
+              <li>
+                ✅ Fondo limpio y visible
+              </li>
+
+            </ul>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
 
 </body>
 <style>
@@ -240,6 +341,25 @@
 </style>
 
 </body>
+<script>
+
+  function openCameraModal() {
+
+    document
+      .getElementById("cameraModal")
+      .classList.add("show");
+
+  }
+
+  function closeCameraModal() {
+
+    document
+      .getElementById("cameraModal")
+      .classList.remove("show");
+
+  }
+
+</script>
 
 <script>
   // 🔐 TOKEN
