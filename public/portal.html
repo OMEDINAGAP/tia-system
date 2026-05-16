@@ -23,6 +23,41 @@
       Este sistema te guiará durante todo el proceso.
     </p>
 
+    <div class="top-user-card">
+
+      <div class="user-info">
+
+        <div class="user-avatar">
+          ✈️
+        </div>
+
+        <div class="user-data">
+
+          <h3 id="userName">
+            Cargando...
+          </h3>
+
+          <p id="userCompany">
+            Empresa
+          </p>
+
+          <span id="userPuesto">
+            Puesto
+          </span>
+
+        </div>
+
+      </div>
+
+      <button class="logout-btn" onclick="logout()">
+        Cerrar sesión
+      </button>
+
+    </div>
+
+
+
+
     <!-- PASOS -->
     <div class="card">
       <h2>📌 Sigue estos pasos</h2>
@@ -212,6 +247,52 @@
 
 
   if (!token) location.href = "/";
+
+
+
+  async function loadUserInfo() {
+
+    try {
+
+      const res = await fetch("/me", {
+        headers: {
+          Authorization:
+            "Bearer " + token
+        }
+      });
+
+      if (!res.ok) return;
+
+      const user = await res.json();
+
+      document.getElementById("userName").innerText =
+        user.name || "---";
+
+      document.getElementById("userCompany").innerText =
+        user.company || "---";
+
+      document.getElementById("userPuesto").innerText =
+        user.puesto || "Sin puesto";
+
+    } catch (err) {
+
+      console.error(
+        "ERROR USER INFO:",
+        err
+      );
+
+    }
+  }
+
+  function logout() {
+
+    sessionStorage.clear();
+
+    window.location.href = "/";
+
+  }
+
+  loadUserInfo();
 
 
 
