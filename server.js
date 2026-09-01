@@ -36,6 +36,12 @@ app.use(cors({
   methods: ["GET", "POST", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
+app.use((err, req, res, next) => {
+  if (err?.message === "Origen no permitido") {
+    return res.status(403).json({ ok:false,error:"Origen no permitido" });
+  }
+  return next(err);
+});
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
