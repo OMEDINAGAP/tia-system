@@ -122,11 +122,19 @@
           body: JSON.stringify({ usuario, password: pin })
         });
 
-        if (!res.ok) {
-          throw new Error("Error de autenticación");
+        let data = {};
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
         }
 
-        const data = await res.json();
+        if (!res.ok) {
+          error.innerText = data.msg || data.message || data.error ||
+            (res.status === 401 ? "Usuario o contraseña incorrectos" : "No fue posible iniciar sesión");
+          loader.innerText = "";
+          return;
+        }
 
         if (data.ok) {
 
@@ -148,6 +156,10 @@
       }
 
     }
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Enter") loginAdmin();
+    });
 
   </script>
 
