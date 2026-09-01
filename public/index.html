@@ -325,7 +325,7 @@
           sessionStorage.clear();
           sessionStorage.setItem("token", data.token);
           sessionStorage.setItem("userId", String(data.userId));
-          window.location.href = data.pendingPhoto ? "/foto-final.html" : "/curso.html";
+          window.location.href = data.pendingPhoto ? "/foto-final.html" : "/portal.html";
           return;
         }
         if (data.requiereCredenciales) {
