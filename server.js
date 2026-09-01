@@ -17,9 +17,70 @@ const db = mysql.createPool({
 });
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.set("trust proxy", 1);
+
+const publicOrigin = (() => {
+  try { return new URL(process.env.PUBLIC_URL || "http://localhost:3000").origin; }
+  catch { return "http://localhost:3000"; }
+})();
+const allowedOrigins = new Set([
+  publicOrigin,
+  "http://localhost:3000",
+  "http://127.0.0.1:3000"
+]);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error("Origen no permitido"));
+  },
+  methods: ["GET", "POST", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.removeHeader("X-Powered-By");
+  next();
+});
+app.use(express.json({ limit: "100kb" }));
 app.use(express.static(__dirname + "/public"));
+
+function createRateLimiter({ windowMs, max, message }) {
+  const attempts = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${req.ip}:${req.path}`;
+    const current = attempts.get(key);
+    if (!current || current.resetAt <= now) {
+      attempts.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    current.count += 1;
+    if (current.count > max) {
+      res.setHeader("Retry-After", Math.ceil((current.resetAt - now) / 1000));
+      return res.status(429).json({ ok: false, message, msg: message });
+    }
+    next();
+  };
+}
+
+const adminLoginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Demasiados intentos. Espera 15 minutos e intenta nuevamente."
+});
+const accessLoginLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: "Demasiados intentos. Espera unos minutos e intenta nuevamente."
+});
+
+app.all(["/validate-new", "/validate-id", "/log-login", "/validate", "/validate-cert"], (req, res) => {
+  return res.status(410).json({ ok: false, error: "Ruta retirada" });
+});
 
 app.get("/health",async(req,res)=>{
   try{await db.query("SELECT 1");return res.json({ok:true,service:"tia-system"})}
@@ -93,7 +154,8 @@ async function auth(req, res, next) {
 
     }
 
-    const token = header.split(" ")[1];
+    const token = header.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+    if (!token) return res.status(401).json({ error: "Token invalido" });
 
     // 🔥 ADMIN
     if (token.startsWith("admin-")) {
@@ -116,9 +178,9 @@ async function auth(req, res, next) {
     // 🔍 BUSCAR SESIÓN
     const [rows] = await db.query(
       `SELECT * FROM sessions
-       WHERE token=?
+       WHERE token=? AND expires>?
        LIMIT 1`,
-      [token]
+      [token, Date.now()]
     );
 
     if (!rows.length) {
@@ -265,7 +327,7 @@ function generatePassword() {
 
 
 // ADMIN PASSWORD (PROTEGIDO)
-app.post("/admin-login", async (req, res) => {
+app.post("/admin-login", adminLoginLimiter, async (req, res) => {
 
   const usuario = String(req.body.usuario || "").trim();
   const password = String(req.body.password || req.body.pin || "");
@@ -530,7 +592,7 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
 
 
 // ACCESO DE USUARIO MEDIANTE FOLIO PREVIAMENTE REGISTRADO
-app.post("/folio-login", async (req, res) => {
+app.post("/folio-login", accessLoginLimiter, async (req, res) => {
   try {
     const folio = String(req.body.folio || "").trim().toUpperCase();
     if (!folio) return res.status(400).json({ ok: false, message: "El folio es requerido" });
@@ -753,7 +815,7 @@ app.post("/configurar-cuenta", async (req, res) => {
   }
 });
 
-app.post("/login-empresa", async (req, res) => {
+app.post("/login-empresa", accessLoginLimiter, async (req, res) => {
   try {
     const folio = String(req.body.folio || "").trim().toUpperCase();
     const usuario = String(req.body.usuario || "").trim().toLowerCase();
@@ -1192,6 +1254,7 @@ app.post("/log-exam", auth, async (req, res) => {
         qr,
         userId
       ]);
+      await db.query("UPDATE personas_curso SET estatus='APROBADO' WHERE user_id=?", [userId]);
 
       console.log("APROBADO OK");
 
@@ -1219,7 +1282,6 @@ app.post("/log-exam", auth, async (req, res) => {
           exam=0,
           intentos=0,
           aprobado=0,
-          folio=NULL,
           fecha=NULL,
           qr=NULL,
           video=0
@@ -1231,6 +1293,7 @@ app.post("/log-exam", auth, async (req, res) => {
         "DELETE FROM video_progress WHERE userId=?",
         [userId]
       );
+      await db.query("UPDATE personas_curso SET estatus='REGISTRADO' WHERE user_id=?", [userId]);
 
       return res.json({
         ok: true,
@@ -1254,6 +1317,7 @@ app.post("/log-exam", auth, async (req, res) => {
       intentoActual,
       userId
     ]);
+    await db.query("UPDATE personas_curso SET estatus='REPROBADO' WHERE user_id=?", [userId]);
 
     console.log("REPROBADO");
 
@@ -1371,7 +1435,14 @@ app.get("/admin-data", auth, async (req, res) => {
 
 
 app.get("/me", auth, async (req, res) => {
-  const [rows] = await db.query("SELECT * FROM users WHERE id=?", [req.userId]);
+  if (req.isAdmin) return res.status(403).json({ error: "Acceso no disponible" });
+  const [rows] = await db.query(
+    `SELECT id,name,company,puesto,telefono,correo,folio,exam,intentos,aprobado,fecha,
+            video,foto_registrada_en,foto_estatus,foto_motivo_rechazo
+     FROM users WHERE id=? LIMIT 1`,
+    [req.userId]
+  );
+  if (!rows.length) return res.status(404).json({ error: "Colaborador no encontrado" });
   res.json(rows[0]);
 });
 
@@ -1540,8 +1611,33 @@ app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
 });
 
 
+async function getExamEligibility(userId) {
+  const [rows] = await db.query(
+    `SELECT u.aprobado,COUNT(vp.videoIndex) AS videos,
+            COALESCE(AVG(vp.progress),0) AS progress
+     FROM users u
+     LEFT JOIN video_progress vp ON vp.userId=u.id AND vp.videoIndex IN (0,1)
+     WHERE u.id=?
+     GROUP BY u.id`,
+    [userId]
+  );
+  if (!rows.length) return { eligible:false,progress:0,reason:"Colaborador no encontrado" };
+  const user = rows[0];
+  const progress = Number(user.progress || 0);
+  if (user.aprobado) return { eligible:false,progress,reason:"El curso ya fue aprobado" };
+  if (Number(user.videos) < 2 || progress <= 95) {
+    return { eligible:false,progress,reason:"Debes completar más del 95% del curso" };
+  }
+  return { eligible:true,progress };
+}
+
 app.get("/questions", auth, async (req, res) => {
   try {
+    if (req.isAdmin) return res.status(403).json({ok:false,error:"Acceso no disponible"});
+    const eligibility = await getExamEligibility(req.userId);
+    if (!eligibility.eligible) {
+      return res.status(403).json({ok:false,error:eligibility.reason,progress:eligibility.progress});
+    }
     const [rows] = await db.query(`
       SELECT id,question,option_a,option_b,option_c,option_d
       FROM questions WHERE active=1 ORDER BY RAND() LIMIT 15
@@ -1565,6 +1661,11 @@ app.post("/submit-exam", auth, async (req, res) => {
   try {
 
     const userId = req.userId;
+    if (req.isAdmin) return res.status(403).json({ok:false,error:"Acceso no disponible"});
+    const eligibility = await getExamEligibility(userId);
+    if (!eligibility.eligible) {
+      return res.status(403).json({ok:false,error:eligibility.reason,progress:eligibility.progress});
+    }
     const examToken=String(req.body.examToken||"");
     const answers=Array.isArray(req.body.answers)?req.body.answers:[];
     const [sessions]=await db.query(
