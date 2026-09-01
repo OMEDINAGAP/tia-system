@@ -370,7 +370,7 @@
         if (!res.ok || !data.ok) { Swal.fire("Error", data.message || "Credenciales incorrectas", "error"); return; }
         sessionStorage.clear();
         sessionStorage.setItem("gestionEmpresaToken", data.token);
-        window.location.href = "/empresa-panel.html";
+        window.location.href = "/empresa-requisitos.html";
       } catch (error) { Swal.fire("Error", "No fue posible conectar con el servidor", "error"); }
     }
   </script>
