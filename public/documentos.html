@@ -172,9 +172,14 @@
 
   <br>
 
-  <button onclick="window.location.href='/portal.html'">⬅ Regresar</button>
+  <button onclick="regresar()">⬅ Regresar</button>
 
 </div>
+<script>
+  function regresar(){
+    location.href=sessionStorage.getItem('gestionEmpresaToken')?'/empresa-requisitos.html':'/portal.html';
+  }
+</script>
 </body>
 
 
