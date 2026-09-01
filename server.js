@@ -115,6 +115,7 @@ function createMailTransport(){
 
 // arriba
 const sessions = new Map(); // token -> userId
+const COLLABORATOR_SESSION_EXPIRES = 253402300799000; // 31-12-9999; la sesión personal no vence por tiempo.
 
 let lastSent = 0;
 const videoProgressRate = new Map();
@@ -184,9 +185,9 @@ async function auth(req, res, next) {
     // 🔍 BUSCAR SESIÓN
     const [rows] = await db.query(
       `SELECT * FROM sessions
-       WHERE token=? AND expires>?
+       WHERE token=?
        LIMIT 1`,
-      [token, Date.now()]
+      [token]
     );
 
     if (!rows.length) {
@@ -655,7 +656,7 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
       const token = crypto.randomBytes(32).toString("hex");
       await db.query(
         "INSERT INTO sessions (token, userId, expires) VALUES (?, ?, ?)",
-        [token, user.id, Date.now() + 86400000]
+        [token, user.id, COLLABORATOR_SESSION_EXPIRES]
       );
       return res.json({ ok: true, persona: true, pendingPhoto:!!user.aprobado&&user.foto_estatus!=="APROBADA", token, userId: user.id, folio: user.folio });
     }
