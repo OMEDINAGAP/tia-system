@@ -98,43 +98,19 @@
 
     <h2>✈️ Sistema TIA</h2>
 
-    <!-- 🔘 TABS -->
-    <div class="tabs">
-      <div class="tab active" onclick="switchTab(0)">Nuevo</div>
-      <div class="tab" onclick="switchTab(1)">Seguimiento</div>
-    </div>
+    <p style="text-align:center;color:#cbd5e1;font-size:14px;line-height:1.5">
+      Ingresa el folio que te fue proporcionado para acceder al sistema.
+    </p>
 
-    <!-- 🆕 NUEVO -->
-    <div class="form active" id="formNew">
-
-      <input id="apellidoPaterno" placeholder="Apellido paterno">
-
-      <input id="apellidoMaterno" placeholder="Apellido materno">
-
-      <input id="nombre" placeholder="Nombre(s)">
-
-      <input id="company" placeholder="Empresa">
-
-      <input id="puesto" placeholder="Puesto">
-
-      <input id="telefono" placeholder="Teléfono">
-
-      <input id="correo" type="email" placeholder="Correo electrónico">
-
-      <input id="pass" type="password" placeholder="Contraseña del día">
-
-      <button onclick="loginNew()">Iniciar / Registrarse</button>
-
-    </div>
-
-    <!-- 🔁 EXISTENTE -->
-    <div class="form" id="formOld">
-
-      <input id="userId" placeholder="ID o Folio (ej. TIA-123456)">
-      <input id="pass2" type="password" placeholder="Contraseña del día">
-
+    <div class="form active" id="formOld">
+      <input id="userId" placeholder="Folio (ej. TIA-123456)" autocomplete="username" maxlength="50" autofocus>
       <button onclick="loginById()">Ingresar</button>
+    </div>
 
+    <div class="form" id="credentialsForm">
+      <input id="empresaUsuario" placeholder="Usuario" autocomplete="username" maxlength="80">
+      <input id="empresaPassword" type="password" placeholder="Contrasena" autocomplete="current-password">
+      <button onclick="loginEmpresa()">Continuar</button>
     </div>
 
     <div class="footer">
@@ -339,66 +315,63 @@
 
 
     async function loginById() {
-
-      const id = document.getElementById("userId").value.trim();
-      const pass = document.getElementById("pass2").value.trim();
-
-      if (!id || !pass) {
-        Swal.fire("⚠️", "Completa todos los campos", "warning");
-        return;
-      }
-
+      const folio = document.getElementById("userId").value.trim().toUpperCase();
+      if (!folio) { Swal.fire("Aviso", "Ingresa tu folio", "warning"); return; }
       try {
-
-        // 🔐 validar usuario
-        const res = await fetch("/validate-id", {
-          method: "POST",
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, pass })
-        });
-
+        const res = await fetch("/folio-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folio }) });
         const data = await res.json();
-
-        if (!data.ok) {
-          Swal.fire("❌", "Acceso inválido", "error");
+        if (!res.ok || !data.ok) { Swal.fire("Error", data.message || "Folio no encontrado", "error"); return; }
+        if (data.persona) {
+          sessionStorage.clear();
+          sessionStorage.setItem("token", data.token);
+          sessionStorage.setItem("userId", String(data.userId));
+          window.location.href = data.pendingPhoto ? "/foto-final.html" : "/curso.html";
           return;
         }
-
-        const userData = data.user;
-
-        // 🔥 CREAR SESIÓN (AQUÍ ESTÁ LA CLAVE)
-        const u = await fetch("/log-login", {
-          method: "POST",
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: userData.name,
-            company: userData.company
-          })
-        });
-
-
-        const session = await u.json();
-
-        if (!session.token) {
-          Swal.fire("❌", "Error creando sesión", "error");
+        if (data.requiereCredenciales) {
+          sessionStorage.setItem("folio", data.folio);
+          document.getElementById("formOld").classList.remove("active");
+          document.getElementById("credentialsForm").classList.add("active");
+          document.getElementById("empresaUsuario").focus();
           return;
         }
-
-        // 🔐 guardar token
-        sessionStorage.setItem("token", session.token);
-
-        // opcional
-        sessionStorage.setItem("userId", userData.id);
-
-
-
-        // 🚀 entrar
-        window.location.href = "/portal.html";
-
+        if (data.configurarCuenta) {
+          sessionStorage.setItem("configurarCuentaToken", data.token);
+          window.location.href = "/cuenta.html";
+          return;
+        }
+        if (!data.token) { Swal.fire("Error", "No se genero la sesion", "error"); return; }
+        sessionStorage.clear();
+        sessionStorage.setItem("registroEmpresaToken", data.token);
+        sessionStorage.setItem("folio", data.folio);
+        sessionStorage.setItem("empresaAutorizada", data.empresa || "");
+        window.location.href = "/empresa.html";
       } catch (err) {
         console.error(err);
-        Swal.fire("❌", "Error de conexión", "error");
+        Swal.fire("Error", "No fue posible conectar con el servidor", "error");
       }
+    }
+
+    document.getElementById("userId").addEventListener("keydown", event => {
+      if (event.key === "Enter") loginById();
+    });
+
+    async function loginEmpresa() {
+      const folio = sessionStorage.getItem("folio");
+      const usuario = document.getElementById("empresaUsuario").value.trim();
+      const password = document.getElementById("empresaPassword").value;
+      if (!usuario || !password) { Swal.fire("Aviso", "Ingresa usuario y contrasena", "warning"); return; }
+      try {
+        const res = await fetch("/login-empresa", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folio, usuario, password })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) { Swal.fire("Error", data.message || "Credenciales incorrectas", "error"); return; }
+        sessionStorage.clear();
+        sessionStorage.setItem("gestionEmpresaToken", data.token);
+        window.location.href = "/empresa-panel.html";
+      } catch (error) { Swal.fire("Error", "No fue posible conectar con el servidor", "error"); }
     }
   </script>
 

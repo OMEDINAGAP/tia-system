@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.hostinger.example
+node_modules/
+uploads/
+*.log
+constancia-*.pdf
+deployment/*.zip

@@ -75,9 +75,10 @@
 <body>
 
   <div class="login-box">
-    <h2>🔐 Acceso Admin</h2>
+    <h2>Acceso administrativo</h2>
 
-    <input id="pin" type="password" placeholder="Ingresa tu PIN">
+    <input id="usuario" autocomplete="username" placeholder="Usuario">
+    <input id="pin" type="password" autocomplete="current-password" placeholder="Contraseña">
 
     <button onclick="loginAdmin()">Entrar</button>
 
@@ -91,20 +92,21 @@
     const existingToken = sessionStorage.getItem("token");
 
     if (existingToken && existingToken.startsWith("admin-")) {
-      window.location.href = "/admin.html";
+      window.location.href = "/administracion.html";
     }
 
     async function loginAdmin(){
 
-      const pin = document.getElementById("pin").value.trim();
+      const usuario = document.getElementById("usuario").value.trim();
+      const pin = document.getElementById("pin").value;
       const error = document.getElementById("error");
       const loader = document.getElementById("loader");
 
       error.innerText = "";
       loader.innerText = "";
 
-      if (!pin) {
-        error.innerText = "Ingresa el PIN";
+      if (!usuario || !pin) {
+        error.innerText = "Ingresa tu usuario y contraseña";
         return;
       }
 
@@ -117,7 +119,7 @@
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ pin })
+          body: JSON.stringify({ usuario, password: pin })
         });
 
         if (!res.ok) {
@@ -132,10 +134,10 @@
           sessionStorage.setItem("token", data.token);
 
           // 🚀 redirigir
-          window.location.href = "/admin.html";
+          window.location.href = "/administracion.html";
 
         } else {
-          error.innerText = "PIN incorrecto";
+          error.innerText = "Usuario o contraseña incorrectos";
           loader.innerText = "";
         }
 

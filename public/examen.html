@@ -178,15 +178,26 @@
     let questions = [];
     let current = 0;
     let answers = [];
+    let examToken = "";
 
     // 🔥 Cargar preguntas desde backend
     async function loadExam() {
 
+      current = 0;
+      answers = [];
+      examToken = "";
+
       const res = await fetch("/questions", {
-        headers: { Authorization: token }
+        headers: { Authorization: "Bearer " + token }
       });
 
-      questions = await res.json();
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        Swal.fire("Error", data.error || "No fue posible cargar el examen", "error");
+        return;
+      }
+      questions = data.questions;
+      examToken = data.examToken;
       answers = new Array(questions.length).fill(null);
 
       render();
@@ -274,36 +285,6 @@
     // 🔥 Enviar al backend
     async function finish() {
 
-      let correct = 0;
-
-      questions.forEach((q, index) => {
-
-        const selected = answers[index];
-
-        console.log(
-          "Pregunta:",
-          index,
-          "Seleccionada:",
-          selected,
-          "Correcta:",
-          q.correct
-        );
-
-        // 🔥 VALIDAR
-        if (selected === q.correct) {
-          correct++;
-        }
-
-      });
-
-      const score = Math.round(
-        (correct / questions.length) * 100
-      );
-
-      console.log("CORRECTAS:", correct);
-      console.log("TOTAL:", questions.length);
-      console.log("SCORE:", score);
-
       // 🚀 GUARDAR RESULTADO
       const res = await fetch("/submit-exam", {
 
@@ -315,12 +296,18 @@
         },
 
         body: JSON.stringify({
-          score
+          examToken,
+          answers: questions.map((q, index) => ({ id: q.id, answer: answers[index] }))
         })
 
       });
 
       const data = await res.json();
+      if (!res.ok || !data.ok) {
+        Swal.fire("Error", data.error || "No fue posible calificar el examen", "error");
+        return;
+      }
+      const score = Number(data.score);
 
       console.log("SUBMIT:", data);
 
@@ -337,9 +324,7 @@
             "Authorization": "Bearer " + token
           },
 
-          body: JSON.stringify({
-            score
-          })
+          body: JSON.stringify({ examToken })
 
         });
 
@@ -364,7 +349,7 @@
         </div>
       `,
 
-          confirmButtonText: "Ver certificado",
+          confirmButtonText: "Registrar fotografía",
 
           background: "#0f172a",
 
@@ -375,7 +360,7 @@
         }).then(() => {
 
           window.location.href =
-            "/certificado.html";
+            "/foto-final.html";
 
         });
 
@@ -394,9 +379,7 @@
             "Authorization": "Bearer " + token
           },
 
-          body: JSON.stringify({
-            score
-          })
+          body: JSON.stringify({ examToken })
 
         });
 
@@ -501,16 +484,10 @@
 
           confirmButtonText: "Intentar nuevamente"
 
-        }).then(() => {
+        }).then(async () => {
 
-          // 🔥 REINICIAR RESPUESTAS
-          answers = [];
-
-          // 🔥 VOLVER A PRIMERA PREGUNTA
-          current = 0;
-
-          // 🔥 RECARGAR UI
-          render();
+          // Cada intento requiere nuevas preguntas y un token nuevo.
+          await loadExam();
 
           // 🔥 SUBIR ARRIBA
           window.scrollTo({
@@ -530,12 +507,9 @@
     async function validateAccess() {
 
       const token = sessionStorage.getItem("token");
-      const isTest = sessionStorage.getItem("testMode") === "true";
-
       const res = await fetch("/can-take-exam", {
         headers: {
-          Authorization: "Bearer " + token,
-          ...(isTest && { "x-test-mode": "true" }) // 🔥 clave
+          Authorization: "Bearer " + token
         }
       });
 

@@ -1,0 +1,22 @@
+CREATE TABLE `personas_curso` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `empresa_id` bigint unsigned NOT NULL,
+  `folio` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_id` bigint unsigned DEFAULT NULL,
+  `nombres` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `apellido_paterno` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `apellido_materno` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `puesto` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `telefono` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `correo` varchar(180) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `estatus` enum('REGISTRADO','EN_CURSO','APROBADO','REPROBADO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'REGISTRADO',
+  `creado_en` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `actualizado_en` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_personas_curso_folio` (`folio`),
+  UNIQUE KEY `uq_personas_curso_user` (`user_id`),
+  KEY `idx_personas_curso_empresa` (`empresa_id`),
+  KEY `idx_personas_curso_correo` (`correo`),
+  CONSTRAINT `fk_personas_curso_empresa` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_personas_curso_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

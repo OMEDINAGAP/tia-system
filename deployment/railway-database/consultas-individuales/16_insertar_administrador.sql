@@ -1,0 +1,1 @@
+INSERT INTO `admins` VALUES (1,'Administrador TIA','admin',NULL,NULL,NULL,'SUPERADMIN',1,'2026-08-28 16:28:20');

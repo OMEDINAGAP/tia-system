@@ -18,6 +18,32 @@
       margin: auto;
     }
 
+    .top-user-card {
+      margin: 0 0 25px;
+      background: #0f172a;
+      border-radius: 18px;
+      padding: 18px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+      border: 1px solid #1e293b;
+      color: white;
+    }
+
+    .user-info { display: flex; align-items: center; gap: 15px; }
+    .user-avatar { width: 58px; height: 58px; border-radius: 50%; background: #1e293b; display: flex; align-items: center; justify-content: center; font-size: 28px; border: 2px solid #22c55e; }
+    .user-data h3 { margin: 0; font-size: 20px; font-weight: 700; }
+    .user-data p { margin: 2px 0; color: #cbd5e1; font-size: 14px; }
+    .user-data span { display: inline-block; margin-top: 4px; background: #22c55e; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .logout-btn { background: #ef4444; border: none; color: white; padding: 12px 18px; border-radius: 12px; cursor: pointer; font-weight: 600; transition: .3s; }
+    .logout-btn:hover { background: #dc2626; transform: translateY(-2px); }
+
+    @media (max-width: 600px) {
+      .top-user-card { align-items: flex-start; gap: 14px; flex-direction: column; }
+      .logout-btn { width: 100%; }
+    }
+
     .subtitle {
       color: #94a3b8;
       margin-bottom: 20px;
@@ -36,7 +62,12 @@
     #videoWrapper {
       position: relative;
       margin-bottom: 15px;
+      background: #000;
     }
+
+    #videoWrapper:fullscreen { display: flex; align-items: center; justify-content: center; }
+    #videoWrapper:fullscreen #player { width: 100%; height: 100%; }
+    #videoWrapper:fullscreen iframe { width: 100% !important; height: 100% !important; }
 
     #blocker {
       position: absolute;
@@ -77,6 +108,8 @@
       cursor: pointer;
       margin-top: 10px;
     }
+
+    .video-controls { display: flex; gap: 10px; flex-wrap: wrap; }
 
     .btn-success {
       background: #22c55e;
@@ -126,6 +159,18 @@
 
   <div class="container">
 
+    <div class="top-user-card">
+      <div class="user-info">
+        <div class="user-avatar">✈️</div>
+        <div class="user-data">
+          <h3 id="userName">Cargando...</h3>
+          <p id="userCompany">Empresa</p>
+          <span id="userFolio">Folio</span>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
+    </div>
+
     <h1>🎥 Curso de Seguridad Aeroportuaria</h1>
     <p class="subtitle">Debes ver los videos completos para continuar.</p>
 
@@ -137,9 +182,10 @@
         <div id="blocker"></div>
       </div>
 
-      <button onclick="togglePlay()" class="btn-primary">
-        ▶ Reproducir / Pausar
-      </button>
+      <div class="video-controls">
+        <button onclick="togglePlay()" class="btn-primary">Reproducir / Pausar</button>
+        <button onclick="toggleFullscreen()" class="btn-primary">Pantalla completa</button>
+      </div>
 
       <p id="status" class="status">Pendiente</p>
 
@@ -154,12 +200,8 @@
     <!-- 📊 CARD ACCIONES -->
     <div class="card actions">
 
-      <button id="btnExam" class="btn-success" onclick="goExam()">
+      <button id="btnExam" class="btn-success" onclick="goExam()" disabled hidden>
         Ir al examen
-      </button>
-
-      <button class="btn-secondary" onclick="goExamTest()">
-        ⚡ Modo prueba
       </button>
 
       <div class="alert">
@@ -187,6 +229,32 @@
     alert("Sesión expirada");
     window.location.href = "/";
   }
+
+  async function loadUserInfo() {
+    try {
+      const res = await fetch("/me", {
+        headers: { Authorization: "Bearer " + token }
+      });
+      if (!res.ok) {
+        logout();
+        return;
+      }
+      const user = await res.json();
+      document.getElementById("userName").innerText = user.name || "---";
+      document.getElementById("userCompany").innerText =
+        [user.company, user.puesto].filter(Boolean).join(" · ") || "---";
+      document.getElementById("userFolio").innerText = user.folio || "Sin folio";
+    } catch (err) {
+      console.error("ERROR USER INFO:", err);
+    }
+  }
+
+  function logout() {
+    sessionStorage.clear();
+    window.location.href = "/";
+  }
+
+  loadUserInfo();
 
   // 🎥 VIDEOS (ORDENADOS)
   const videos = [
@@ -241,7 +309,8 @@
       },
       events: {
         'onReady': onReady,
-        'onStateChange': onStateChange
+        'onStateChange': onStateChange,
+        'onPlaybackRateChange': enforceNormalSpeed
       }
     });
   }
@@ -250,6 +319,7 @@
 
     player.unMute();
     player.setVolume(100);
+    player.setPlaybackRate(1);
 
     // 🔥 cargar progreso
     setTimeout(() => {
@@ -294,6 +364,8 @@
           lastVideoIndex = Math.max(lastVideoIndex, row.videoIndex);
         }
       });
+
+      updateExamAvailability(data);
 
       console.log("MAPA FINAL:", videoProgressMap);
 
@@ -354,6 +426,15 @@
         progress: 100
       };
 
+      fetch("/log-video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({ progress: 100, videoIndex: currentVideoIndex })
+      }).then(() => refreshExamAvailability());
+
       if (currentVideoIndex < videos.length - 1) {
 
         currentVideoIndex++;
@@ -368,7 +449,7 @@
       } else {
 
         document.getElementById("status").innerText = "✅ Curso completado";
-        document.getElementById("btnExam").disabled = false;
+        refreshExamAvailability();
       }
     }
   }
@@ -494,17 +575,31 @@
       window.location.href = "/examen.html";
     } else {
       const progress = isNaN(data.progress) ? 0 : Math.floor(data.progress);
-      alert(`Debes completar al menos el 90% del curso.\nProgreso actual: ${progress}%`);
+      alert(`Debes completar más del 95% del curso.\nProgreso actual: ${progress}%`);
     }
   }
 
-  // ⚡ MODO PRUEBA
-  function goExamTest() {
-    sessionStorage.setItem("testMode", "true");
+  function updateExamAvailability(progressRows) {
+    const requiredVideos = [0, 1];
+    const total = requiredVideos.reduce((sum, index) => {
+      const row = progressRows.find(item => Number(item.videoIndex) === index);
+      return sum + Number(row?.progress || 0);
+    }, 0) / requiredVideos.length;
+    const button = document.getElementById("btnExam");
+    const allowed = total > 95;
+    button.disabled = !allowed;
+    button.hidden = !allowed;
+  }
 
-    setTimeout(() => {
-      window.location.href = "/examen.html";
-    }, 100);
+  async function refreshExamAvailability() {
+    try {
+      const res = await fetch("/video-progress", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      if (res.ok) updateExamAvailability(await res.json());
+    } catch (err) {
+      console.error("ERROR exam availability:", err);
+    }
   }
 
 
@@ -515,6 +610,23 @@
       player.pauseVideo();
     } else {
       player.playVideo();
+    }
+  }
+
+  function enforceNormalSpeed() {
+    if (player && player.getPlaybackRate() !== 1) player.setPlaybackRate(1);
+  }
+
+  async function toggleFullscreen() {
+    const wrapper = document.getElementById("videoWrapper");
+    try {
+      if (!document.fullscreenElement) {
+        await wrapper.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error("No fue posible cambiar a pantalla completa:", err);
     }
   }
 
@@ -541,7 +653,8 @@
       window.location.href = "/curso.html";
 
     } else if (path.includes("curso")) {
-      window.location.href = "/portal.html";
+      sessionStorage.clear();
+      window.location.href = "/";
 
     } else if (path.includes("documentos")) {
       window.location.href = "/portal.html";

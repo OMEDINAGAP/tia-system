@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro de empresa - TIA</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body { margin:0; font-family:'Segoe UI',sans-serif; background:linear-gradient(135deg,#0f172a,#1e293b); min-height:100vh; color:white; }
+    .container { box-sizing:border-box; background:#1e293b; border-radius:16px; padding:30px; width:min(760px,calc(100% - 32px)); margin:40px auto; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+    h2 { text-align:center; margin:0 0 8px; }
+    .subtitle { color:#cbd5e1; text-align:center; margin:0 0 24px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .full { grid-column:1/-1; }
+    label { display:block; color:#cbd5e1; font-size:13px; margin-bottom:6px; }
+    input,textarea { box-sizing:border-box; width:100%; padding:12px; border-radius:8px; border:none; font:inherit; }
+    textarea { min-height:100px; resize:vertical; }
+    button { width:100%; padding:12px; border-radius:8px; border:none; background:#22c55e; color:white; font-weight:bold; cursor:pointer; margin-top:20px; }
+    button:hover { background:#16a34a; }
+    button:disabled { opacity:.65; cursor:wait; }
+    .footer { margin-top:15px; font-size:12px; opacity:.6; text-align:center; }
+    @media (max-width:640px) { .grid { grid-template-columns:1fr; } .full { grid-column:auto; } .container { margin:16px auto; padding:22px; } }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h2>Registro de empresa</h2>
+    <p class="subtitle">Folio: <strong id="folio"></strong></p>
+
+    <form id="empresaForm">
+      <div class="grid">
+        <div><label for="nombre">Nombre de la empresa</label><input id="nombre" name="nombre" maxlength="180" required></div>
+        <div><label for="razonSocial">Razon social</label><input id="razonSocial" name="razonSocial" maxlength="220" required></div>
+        <div class="full"><label for="representanteLegal">Nombre del representante legal</label><input id="representanteLegal" name="representanteLegal" maxlength="180" required></div>
+        <div><label for="telefono1">Telefono principal</label><input id="telefono1" name="telefono1" type="tel" maxlength="30" required></div>
+        <div><label for="telefono2">Telefono alterno</label><input id="telefono2" name="telefono2" type="tel" maxlength="30" required></div>
+        <div><label for="correo1">Correo principal</label><input id="correo1" name="correo1" type="email" maxlength="180" required></div>
+        <div><label for="correo2">Correo alterno</label><input id="correo2" name="correo2" type="email" maxlength="180" required></div>
+        <div class="full"><label for="direccion">Direccion</label><textarea id="direccion" name="direccion" maxlength="1000" required></textarea></div>
+        <div class="full"><label for="descripcion">Descripcion de las actividades de la empresa</label><textarea id="descripcion" name="descripcion" maxlength="2000" required></textarea></div>
+      </div>
+      <button id="submitButton" type="submit">Guardar informacion</button>
+    </form>
+    <div class="footer">Sistema de Capacitacion Aeroportuaria</div>
+  </main>
+
+  <script>
+    const token = sessionStorage.getItem("registroEmpresaToken");
+    if (!token) window.location.replace("/");
+
+    document.getElementById("folio").textContent = sessionStorage.getItem("folio") || "";
+    document.getElementById("nombre").value = sessionStorage.getItem("empresaAutorizada") || "";
+
+    document.getElementById("empresaForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const button = document.getElementById("submitButton");
+      const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+      button.disabled = true;
+      button.textContent = "Guardando...";
+
+      try {
+        const response = await fetch("/registro-empresa", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+          Swal.fire("Error", data.message || "No fue posible guardar la informacion", "error");
+          return;
+        }
+        sessionStorage.clear();
+        sessionStorage.setItem("configurarCuentaToken", data.setupToken);
+        await Swal.fire("Empresa registrada", "Ahora crea el usuario y la contrasena de acceso", "success");
+        window.location.replace("/cuenta.html");
+      } catch (error) {
+        console.error(error);
+        Swal.fire("Error", "No fue posible conectar con el servidor", "error");
+      } finally {
+        button.disabled = false;
+        button.textContent = "Guardar informacion";
+      }
+    });
+  </script>
+</body>
+</html>

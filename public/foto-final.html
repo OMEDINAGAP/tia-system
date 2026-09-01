@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Fotografía de finalización | TIA</title>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root{--navy:#07111f;--panel:#111d2d;--line:#29384d;--muted:#9bacc1;--green:#22c55e;--gold:#d6a94f}*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#07111f,#122238);color:#eef4fb;font-family:'Segoe UI',sans-serif;min-height:100vh}.page{width:min(1050px,calc(100% - 32px));margin:28px auto}.top-user-card{display:flex;justify-content:space-between;align-items:center;gap:20px;background:#0c1727;border:1px solid var(--line);border-radius:16px;padding:18px 22px;margin-bottom:20px;box-shadow:0 12px 35px rgba(0,0,0,.28)}.brand{font-size:22px;font-weight:800;color:var(--gold)}.user{text-align:right}.user strong{display:block}.user span{color:var(--muted);font-size:13px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;display:grid;grid-template-columns:340px 1fr;gap:30px}.photo-frame{width:300px;height:375px;margin:auto;background:white;border:5px solid white;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 12px 28px rgba(0,0,0,.4)}video,canvas{width:100%;height:100%;object-fit:cover}video{transform:scaleX(-1)}canvas{display:none}.placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#64748b;padding:25px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;justify-content:center}button,.file-label{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer;background:var(--green);color:white}.secondary{background:#334155}.file-label input{display:none}h1{margin:0 0 8px;font-size:27px}.lead{color:var(--muted);margin:0 0 20px}.requirements{padding:0;list-style:none;display:grid;gap:10px}.requirements li{background:#0a1422;border:1px solid var(--line);padding:11px 13px;border-radius:9px}.requirements li:before{content:'✓';color:#6ee7a0;font-weight:800;margin-right:10px}.confirm{display:flex;gap:10px;align-items:flex-start;background:#13243a;border:1px solid #36506e;padding:14px;border-radius:10px;margin:20px 0}.confirm input{margin-top:3px}.save{width:100%;font-size:16px;padding:14px}.save:disabled{opacity:.45;cursor:not-allowed}.note{font-size:12px;color:var(--muted);margin-top:12px}@media(max-width:780px){.panel{grid-template-columns:1fr}.top-user-card{align-items:flex-start}.photo-frame{width:260px;height:325px}.user{text-align:left}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="top-user-card"><div class="brand">✈ TIA</div><div class="user"><strong id="personName">Colaborador</strong><span id="personFolio">Validando sesión...</span></div></header>
+    <section class="panel">
+      <div>
+        <div class="photo-frame"><video id="camera" autoplay playsinline></video><canvas id="photo" width="480" height="600"></canvas><div class="placeholder" id="placeholder">Activa la cámara para tomar tu fotografía.</div></div>
+        <div class="actions"><button type="button" id="startCamera">Activar cámara</button><button type="button" id="capture" class="secondary" disabled>Tomar foto</button><button type="button" id="retake" class="secondary" hidden>Repetir</button></div>
+      </div>
+      <div>
+        <h1>Fotografía para concluir el curso</h1>
+        <p class="lead">Tu constancia estará disponible después de registrar esta fotografía.</p>
+        <ul class="requirements"><li>Tamaño infantil y encuadre de frente.</li><li>Fondo blanco, uniforme y con buena iluminación.</li><li>Sin gorra, lentes ni objetos que cubran el rostro.</li><li>Presentación formal y rostro completamente visible.</li><li>En caso de aplicar, presentarse rasurado.</li></ul>
+        <label class="confirm"><input id="confirm" type="checkbox"><span>Confirmo que la fotografía es reciente y cumple todos los requisitos indicados.</span></label>
+        <button class="save" id="save" disabled>Guardar fotografía y enviar a revisión</button>
+        <p class="note">La fotografía debe tomarse en este momento con la cámara y quedará vinculada a tu expediente.</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const token=sessionStorage.getItem('token');if(!token)location.replace('/');
+    const video=document.getElementById('camera'),canvas=document.getElementById('photo'),placeholder=document.getElementById('placeholder'),capture=document.getElementById('capture'),retake=document.getElementById('retake'),save=document.getElementById('save'),confirmBox=document.getElementById('confirm');let stream=null,photoBlob=null;
+    function refresh(){save.disabled=!(photoBlob&&confirmBox.checked)}confirmBox.addEventListener('change',refresh);
+    async function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+    async function startCamera(){try{await stopCamera();stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:900}},audio:false});video.srcObject=stream;video.style.display='block';canvas.style.display='none';placeholder.style.display='none';capture.disabled=false;retake.hidden=true;photoBlob=null;refresh()}catch(e){Swal.fire('Cámara no disponible','Debes permitir el acceso a la cámara para poder concluir el curso.','warning')}}
+    function drawCover(source,w,h){const sw=source.videoWidth||source.naturalWidth,sh=source.videoHeight||source.naturalHeight,scale=Math.max(w/sw,h/sh),cw=w/scale,ch=h/scale;canvas.getContext('2d').drawImage(source,(sw-cw)/2,(sh-ch)/2,cw,ch,0,0,w,h)}
+    document.getElementById('startCamera').onclick=startCamera;capture.onclick=()=>{drawCover(video,canvas.width,canvas.height);canvas.toBlob(b=>{photoBlob=b;video.style.display='none';canvas.style.display='block';capture.disabled=true;retake.hidden=false;stopCamera();refresh()},'image/jpeg',.9)};retake.onclick=startCamera;
+    save.onclick=async()=>{if(!photoBlob||!confirmBox.checked)return;save.disabled=true;save.textContent='Guardando...';const form=new FormData();form.append('photo',photoBlob,'captura-camara.jpg');form.append('confirmacion','true');form.append('origen','CAMARA');const r=await fetch('/upload-photo',{method:'POST',headers:{Authorization:'Bearer '+token},body:form});let d={};try{d=await r.json()}catch{}if(!r.ok){save.textContent='Guardar fotografía y enviar a revisión';refresh();return Swal.fire('No fue posible guardar',d.error||'Revisa la fotografía e intenta nuevamente.','error')}await Swal.fire({icon:'success',title:'Fotografía enviada',text:'Administración revisará la fotografía. La constancia se habilitará cuando sea aceptada.',confirmButtonText:'Terminar'});sessionStorage.clear();location.replace('/')};
+    (async()=>{const r=await fetch('/estado-finalizacion',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok){sessionStorage.clear();return location.replace('/')}document.getElementById('personName').textContent=d.nombre||'Colaborador';document.getElementById('personFolio').textContent=d.folio||'';if(!d.aprobado)return location.replace('/curso.html');if(d.fotoEstatus==='APROBADA')return location.replace('/certificado.html');if(d.fotoEstatus==='PENDIENTE'&&d.fotoRegistrada){await Swal.fire({icon:'info',title:'Fotografía en revisión',text:'Tu fotografía fue enviada y debe ser validada por administración antes de habilitar la constancia.',confirmButtonText:'Terminar'});sessionStorage.clear();return location.replace('/')}if(d.fotoEstatus==='RECHAZADA'){Swal.fire({icon:'warning',title:'Fotografía rechazada',text:d.motivoRechazo||'Debes tomar una nueva fotografía para concluir el curso.'})}})();
+    window.addEventListener('beforeunload',stopCamera);
+  </script>
+</body>
+</html>

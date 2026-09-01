@@ -54,10 +54,26 @@
       object-fit: contain;
 
     }
+
+    .cert, .text-center { display: none !important; }
+    body { margin: 0; background: #0f172a; font-family: 'Segoe UI', sans-serif; }
+    .certificate-viewer { min-height: 100vh; padding: 24px; box-sizing: border-box; }
+    .viewer-actions { max-width: 1100px; margin: 0 auto 16px; display: flex; justify-content: space-between; gap: 12px; }
+    .viewer-actions button { border: 0; border-radius: 10px; padding: 12px 18px; color: white; font-weight: 700; cursor: pointer; background: #22c55e; }
+    .viewer-actions .back { background: #334155; }
+    #pdfViewer { display: block; width: min(1100px, 100%); height: calc(100vh - 105px); margin: auto; border: 0; border-radius: 12px; background: white; }
   </style>
 </head>
 
 <body>
+
+  <main class="certificate-viewer">
+    <div class="viewer-actions">
+      <button class="back" onclick="finishCourse()">Terminar curso</button>
+      <button onclick="downloadOfficialCertificate()">Descargar constancia PDF</button>
+    </div>
+    <iframe id="pdfViewer" title="Constancia de acreditacion"></iframe>
+  </main>
 
   <div class="cert" id="cert">
 
@@ -242,7 +258,37 @@
 
     }
 
-    load();
+    let officialPdfUrl = "";
+
+    async function loadOfficialCertificate() {
+      const token = sessionStorage.getItem("token");
+      if (!token) return window.location.replace("/");
+      const response = await fetch("/mi-constancia", {
+        headers: { Authorization: "Bearer " + token }
+      });
+      if (!response.ok) {
+        alert("No fue posible cargar la constancia");
+        return window.location.replace("/foto-final.html");
+      }
+      officialPdfUrl = URL.createObjectURL(await response.blob());
+      document.getElementById("pdfViewer").src = officialPdfUrl;
+    }
+
+    function downloadOfficialCertificate() {
+      if (!officialPdfUrl) return;
+      const link = document.createElement("a");
+      link.href = officialPdfUrl;
+      link.download = "Constancia-TIA.pdf";
+      link.click();
+    }
+
+    function finishCourse() {
+      if (officialPdfUrl) URL.revokeObjectURL(officialPdfUrl);
+      sessionStorage.clear();
+      window.location.replace("/");
+    }
+
+    loadOfficialCertificate();
 
   </script>
 

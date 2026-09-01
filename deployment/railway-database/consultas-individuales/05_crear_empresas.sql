@@ -1,0 +1,20 @@
+CREATE TABLE `empresas` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `folio_acceso_id` bigint unsigned NOT NULL,
+  `nombre` varchar(180) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `razon_social` varchar(220) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `representante_legal` varchar(180) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `telefono_1` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `telefono_2` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `correo_1` varchar(180) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `correo_2` varchar(180) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `direccion` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descripcion` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `creado_en` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `actualizado_en` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_empresas_folio_acceso` (`folio_acceso_id`),
+  KEY `idx_empresas_nombre` (`nombre`),
+  KEY `idx_empresas_razon_social` (`razon_social`),
+  CONSTRAINT `fk_empresas_folio_acceso` FOREIGN KEY (`folio_acceso_id`) REFERENCES `folios_acceso` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

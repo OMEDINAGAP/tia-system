@@ -47,30 +47,25 @@ h1{
 <script>
 function getData(){
   const params = new URLSearchParams(window.location.search);
-  const raw = params.get("data");
-  return raw ? JSON.parse(decodeURIComponent(raw)) : null;
+  return params.get("folio");
 }
 
 async function validar(){
-  const d = getData();
+  const folio = getData();
 
-  if(!d){
+  if(!folio){
     render(false);
     return;
   }
 
-  const res = await fetch("/validate-cert", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(d)
-  });
+  const res = await fetch("/verificar-constancia?folio=" + encodeURIComponent(folio));
 
   const data = await res.json();
 
-  render(data.ok, d);
+  render(data.ok, data.constancia, data.message);
 }
 
-function render(ok, d, user){
+function render(ok, user, message){
   const card = document.getElementById("card");
 
   if(ok){
@@ -80,8 +75,9 @@ function render(ok, d, user){
       <p><b>Nombre:</b> ${user.nombre}</p>
       <p><b>Folio:</b> ${user.folio}</p>
       <p><b>Fecha:</b> ${new Date(user.fecha).toLocaleString()}</p>
-      <p><b>Resultado:</b> ${user.aprobado ? "APROBADO ✅" : "NO APROBADO ❌"}</p>
-      <p><b>Puntaje:</b> ${user.score}</p>
+      <p><b>Empresa:</b> ${user.empresa}</p>
+      <p><b>Resultado:</b> APROBADO ✅</p>
+      <p><b>Puntaje:</b> ${user.calificacion}%</p>
 
       <hr>
 
@@ -90,7 +86,7 @@ function render(ok, d, user){
   }else{
     card.innerHTML = `
       <h1 class="bad">✖ Certificado inválido</h1>
-      <p>${d?.reason || "Documento no válido"}</p>
+      <p>${message || "Documento no válido"}</p>
     `;
   }
 }
