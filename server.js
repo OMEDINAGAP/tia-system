@@ -560,7 +560,32 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
         [req.admin.id,person.user_id]
       );
       await connection.commit();
-      return res.json({ok:true,decision:"APROBADA"});
+      const nombre=[person.nombres,person.apellido_paterno,person.apellido_materno].filter(Boolean).join(" ");
+      const subject=`Fotografía aceptada - ${nombre}`;
+      let emailSent=false,emailError="";
+      try{
+        const transporter=createMailTransport();
+        if(!transporter)throw new Error("SMTP no configurado");
+        await transporter.sendMail({
+          from:process.env.MAIL_FROM||process.env.SMTP_USER,
+          to:person.correo_1,
+          subject,
+          text:`La fotografía de ${nombre}, folio ${person.folio}, fue aceptada. El curso ha quedado concluido y la constancia ya está disponible en el portal de la empresa.`
+        });
+        emailSent=true;
+      }catch(mailErr){emailError=mailErr.message;console.error("PHOTO ACCEPTANCE EMAIL ERROR:",mailErr.message)}
+      await db.query(
+        `INSERT INTO notificaciones_correo(tipo,destinatario,asunto,persona_id,estatus,detalle)
+         VALUES('FOTO_ACEPTADA',?,?,?,?,?)`,
+        [person.correo_1,subject,person.id,emailSent?"ENVIADO":"ERROR",emailSent?"Notificación enviada":emailError]
+      );
+      return res.json({
+        ok:true,
+        decision:"APROBADA",
+        emailSent,
+        email:person.correo_1,
+        warning:emailSent?null:"La fotografía fue aceptada, pero el correo no pudo enviarse: "+emailError
+      });
     }
     await connection.query(
       "UPDATE users SET photo=NULL,photo_data=NULL,photo_mime=NULL,foto_estatus='RECHAZADA',foto_revisada_en=NOW(),foto_revisada_por=?,foto_motivo_rechazo=? WHERE id=?",
