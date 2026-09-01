@@ -2,16 +2,19 @@
 <html>
 <head>
   <title>Documentación TIA</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    body.empresa-docs{padding:0;min-height:100vh;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff}body.empresa-docs .container{box-sizing:border-box;width:min(1150px,calc(100% - 32px));margin:32px auto}body.empresa-docs h1,body.empresa-docs h2{color:#fff}body.empresa-docs>main>p{color:#cbd5e1}body.empresa-docs .card{background:#1e293b;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.35)}body.empresa-docs .table-card{padding:0;overflow:hidden}body.empresa-docs .table-wrap{overflow:auto}body.empresa-docs .tabla{background:#0f172a;border-radius:0;min-width:760px}body.empresa-docs .tabla th{background:#15263b;color:#fff}body.empresa-docs .tabla td{border-color:#334155;color:#cbd5e1}body.empresa-docs .tabla tr:hover{background:#16243a}body.empresa-docs .tabla td:nth-child(3){color:#cbd5e1}body.empresa-docs a{color:#6ee7a0}body.empresa-docs .info-item{background:#0f172a;color:#fff}body.empresa-docs .info-item:hover{background:#16243a}body.empresa-docs .info-item strong{color:#fff}body.empresa-docs .info-item p{color:#cbd5e1}body.empresa-docs .highlight{border-color:#22c55e;background:#14283a}body.empresa-docs button{background:#22c55e}body.empresa-docs button:hover{background:#16a34a}@media(max-width:768px){body.empresa-docs .container{width:min(100% - 24px,1150px);margin:20px auto}}
+  </style>
 </head>
 <body>
-<div class="container"></div>
+<main class="container documents-page">
   <h1>📄 Requisitos para trámite de TIA</h1>
 
 <p>Reúne los siguientes documentos y preséntalos en el módulo TIA.</p>
 
-<div class="card"></div>
-<table class="tabla">
+<section class="card table-card"><div class="table-wrap"><table class="tabla">
 
 <tr>
   <th>Documento</th>
@@ -105,7 +108,7 @@
 
 </table>
 </div>
-</div>
+</section>
 
 <br>
 
@@ -175,7 +178,12 @@
   <button onclick="regresar()">⬅ Regresar</button>
 
 </div>
+</main>
 <script>
+  if (new URLSearchParams(location.search).get('origen') === 'empresa') {
+    document.body.classList.add('empresa-docs');
+  }
+
   function regresar(){
     location.href=sessionStorage.getItem('gestionEmpresaToken')?'/empresa-requisitos.html':'/portal.html';
   }
