@@ -89,10 +89,14 @@
       opacity: 0.6;
       text-align: center;
     }
+
+    .flight-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(7,17,31,.82);backdrop-filter:blur(3px);opacity:0;pointer-events:none;z-index:100;transition:opacity .25s ease}.flight-overlay.active{opacity:1;pointer-events:auto}.flight-scene{position:relative;width:min(520px,90vw);height:250px;overflow:hidden}.flight-cloud{position:absolute;color:#dbeafe;opacity:.25;font-size:34px;animation:cloudDrift 5s linear infinite}.cloud-one{top:25px;left:5%}.cloud-two{top:70px;right:4%;animation-delay:-2.6s}.runway{position:absolute;bottom:34px;left:8%;right:8%;height:8px;border-radius:20px;background:#31445c;box-shadow:0 0 0 2px rgba(148,163,184,.12)}.runway:after{content:'';position:absolute;inset:2px 12px;background:repeating-linear-gradient(90deg,#f8fafc 0 24px,transparent 24px 48px);opacity:.7}.aircraft{position:absolute;left:-130px;bottom:68px;font-size:62px;filter:drop-shadow(0 10px 8px rgba(0,0,0,.4));transform:rotate(-10deg)}.flight-overlay.landing .aircraft{animation:planeLand 1.05s cubic-bezier(.2,.85,.25,1) forwards}.flight-overlay.waiting .aircraft{left:calc(50% - 34px);transform:rotate(0deg);animation:planeIdle 1.2s ease-in-out infinite}.flight-overlay.takeoff .aircraft{left:calc(50% - 34px);transform:rotate(-18deg);animation:planeTakeoff .85s cubic-bezier(.55,.01,.76,.44) forwards}.flight-message{position:absolute;bottom:0;left:0;right:0;text-align:center;color:#dce7f5;font-size:15px;font-weight:600;opacity:0;transition:opacity .25s}.flight-overlay.active .flight-message{opacity:1}@keyframes planeLand{0%{left:-130px;bottom:165px;transform:rotate(-16deg)}70%{left:calc(50% - 45px);bottom:68px;transform:rotate(-2deg)}100%{left:calc(50% - 34px);bottom:68px;transform:rotate(0)}}@keyframes planeTakeoff{0%{left:calc(50% - 34px);bottom:68px;opacity:1}100%{left:110%;bottom:220px;opacity:0;transform:rotate(-18deg)}}@keyframes planeIdle{50%{transform:translateY(-5px)}}@keyframes cloudDrift{from{transform:translateX(-18px)}to{transform:translateX(22px)}}@media(prefers-reduced-motion:reduce){.flight-overlay,.aircraft,.flight-cloud{animation:none!important;transition:none!important}}
   </style>
 </head>
 
 <body>
+
+  <div class="flight-overlay" id="flightOverlay" aria-live="polite"><div class="flight-scene"><span class="flight-cloud cloud-one">☁</span><span class="flight-cloud cloud-two">☁</span><div class="aircraft">✈️</div><div class="runway"></div><div class="flight-message" id="flightMessage">Preparando tu acceso...</div></div></div>
 
   <div class="container">
 
@@ -120,6 +124,26 @@
   </div>
 
   <script>
+
+    let flightTimer;
+    function beginLoginFlight() {
+      const overlay = document.getElementById('flightOverlay');
+      document.getElementById('flightMessage').textContent = 'Verificando tu acceso...';
+      overlay.className = 'flight-overlay active landing';
+      clearTimeout(flightTimer);
+      flightTimer = setTimeout(() => overlay.className = 'flight-overlay active waiting', 1050);
+    }
+    function cancelLoginFlight() {
+      clearTimeout(flightTimer);
+      document.getElementById('flightOverlay').className = 'flight-overlay';
+    }
+    function departTo(url) {
+      clearTimeout(flightTimer);
+      const overlay = document.getElementById('flightOverlay');
+      document.getElementById('flightMessage').textContent = '¡Acceso confirmado! Buen vuelo.';
+      overlay.className = 'flight-overlay active takeoff';
+      setTimeout(() => window.location.href = url, 780);
+    }
 
     function switchTab(index) {
 
@@ -317,18 +341,20 @@
     async function loginById() {
       const folio = document.getElementById("userId").value.trim().toUpperCase();
       if (!folio) { Swal.fire("Aviso", "Ingresa tu folio", "warning"); return; }
+      beginLoginFlight();
       try {
         const res = await fetch("/folio-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folio }) });
         const data = await res.json();
-        if (!res.ok || !data.ok) { Swal.fire("Error", data.message || "Folio no encontrado", "error"); return; }
+        if (!res.ok || !data.ok) { cancelLoginFlight(); Swal.fire("Error", data.message || "Folio no encontrado", "error"); return; }
         if (data.persona) {
           sessionStorage.clear();
           sessionStorage.setItem("token", data.token);
           sessionStorage.setItem("userId", String(data.userId));
-          window.location.href = data.pendingPhoto ? "/foto-final.html" : "/curso.html";
+          departTo(data.pendingPhoto ? "/foto-final.html" : "/curso.html");
           return;
         }
         if (data.requiereCredenciales) {
+          cancelLoginFlight();
           sessionStorage.setItem("folio", data.folio);
           document.getElementById("formOld").classList.remove("active");
           document.getElementById("credentialsForm").classList.add("active");
@@ -337,17 +363,18 @@
         }
         if (data.configurarCuenta) {
           sessionStorage.setItem("configurarCuentaToken", data.token);
-          window.location.href = "/cuenta.html";
+          departTo("/cuenta.html");
           return;
         }
-        if (!data.token) { Swal.fire("Error", "No se genero la sesion", "error"); return; }
+        if (!data.token) { cancelLoginFlight(); Swal.fire("Error", "No se genero la sesion", "error"); return; }
         sessionStorage.clear();
         sessionStorage.setItem("registroEmpresaToken", data.token);
         sessionStorage.setItem("folio", data.folio);
         sessionStorage.setItem("empresaAutorizada", data.empresa || "");
-        window.location.href = "/empresa.html";
+        departTo("/empresa.html");
       } catch (err) {
         console.error(err);
+        cancelLoginFlight();
         Swal.fire("Error", "No fue posible conectar con el servidor", "error");
       }
     }
@@ -361,17 +388,18 @@
       const usuario = document.getElementById("empresaUsuario").value.trim();
       const password = document.getElementById("empresaPassword").value;
       if (!usuario || !password) { Swal.fire("Aviso", "Ingresa usuario y contrasena", "warning"); return; }
+      beginLoginFlight();
       try {
         const res = await fetch("/login-empresa", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ folio, usuario, password })
         });
         const data = await res.json();
-        if (!res.ok || !data.ok) { Swal.fire("Error", data.message || "Credenciales incorrectas", "error"); return; }
+        if (!res.ok || !data.ok) { cancelLoginFlight(); Swal.fire("Error", data.message || "Credenciales incorrectas", "error"); return; }
         sessionStorage.clear();
         sessionStorage.setItem("gestionEmpresaToken", data.token);
-        window.location.href = "/empresa-requisitos.html";
-      } catch (error) { Swal.fire("Error", "No fue posible conectar con el servidor", "error"); }
+        departTo("/empresa-requisitos.html");
+      } catch (error) { cancelLoginFlight(); Swal.fire("Error", "No fue posible conectar con el servidor", "error"); }
     }
   </script>
 
