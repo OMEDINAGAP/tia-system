@@ -404,14 +404,15 @@ app.get("/admin-overview",auth,async(req,res)=>{
       SELECT fa.id,e.id AS empresa_id,fa.folio,fa.fecha_emision,fa.empresa AS empresa_autorizada,
              fa.estatus,fa.caducidad,e.nombre,e.razon_social,e.representante_legal,
              e.telefono_1,e.telefono_2,e.correo_1,e.correo_2,e.direccion,e.descripcion,
-             e.creado_en,ce.usuario,COUNT(DISTINCT pc.id) AS colaboradores,
-             SUM(CASE WHEN u.aprobado=1 THEN 1 ELSE 0 END) AS aprobados,
+             e.creado_en,GROUP_CONCAT(DISTINCT ce.usuario ORDER BY ce.usuario SEPARATOR ', ') AS usuario,
+             COUNT(DISTINCT pc.id) AS colaboradores,
+             COUNT(DISTINCT CASE WHEN u.aprobado=1 THEN pc.id END) AS aprobados,
              ROUND(AVG(COALESCE(pg.progreso,0)),1) AS progreso_promedio
       FROM folios_acceso fa LEFT JOIN empresas e ON e.folio_acceso_id=fa.id
       LEFT JOIN cuentas_empresa ce ON ce.empresa_id=e.id
       LEFT JOIN personas_curso pc ON pc.empresa_id=e.id LEFT JOIN users u ON u.id=pc.user_id
       LEFT JOIN (SELECT userId,LEAST(100,SUM(progress)/2) AS progreso FROM video_progress GROUP BY userId) pg ON pg.userId=u.id
-      GROUP BY fa.id,e.id,ce.id ORDER BY fa.creado_en DESC`);
+      GROUP BY fa.id,e.id ORDER BY fa.creado_en DESC`);
     const [people]=await db.query(`
       SELECT pc.id,pc.empresa_id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,
              pc.puesto,pc.telefono,pc.correo,pc.estatus,e.nombre AS empresa,
