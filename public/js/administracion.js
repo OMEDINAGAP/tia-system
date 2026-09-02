@@ -65,7 +65,7 @@ openCompany=function(id){
   const company=data.companies.find(item=>Number(item.id)===Number(id));
   selectedCompanyForSuspension=company||null;
   const canSuspend=company&&company.estatus!=="SUSPENDIDO"&&data.admin?.rol==='SUPERADMIN';
-  companySuspendControl.innerHTML=canSuspend?'<button type="button" style="background:#b91c1c;border:0;color:#fff;font-weight:700;padding:9px 13px;border-radius:8px;cursor:pointer" onclick="suspendCompanyAccess()">Suspender folio y accesos</button>':company?.estatus==='SUSPENDIDO'?'<span class="badge red">FOLIO SUSPENDIDO</span>':'';
+  companySuspendControl.innerHTML=canSuspend?'<button type="button" style="background:#b91c1c;border:0;color:#fff;font-weight:700;padding:9px 13px;border-radius:8px;cursor:pointer" onclick="suspendCompanyAccess()">Suspender folio y accesos</button>':company?.estatus==='SUSPENDIDO'&&data.admin?.rol==='SUPERADMIN'?'<button type="button" class="primary" onclick="reactivateCompanyAccess()">Reactivar folio y accesos</button>':'<span class="badge red">FOLIO SUSPENDIDO</span>';
 };
 async function suspendCompanyAccess(){
   const company=selectedCompanyForSuspension;
@@ -88,6 +88,21 @@ async function suspendCompanyAccess(){
   activeView='companies';
   render();
   Swal.fire('Folios suspendidos','La empresa no fue eliminada. Su acceso y el de sus colaboradores quedaron suspendidos; la información permanece disponible para consulta.','success');
+}
+
+async function reactivateCompanyAccess(){
+  const company=selectedCompanyForSuspension;
+  if(!company)return;
+  const result=await Swal.fire({icon:'question',title:'Reactivar folio y accesos',html:`<p>Se restaurará el acceso de <strong>${esc(company.nombre||company.empresa_autorizada||company.folio)}</strong>, sus cuentas autorizadas y sus colaboradores.</p><p>Las sesiones anteriores permanecen cerradas; cada persona deberá iniciar sesión nuevamente.</p>`,showCancelButton:true,confirmButtonText:'Si, reactivar accesos',cancelButtonText:'Cancelar',confirmButtonColor:'#16a34a'});
+  if(!result.isConfirmed)return;
+  const response=await fetch(`/admin-empresas/${company.id}/reactivar`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:'{}'});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.ok)return Swal.fire('No fue posible reactivar',payload.error||'Intenta nuevamente','error');
+  closeCompany();
+  await load();
+  activeView='companies';
+  render();
+  Swal.fire('Accesos reactivados','El folio, las cuentas autorizadas y los colaboradores ya pueden volver a ingresar al sistema.','success');
 }
 
 const renderWithCourseDate=render;

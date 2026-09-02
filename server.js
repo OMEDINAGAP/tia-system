@@ -570,6 +570,33 @@ app.patch("/admin-empresas/:id/suspender",auth,async(req,res)=>{
   }finally{if(connection)connection.release()}
 });
 
+app.patch("/admin-empresas/:id/reactivar",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede reactivar folios empresariales"});
+    const folioId=Number(req.params.id);
+    if(!Number.isInteger(folioId)||folioId<1)return res.status(400).json({ok:false,error:"Empresa invalida"});
+    connection=await db.getConnection();
+    await connection.beginTransaction();
+    const [companies]=await connection.query(`SELECT fa.id,fa.estatus,fa.caducidad,e.id AS empresa_id FROM folios_acceso fa LEFT JOIN empresas e ON e.folio_acceso_id=fa.id WHERE fa.id=? FOR UPDATE`,[folioId]);
+    const company=companies[0];
+    if(!company){await connection.rollback();return res.status(404).json({ok:false,error:"Empresa no encontrada"});}
+    if(company.estatus!=="SUSPENDIDO"){await connection.rollback();return res.status(409).json({ok:false,error:"El folio no esta suspendido"});}
+    if(new Date(company.caducidad).getTime()<Date.now()){await connection.rollback();return res.status(409).json({ok:false,error:"No es posible reactivar un folio vencido"});}
+    let status="ACTIVO";
+    if(company.empresa_id){
+      const [accounts]=await connection.query("SELECT id FROM cuentas_empresa WHERE empresa_id=? LIMIT 1",[company.empresa_id]);
+      status=accounts.length?"USADO":"CONFIGURANDO";
+      await connection.query("UPDATE cuentas_empresa SET activo=1 WHERE empresa_id=?",[company.empresa_id]);
+      await connection.query("DELETE FROM suspensiones_colaborador WHERE empresa_id=?",[company.empresa_id]);
+    }
+    await connection.query("UPDATE folios_acceso SET estatus=? WHERE id=?",[status,folioId]);
+    await connection.commit();
+    return res.json({ok:true,estatus:status});
+  }catch(err){if(connection)await connection.rollback();console.error("ADMIN COMPANY REACTIVATE ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible reactivar los accesos"});}
+  finally{if(connection)connection.release();}
+});
+
 app.get("/admin-users",auth,async(req,res)=>{
   try{
     if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"No autorizado"});
