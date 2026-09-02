@@ -171,3 +171,20 @@ new MutationObserver(ensureCourseDateColumn).observe(document.getElementById('pe
 document.querySelectorAll('input[type="date"]').forEach(input=>input.addEventListener('click',()=>{
   try{input.showPicker?.()}catch{}
 }));
+
+async function downloadApprovedExam(id,folio){
+  const response=await fetch(`/admin-personas/${id}/examen`,{headers:{Authorization:'Bearer '+token}});
+  if(!response.ok){const data=await response.json().catch(()=>({}));return Swal.fire('Error',data.error||'Examen no disponible','error');}
+  const url=URL.createObjectURL(await response.blob()),anchor=document.createElement('a');
+  anchor.href=url;anchor.download=`examen-${folio}.pdf`;anchor.click();URL.revokeObjectURL(url);
+}
+
+const renderWithExamAudit=render;
+render=function(){
+  renderWithExamAudit();
+  if(activeView!=="people")return;
+  [...document.getElementById('peopleRows').rows].forEach((row,index)=>{
+    const person=visible[index],actionCell=row.lastElementChild;
+    if(person?.examen_auditado_id&&!actionCell.querySelector('[data-examen]'))actionCell.insertAdjacentHTML('beforeend',` <button class="view-btn" data-examen onclick="downloadApprovedExam(${Number(person.id)},'${esc(person.folio)}')">Examen</button>`);
+  });
+};

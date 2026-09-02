@@ -417,11 +417,12 @@ app.get("/admin-overview",auth,async(req,res)=>{
       SELECT pc.id,pc.empresa_id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,
              pc.puesto,pc.telefono,pc.correo,pc.estatus,e.nombre AS empresa,
              COALESCE(u.exam,0) AS calificacion,COALESCE(u.intentos,0) AS intentos,
-             COALESCE(u.aprobado,0) AS aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo,u.fecha AS fecha_aprobacion,cc.aceptado_en AS carta_aceptada_en,sc.suspendido_en,
+             COALESCE(u.aprobado,0) AS aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo,u.fecha AS fecha_aprobacion,cc.aceptado_en AS carta_aceptada_en,ea.id AS examen_auditado_id,sc.suspendido_en,
              ROUND(COALESCE(pg.progreso,0),1) AS progreso,pc.creado_en
       FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id
       LEFT JOIN users u ON u.id=pc.user_id
       LEFT JOIN cartas_compromiso cc ON cc.user_id=u.id
+      LEFT JOIN examenes_aprobados ea ON ea.user_id=u.id
       LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
       LEFT JOIN (SELECT userId,LEAST(100,SUM(progress)/2) AS progreso FROM video_progress GROUP BY userId) pg ON pg.userId=u.id
       ORDER BY pc.creado_en DESC`);
@@ -1893,6 +1894,45 @@ async function generateProfessionalCommitmentPdf(res, record) {
   doc.end();
 }
 
+async function generateApprovedExamPdf(res, exam, answers) {
+  const filename=`examen-${String(exam.folio).replace(/[^a-z0-9_-]/gi,"_")}.pdf`;
+  res.setHeader("Content-Type","application/pdf");
+  res.setHeader("Content-Disposition",`attachment; filename="${filename}"`);
+  const doc=new PDFDocument({size:"LETTER",margin:0});
+  doc.pipe(res);
+  const width=612,height=792,left=48,bodyWidth=516,navy="#082f49",gold="#c6923b",ink="#24364a",pale="#edf3f8";
+  let page=1;
+  const header=()=>{
+    doc.rect(0,0,width,height).fill("#f8fafc");doc.rect(18,18,width-36,height-36).lineWidth(1).stroke("#cbd5e1");doc.rect(18,18,width-36,82).fill(navy);
+    const logo=path.join(__dirname,"public","assets","logo-gap.png");if(fs.existsSync(logo))doc.image(logo,42,34,{fit:[54,45]});
+    doc.font("Helvetica-Bold").fillColor("#fff").fontSize(8).text("SISTEMA TIA  |  SEGURIDAD AEROPORTUARIA",116,37,{characterSpacing:1.1});doc.font("Helvetica-Bold").fontSize(17).text("EVALUACIÓN DE SEGURIDAD",116,51);doc.font("Helvetica").fontSize(9).text("EXPEDIENTE AUDITABLE",116,72,{characterSpacing:1.3});doc.rect(18,100,width-36,4).fill(gold);
+    doc.font("Helvetica").fontSize(7).fillColor("#64748b").text(`Página ${page}`,left,766,{width:bodyWidth,align:"right"});
+  };
+  header();
+  let y=121;
+  doc.roundedRect(left,y,bodyWidth,58,4).fillAndStroke(pale,"#cbd5e1");
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#64748b").text("COLABORADOR",left+12,y+10);doc.font("Helvetica-Bold").fontSize(10).fillColor(navy).text(exam.name,left+12,y+23,{width:240});
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#64748b").text("EMPRESA",left+275,y+10);doc.font("Helvetica-Bold").fontSize(9).fillColor(navy).text(exam.company,left+275,y+23,{width:225});
+  doc.font("Helvetica").fontSize(8).fillColor("#475569").text(`Folio: ${exam.folio}    Fecha: ${new Date(exam.aprobado_en).toLocaleDateString("es-MX")}    Resultado: ${Number(exam.calificacion).toFixed(0)}%`,left+12,y+43);
+  y+=74;
+  doc.roundedRect(left,y,bodyWidth,21,3).fill(pale);doc.rect(left,y,4,21).fill(gold);doc.font("Helvetica-Bold").fontSize(8.5).fillColor(navy).text("RESPUESTAS REGISTRADAS DEL EXAMEN APROBADO",left+12,y+7,{characterSpacing:.3});y+=33;
+  const newPage=()=>{doc.addPage();page++;header();y=121;};
+  for(const answer of answers){
+    const questionText=`${answer.orden}. ${answer.pregunta}`;
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(navy);
+    const questionHeight=doc.heightOfString(questionText,{width:bodyWidth,lineGap:2});
+    const options=["A","B","C","D"].filter(letter=>answer[`opcion_${letter.toLowerCase()}`]).map(letter=>`${letter}) ${answer[`opcion_${letter.toLowerCase()}`]}`);
+    doc.font("Helvetica").fontSize(8.1);const optionsHeight=options.reduce((sum,text)=>sum+doc.heightOfString(text,{width:bodyWidth-24,lineGap:1.5})+5,0);
+    const total=questionHeight+optionsHeight+40;if(y+total>730)newPage();
+    doc.roundedRect(left,y,bodyWidth,total,4).fillAndStroke("#ffffff","#d6dee8");
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(navy).text(questionText,left+12,y+11,{width:bodyWidth-24,lineGap:2});
+    let optionY=doc.y+7;
+    for(const text of options){const letter=text[0],selected=letter===answer.respuesta_colaborador,correct=letter===answer.respuesta_correcta;const color=selected?(correct?"#e8f7ed":"#fdecec"):"#f8fafc";const border=selected?(correct?"#22c55e":"#ef4444"):"#e2e8f0";doc.roundedRect(left+12,optionY,bodyWidth-24,doc.heightOfString(text,{width:bodyWidth-48,lineGap:1.5})+8,3).fillAndStroke(color,border);doc.font(selected?"Helvetica-Bold":"Helvetica").fontSize(8.1).fillColor(ink).text(text,left+24,optionY+4,{width:bodyWidth-48,lineGap:1.5});optionY=doc.y+5;}
+    doc.font("Helvetica-Bold").fontSize(7.6).fillColor(answer.es_correcta?"#15803d":"#b91c1c").text(answer.es_correcta?"RESPUESTA CORRECTA":"RESPUESTA INCORRECTA",left+12,optionY+2);y+=total+10;
+  }
+  doc.end();
+}
+
 app.get("/admin-personas/:id/carta-compromiso", auth, async (req,res) => {
   try {
     if (!req.isAdmin) return res.status(403).json({error:"No autorizado"});
@@ -1900,6 +1940,20 @@ app.get("/admin-personas/:id/carta-compromiso", auth, async (req,res) => {
     if (!rows.length) return res.status(404).json({error:"Carta de aceptación no disponible"});
     await generateProfessionalCommitmentPdf(res,rows[0]);
   } catch(err) { console.error("ADMIN COMMITMENT PDF ERROR:",err); if(!res.headersSent)return res.status(500).json({error:"No fue posible generar la carta"}); res.end(); }
+});
+
+app.get("/admin-personas/:id/examen", auth, async (req,res) => {
+  try {
+    if (!req.isAdmin) return res.status(403).json({error:"No autorizado"});
+    const personId=Number(req.params.id);
+    const [exams]=await db.query(`SELECT ea.id,ea.calificacion,ea.aprobado_en,u.name,u.company,u.folio,e.nombre AS empresa FROM personas_curso pc JOIN users u ON u.id=pc.user_id JOIN empresas e ON e.id=pc.empresa_id JOIN examenes_aprobados ea ON ea.user_id=u.id WHERE pc.id=? LIMIT 1`,[personId]);
+    const exam=exams[0];
+    if(!exam)return res.status(404).json({error:"Examen aprobado no disponible"});
+    exam.company=exam.empresa||exam.company;
+    const [answers]=await db.query("SELECT orden,pregunta,opcion_a,opcion_b,opcion_c,opcion_d,respuesta_colaborador,respuesta_correcta,es_correcta FROM respuestas_examen_aprobado WHERE examen_id=? ORDER BY orden",[exam.id]);
+    if(!answers.length)return res.status(404).json({error:"Respuestas del examen no disponibles"});
+    await generateApprovedExamPdf(res,exam,answers);
+  } catch(err) { console.error("ADMIN EXAM PDF ERROR:",err);if(!res.headersSent)return res.status(500).json({error:"No fue posible generar el examen"});res.end(); }
 });
 
 app.get("/me", auth, async (req, res) => {
@@ -1942,6 +1996,33 @@ async function ensureOperationalTables(){
     version_documento VARCHAR(80) NOT NULL,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_cartas_compromiso_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await db.query(`CREATE TABLE IF NOT EXISTS examenes_aprobados (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    exam_token CHAR(64) NOT NULL,
+    calificacion DECIMAL(5,2) NOT NULL,
+    aprobado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_examenes_aprobados_user (user_id),
+    UNIQUE KEY uq_examenes_aprobados_token (exam_token),
+    CONSTRAINT fk_examenes_aprobados_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await db.query(`CREATE TABLE IF NOT EXISTS respuestas_examen_aprobado (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    examen_id BIGINT UNSIGNED NOT NULL,
+    orden TINYINT UNSIGNED NOT NULL,
+    pregunta TEXT NOT NULL,
+    opcion_a TEXT NOT NULL,
+    opcion_b TEXT NOT NULL,
+    opcion_c TEXT NOT NULL,
+    opcion_d TEXT NULL,
+    respuesta_colaborador ENUM('A','B','C','D') NOT NULL,
+    respuesta_correcta ENUM('A','B','C','D') NOT NULL,
+    es_correcta TINYINT(1) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_respuestas_examen_orden (examen_id,orden),
+    CONSTRAINT fk_respuestas_examen_aprobado FOREIGN KEY (examen_id) REFERENCES examenes_aprobados(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 }
 async function prepareProductionAdmin(){
@@ -2190,6 +2271,30 @@ app.post("/submit-exam", auth, async (req, res) => {
       score >= 80;
 
     await db.query("UPDATE exam_sessions SET score=?,submitted_at=NOW() WHERE token=?",[score,examToken]);
+
+    if (aprobado) {
+      const [existingAudit] = await db.query("SELECT id FROM examenes_aprobados WHERE user_id=? LIMIT 1", [userId]);
+      if (!existingAudit.length) {
+        const [questionRows] = await db.query(
+          "SELECT id,question,option_a,option_b,option_c,option_d,correct FROM questions WHERE id IN (?)", [ids]
+        );
+        const questionsById = new Map(questionRows.map(question => [Number(question.id), question]));
+        const [auditResult] = await db.query(
+          "INSERT INTO examenes_aprobados(user_id,exam_token,calificacion,aprobado_en) VALUES(?,?,?,NOW())",
+          [userId, examToken, score]
+        );
+        const auditRows = ids.map((id, index) => {
+          const question = questionsById.get(Number(id));
+          const selected = answerMap.get(Number(id));
+          return [auditResult.insertId, index + 1, repairMojibake(question.question), repairMojibake(question.option_a), repairMojibake(question.option_b), repairMojibake(question.option_c), repairMojibake(question.option_d), selected, question.correct, selected === question.correct ? 1 : 0];
+        });
+        await db.query(
+          `INSERT INTO respuestas_examen_aprobado
+           (examen_id,orden,pregunta,opcion_a,opcion_b,opcion_c,opcion_d,respuesta_colaborador,respuesta_correcta,es_correcta)
+           VALUES ?`, [auditRows]
+        );
+      }
+    }
 
     res.json({
       ok: true,
