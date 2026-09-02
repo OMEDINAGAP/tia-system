@@ -188,3 +188,26 @@ render=function(){
     if(person?.examen_auditado_id&&!actionCell.querySelector('[data-examen]'))actionCell.insertAdjacentHTML('beforeend',` <button class="view-btn" data-examen onclick="downloadApprovedExam(${Number(person.id)},'${esc(person.folio)}')">Examen</button>`);
   });
 };
+
+/* Acciones documentales uniformes para el expediente del colaborador. */
+document.head.insertAdjacentHTML('beforeend',`<style>
+.action-icons{display:flex;align-items:center;gap:6px;white-space:nowrap}.action-icon{width:32px;height:32px;border:1px solid #31527a;border-radius:8px;background:#1646b8;color:#fff;display:inline-grid;place-items:center;font-size:16px;cursor:pointer;transition:transform .15s,background .15s}.action-icon:hover:not(:disabled){background:#2563eb;transform:translateY(-1px)}.action-icon.photo{background:#0f766e;border-color:#2dd4bf}.action-icon.document{background:#7c3aed;border-color:#a78bfa}.action-icon.exam{background:#b7791f;border-color:#e7bd69}.action-icon:disabled{background:#263449;border-color:#334155;color:#718096;cursor:not-allowed;opacity:.75}
+</style>`);
+function actionIcon({kind,label,enabled,onClick}){return `<button type="button" class="action-icon ${kind}" title="${esc(label)}" aria-label="${esc(label)}"${enabled?` onclick="${onClick}"`:" disabled"}>${kind==='pdf'?'📄':kind==='photo'?'🖼️':kind==='document'?'✍️':'📝'}</button>`}
+const renderWithDocumentIcons=render;
+render=function(){
+  renderWithDocumentIcons();
+  if(activeView!=="people")return;
+  const header=document.getElementById('peopleRows')?.closest('table')?.querySelector('thead tr th:last-child');
+  if(header)header.textContent='Documentos';
+  [...document.getElementById('peopleRows').rows].forEach((row,index)=>{
+    const person=visible[index];if(!person)return;
+    const canDownloadCertificate=Boolean(person.aprobado&&person.foto_estatus==='APROBADA');
+    const hasApprovedPhoto=Boolean(person.aprobado&&person.foto_estatus==='APROBADA');
+    const hasPendingPhoto=Boolean(person.aprobado&&person.photo&&person.foto_estatus==='PENDIENTE');
+    const canReviewOrDownloadPhoto=hasApprovedPhoto||hasPendingPhoto;
+    const photoClick=hasApprovedPhoto?`downloadPhoto(${Number(person.id)},'${esc(person.folio)}')`:hasPendingPhoto?`reviewPhoto(${Number(person.id)})`:'';
+    const cell=row.lastElementChild;
+    cell.innerHTML=`<div class="action-icons">${actionIcon({kind:'pdf',label:canDownloadCertificate?'Descargar constancia PDF':'Constancia no disponible',enabled:canDownloadCertificate,onClick:`certificate(${Number(person.id)},'${esc(person.folio)}')`})}${actionIcon({kind:'photo',label:hasApprovedPhoto?'Descargar fotografía':hasPendingPhoto?'Revisar fotografía':'Fotografía no disponible',enabled:canReviewOrDownloadPhoto,onClick:photoClick})}${actionIcon({kind:'document',label:person.carta_aceptada_en?'Descargar carta de aceptación':'Carta de aceptación no disponible',enabled:Boolean(person.carta_aceptada_en),onClick:`downloadCommitment(${Number(person.id)},'${esc(person.folio)}')`})}${actionIcon({kind:'exam',label:person.examen_auditado_id?'Descargar examen aprobado':'Examen auditado no disponible',enabled:Boolean(person.examen_auditado_id),onClick:`downloadApprovedExam(${Number(person.id)},'${esc(person.folio)}')`})}</div>`;
+  });
+};
