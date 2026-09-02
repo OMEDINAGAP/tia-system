@@ -201,10 +201,24 @@ async function changeAccountStatus(id, activate, name) {
 
 document.getElementById('accountForm').addEventListener('submit', async event => {
   event.preventDefault();
-  const payload = Object.fromEntries(new FormData(event.currentTarget));
-  const { response, data } = await accountRequest('/empresa-cuentas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-  if (!response.ok || !data.ok) return Swal.fire('Error', data.message || 'No fue posible crear la cuenta', 'error');
-  event.currentTarget.reset();
-  await Swal.fire('Cuenta creada', 'El administrador autorizado ya puede iniciar sesion con el folio de la empresa.', 'success');
-  loadAccounts();
+  const form = event.currentTarget;
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (form.dataset.submitting === 'true') return;
+  form.dataset.submitting = 'true';
+  submitButton.disabled = true;
+  submitButton.textContent = 'Creando acceso...';
+  try {
+    const payload = Object.fromEntries(new FormData(form));
+    const { response, data } = await accountRequest('/empresa-cuentas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!response.ok || !data.ok) return Swal.fire('Error', data.message || 'No fue posible crear la cuenta', 'error');
+    form.reset();
+    await loadAccounts();
+    await Swal.fire({ icon: 'success', title: 'Cuenta creada', text: 'El administrador autorizado ya puede iniciar sesion con el folio de la empresa.', confirmButtonText: 'Entendido' });
+  } catch (error) {
+    if (error.message !== 'Sesion expirada') await Swal.fire('Error', error.message || 'No fue posible crear la cuenta', 'error');
+  } finally {
+    form.dataset.submitting = 'false';
+    submitButton.disabled = false;
+    submitButton.textContent = 'Crear acceso';
+  }
 });
