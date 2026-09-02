@@ -350,7 +350,7 @@
           sessionStorage.clear();
           sessionStorage.setItem("token", data.token);
           sessionStorage.setItem("userId", String(data.userId));
-          departTo(data.pendingPhoto ? "/foto-final.html" : "/curso.html");
+          departTo(data.pendingPhoto ? "/foto-final.html" : "/carta-compromiso.html");
           return;
         }
         if (data.requiereCredenciales) {

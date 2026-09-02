@@ -230,6 +230,14 @@
     window.location.href = "/";
   }
 
+  (async function requireCommitment() {
+    try {
+      const response = await fetch('/carta-compromiso', { headers: { Authorization: 'Bearer ' + token } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.aceptada) window.location.replace('/carta-compromiso.html');
+    } catch (error) { window.location.replace('/'); }
+  })();
+
   async function loadUserInfo() {
     try {
       const res = await fetch("/me", {

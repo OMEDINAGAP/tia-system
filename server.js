@@ -417,10 +417,11 @@ app.get("/admin-overview",auth,async(req,res)=>{
       SELECT pc.id,pc.empresa_id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,
              pc.puesto,pc.telefono,pc.correo,pc.estatus,e.nombre AS empresa,
              COALESCE(u.exam,0) AS calificacion,COALESCE(u.intentos,0) AS intentos,
-             COALESCE(u.aprobado,0) AS aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo,u.fecha AS fecha_aprobacion,sc.suspendido_en,
+             COALESCE(u.aprobado,0) AS aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo,u.fecha AS fecha_aprobacion,cc.aceptado_en AS carta_aceptada_en,sc.suspendido_en,
              ROUND(COALESCE(pg.progreso,0),1) AS progreso,pc.creado_en
       FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id
       LEFT JOIN users u ON u.id=pc.user_id
+      LEFT JOIN cartas_compromiso cc ON cc.user_id=u.id
       LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
       LEFT JOIN (SELECT userId,LEAST(100,SUM(progress)/2) AS progreso FROM video_progress GROUP BY userId) pg ON pg.userId=u.id
       ORDER BY pc.creado_en DESC`);
@@ -1795,6 +1796,70 @@ app.get("/admin-data", auth, async (req, res) => {
 });
 
 
+app.get("/carta-compromiso", auth, async (req, res) => {
+  try {
+    if (req.isAdmin) return res.status(403).json({ ok:false, error:"No autorizado" });
+    const [rows] = await db.query(
+      `SELECT c.aceptado_en,u.name,u.company,u.folio
+       FROM users u LEFT JOIN cartas_compromiso c ON c.user_id=u.id
+       WHERE u.id=? LIMIT 1`, [req.userId]
+    );
+    const record=rows[0];
+    if (!record) return res.status(404).json({ ok:false, error:"Colaborador no encontrado" });
+    return res.json({ ok:true, aceptada:!!record.aceptado_en, aceptadoEn:record.aceptado_en||null, usuario:record });
+  } catch (err) { console.error("COMMITMENT STATUS ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible consultar la carta"}); }
+});
+
+app.post("/carta-compromiso", auth, async (req, res) => {
+  try {
+    if (req.isAdmin) return res.status(403).json({ ok:false, error:"No autorizado" });
+    const accepted=req.body.acepta===true;
+    const signature=String(req.body.firma || "");
+    const match=signature.match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+    if (!accepted) return res.status(400).json({ok:false,error:"Debes aceptar la carta compromiso"});
+    if (!match || match[1].length<300 || match[1].length>800000) return res.status(400).json({ok:false,error:"Captura una firma digital valida"});
+    const [existing]=await db.query("SELECT user_id FROM cartas_compromiso WHERE user_id=? LIMIT 1",[req.userId]);
+    if (existing.length) return res.json({ok:true,existente:true});
+    await db.query(
+      `INSERT INTO cartas_compromiso(user_id,firma_data,firma_mime,aceptado_en,version_documento)
+       VALUES(?,?, 'image/png', NOW(), 'SAN_JOSE_DEL_CABO_2026_01')`,
+      [req.userId,Buffer.from(match[1],"base64")]
+    );
+    return res.status(201).json({ok:true});
+  } catch (err) { console.error("COMMITMENT SAVE ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible guardar la carta compromiso"}); }
+});
+
+async function generateCommitmentPdf(res, record) {
+  const filename=`carta-compromiso-${String(record.folio).replace(/[^a-z0-9_-]/gi,"_")}.pdf`;
+  res.setHeader("Content-Type","application/pdf");
+  res.setHeader("Content-Disposition",`attachment; filename="${filename}"`);
+  const doc=new PDFDocument({size:"LETTER",margin:42});
+  doc.pipe(res);
+  doc.font("Helvetica-Bold").fontSize(18).fillColor("#0f172a").text("CARTA COMPROMISO DE CONFIDENCIALIDAD",{align:"center"});
+  doc.moveDown(.6).font("Helvetica-Bold").fontSize(11).text("ADVERTENCIA");
+  doc.font("Helvetica").fontSize(10.3).text("La información contenida en el curso de Seguridad de la Aviación Civil y en el Programa Local de Seguridad Aeroportuaria es propiedad de San Jose del Cabo S.A. de C.V.",{lineGap:3});
+  doc.moveDown(.5).text("La información proporcionada en este curso es únicamente para fines de capacitación y no modifica ni sustituye las políticas, criterios y/o restricciones contenidos en el PLSA del aeropuerto, autorizado por la Autoridad Aeroportuaria.",{lineGap:3});
+  doc.moveDown(.7).font("Helvetica-Bold").text("EL COMPROMISO QUE CADA ALUMNO ACEPTA Y ASUME DE MANERA IMPLÍCITA E IRREVOCABLE ES:");
+  doc.font("Helvetica").text("1. No difundir de ninguna manera, ya sea oral, escrita o por cualquier medio electrónico, directo o indirectamente, el contenido total o parcial de este curso a cualquier persona, dependencia o empresa que no tenga necesidad directa y autorizada por escrito de la Jefatura de Seguridad del Aeropuerto de San Jose del Cabo S.A. de C.V.",{lineGap:3});
+  doc.moveDown(.35).text("2. No prestar, facilitar ni de ningún modo, directo o indirecto o por medio de terceros, fotocopiar, digitalizar, copiar, leer, difundir y/o obtener información de este curso para cualquier uso que no sea autorizado por la Jefatura de Seguridad del Aeropuerto de San Jose del Cabo S.A. de C.V.",{lineGap:3});
+  doc.moveDown(.5).text("Asimismo, estoy enterado de que el curso de seguridad de la aviación civil del Aeropuerto de San Jose del Cabo S.A. de C.V. contiene información restringida cuyo mal uso o inadecuada e ilegal difusión pudiera poner en peligro la seguridad de las operaciones del aeropuerto, con las consecuencias legales que esto constituye.",{lineGap:3});
+  doc.moveDown(.4).text("Es propiedad material e intelectual del Aeropuerto de San Jose del Cabo S.A. de C.V., motivo por el cual se reserva todos los derechos de autor; cualquier violación a estos derechos será sancionada conforme a las leyes correspondientes.",{lineGap:3});
+  doc.moveDown(.8).font("Helvetica-Bold").text(`Nombre: ${record.name}`); doc.font("Helvetica").text(`Folio: ${record.folio}    Fecha: ${new Date(record.aceptado_en).toLocaleDateString("es-MX")}`);
+  doc.moveDown(.45).font("Helvetica-Bold").text("Firma digital de aceptación:");
+  if (record.firma_data) doc.image(record.firma_data,{fit:[230,85],align:"left"});
+  doc.moveDown(.3).fontSize(8).fillColor("#64748b").text("Documento generado electrónicamente por el Sistema TIA.");
+  doc.end();
+}
+
+app.get("/admin-personas/:id/carta-compromiso", auth, async (req,res) => {
+  try {
+    if (!req.isAdmin) return res.status(403).json({error:"No autorizado"});
+    const [rows]=await db.query(`SELECT u.name,u.folio,c.firma_data,c.aceptado_en FROM users u JOIN cartas_compromiso c ON c.user_id=u.id WHERE u.id=(SELECT user_id FROM personas_curso WHERE id=? LIMIT 1) LIMIT 1`,[Number(req.params.id)]);
+    if (!rows.length) return res.status(404).json({error:"Carta de aceptación no disponible"});
+    await generateCommitmentPdf(res,rows[0]);
+  } catch(err) { console.error("ADMIN COMMITMENT PDF ERROR:",err); if(!res.headersSent)return res.status(500).json({error:"No fue posible generar la carta"}); res.end(); }
+});
+
 app.get("/me", auth, async (req, res) => {
   if (req.isAdmin) return res.status(403).json({ error: "Acceso no disponible" });
   const [rows] = await db.query(
@@ -1826,6 +1891,15 @@ async function ensureOperationalTables(){
     solicitado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_fotografias_toma_fisica_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await db.query(`CREATE TABLE IF NOT EXISTS cartas_compromiso (
+    user_id BIGINT UNSIGNED NOT NULL,
+    firma_data LONGBLOB NOT NULL,
+    firma_mime VARCHAR(50) NOT NULL DEFAULT 'image/png',
+    aceptado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    version_documento VARCHAR(80) NOT NULL,
+    PRIMARY KEY (user_id),
+    CONSTRAINT fk_cartas_compromiso_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 }
 async function prepareProductionAdmin(){
