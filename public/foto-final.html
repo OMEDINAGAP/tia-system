@@ -46,8 +46,10 @@
       const response=await fetch('/estado-finalizacion',{headers:{Authorization:'Bearer '+token}});
       const data=await response.json().catch(()=>({}));
       if(!response.ok||!data.tomaFisica)return;
-      document.querySelector('main').innerHTML='<section class="card"><h2>Fotografía en módulo TIA</h2><p>Tu fotografía deberá tomarse de forma física en el módulo TIA.</p><p>Acude al módulo para continuar con la conclusión de tu trámite.</p></section>';
+      document.querySelector('main').style.display='none';
       await Swal.fire({icon:'info',title:'Debes presentarte al módulo TIA',text:'Después de tres fotografías rechazadas, la toma deberá realizarse físicamente en el módulo TIA.',confirmButtonText:'Entendido'});
+      sessionStorage.clear();
+      location.replace('/');
     })();
   </script>
 </body>
