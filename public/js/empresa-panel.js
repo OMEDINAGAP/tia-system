@@ -49,8 +49,8 @@ function certificateMarkup(person) {
 }
 
 function actionMarkup(person) {
-  if (person.suspendido_en) return '<small class="suspended">Suspendido</small>';
   const name = [person.nombres, person.apellido_paterno, person.apellido_materno].filter(Boolean).join(' ');
+  if (person.suspendido_en) return `<button class="secondary download" onclick="reactivateAccess(${Number(person.id)}, ${esc(JSON.stringify(name))})">Reactivar acceso</button>`;
   return `<button class="danger" onclick="suspendAccess(${Number(person.id)}, ${esc(JSON.stringify(name))})">Suspender acceso</button>`;
 }
 
@@ -105,6 +105,26 @@ async function suspendAccess(id, name) {
       ? 'El perfil quedó inhabilitado y se notificó a la empresa. La baja formal debe concluirse en el módulo TIA en sitio.'
       : `El perfil quedó inhabilitado. La baja formal debe concluirse en el módulo TIA en sitio.<br><small>${esc(data.warning || '')}</small>`
   });
+  loadPeople();
+}
+
+async function reactivateAccess(id, name) {
+  const confirmation = await Swal.fire({
+    icon: 'question',
+    title: '¿Reactivar acceso al sistema?',
+    html: `<p>Se restablecerá el acceso de <strong>${esc(name)}</strong> al sistema TIA.</p><p>Su avance, examen y documentos permanecerán sin cambios.</p>`,
+    showCancelButton: true,
+    confirmButtonText: 'Sí, reactivar acceso',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#16a34a'
+  });
+  if (!confirmation.isConfirmed) return;
+  const response = await fetch(`/empresa-personas/${id}/reactivar`, {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) return Swal.fire('No fue posible reactivar', data.message || 'Intenta nuevamente', 'error');
+  await Swal.fire('Acceso reactivado', data.message || 'El colaborador ya puede volver a ingresar.', 'success');
   loadPeople();
 }
 

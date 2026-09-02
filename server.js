@@ -1287,6 +1287,46 @@ app.post("/empresa-personas/:id/suspender", async (req, res) => {
   }
 });
 
+app.post("/empresa-personas/:id/reactivar", async (req, res) => {
+  let connection;
+  try {
+    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const personId = Number(req.params.id);
+    if (!token || !Number.isInteger(personId) || personId < 1) {
+      return res.status(400).json({ ok:false, message:"Solicitud inválida" });
+    }
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    const session = await getEmpresaManagementSession(connection, token, true);
+    if (!session) {
+      await connection.rollback();
+      return res.status(401).json({ ok:false, message:"Sesión expirada" });
+    }
+    const [people] = await connection.query(
+      "SELECT id FROM personas_curso WHERE id=? AND empresa_id=? FOR UPDATE", [personId, session.empresa_id]
+    );
+    if (!people.length) {
+      await connection.rollback();
+      return res.status(404).json({ ok:false, message:"Colaborador no encontrado" });
+    }
+    const [result] = await connection.query(
+      "DELETE FROM suspensiones_colaborador WHERE persona_id=? AND empresa_id=?", [personId, session.empresa_id]
+    );
+    if (!result.affectedRows) {
+      await connection.rollback();
+      return res.status(409).json({ ok:false, message:"El acceso de este colaborador no está suspendido" });
+    }
+    await connection.commit();
+    return res.json({ ok:true, message:"El acceso fue reactivado. El avance y los documentos del colaborador se conservaron." });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error("COLLABORATOR REACTIVATION ERROR:", err);
+    return res.status(500).json({ ok:false, message:"No fue posible reactivar el acceso" });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 async function generateCertificatePdf(req,res,person,disposition="attachment") {
   const name=[person.nombres,person.apellido_paterno,person.apellido_materno].filter(Boolean).join(" ");
   const filename=String(person.folio).replace(/[^a-z0-9_-]/gi,"_");
