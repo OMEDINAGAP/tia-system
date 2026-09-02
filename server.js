@@ -869,6 +869,21 @@ function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString("hex");
 }
 
+async function getEmpresaManagementSession(connection, token, forUpdate = false) {
+  const [sessions] = await connection.query(
+    `SELECT se.empresa_id, se.cuenta_empresa_id, e.nombre AS empresa, e.correo_1,
+            ce.nombre AS administrador, ce.usuario
+     FROM sesiones_empresa se
+     JOIN empresas e ON e.id=se.empresa_id
+     JOIN cuentas_empresa ce ON ce.id=se.cuenta_empresa_id AND ce.empresa_id=se.empresa_id
+     WHERE se.token=? AND se.proposito='GESTIONAR_PERSONAS'
+       AND se.usado_en IS NULL AND se.expira_en>NOW() AND ce.activo=1
+     LIMIT 1${forUpdate ? ' FOR UPDATE' : ''}`,
+    [token]
+  );
+  return sessions[0] || null;
+}
+
 app.post("/configurar-cuenta", async (req, res) => {
   let connection;
   try {
@@ -897,7 +912,7 @@ app.post("/configurar-cuenta", async (req, res) => {
 
     const empresaId = sessions[0].empresa_id;
     const salt = crypto.randomBytes(16).toString("hex");
-    await connection.query(
+    const [accountResult] = await connection.query(
       `INSERT INTO cuentas_empresa (empresa_id, usuario, password_hash, password_salt)
        VALUES (?, ?, ?, ?)`,
       [empresaId, usuario, hashPassword(password, salt), salt]
@@ -909,9 +924,9 @@ app.post("/configurar-cuenta", async (req, res) => {
     );
     const personaToken = crypto.randomBytes(32).toString("hex");
     await connection.query(
-      `INSERT INTO sesiones_empresa (token, empresa_id, proposito, expira_en)
-       VALUES (?, ?, 'GESTIONAR_PERSONAS', DATE_ADD(NOW(), INTERVAL 8 HOUR))`,
-      [personaToken, empresaId]
+      `INSERT INTO sesiones_empresa (token, empresa_id, cuenta_empresa_id, proposito, expira_en)
+       VALUES (?, ?, ?, 'GESTIONAR_PERSONAS', DATE_ADD(NOW(), INTERVAL 8 HOUR))`,
+      [personaToken, empresaId, accountResult.insertId]
     );
     await connection.commit();
     return res.json({ ok: true, gestionToken: personaToken });
@@ -931,7 +946,7 @@ app.post("/login-empresa", accessLoginLimiter, async (req, res) => {
     const usuario = String(req.body.usuario || "").trim().toLowerCase();
     const password = String(req.body.password || "");
     const [rows] = await db.query(
-      `SELECT e.id AS empresa_id, ce.password_hash, ce.password_salt, ce.activo
+      `SELECT e.id AS empresa_id, ce.id AS cuenta_empresa_id, ce.password_hash, ce.password_salt, ce.activo
        FROM folios_acceso fa JOIN empresas e ON e.folio_acceso_id=fa.id
        JOIN cuentas_empresa ce ON ce.empresa_id=e.id
        WHERE UPPER(fa.folio)=? AND ce.usuario=? AND fa.estatus='USADO' LIMIT 1`,
@@ -946,14 +961,112 @@ app.post("/login-empresa", accessLoginLimiter, async (req, res) => {
     }
     const token = crypto.randomBytes(32).toString("hex");
     await db.query(
-      `INSERT INTO sesiones_empresa (token, empresa_id, proposito, expira_en)
-       VALUES (?, ?, 'GESTIONAR_PERSONAS', DATE_ADD(NOW(), INTERVAL 8 HOUR))`,
-      [token, account.empresa_id]
+      `INSERT INTO sesiones_empresa (token, empresa_id, cuenta_empresa_id, proposito, expira_en)
+       VALUES (?, ?, ?, 'GESTIONAR_PERSONAS', DATE_ADD(NOW(), INTERVAL 8 HOUR))`,
+      [token, account.empresa_id, account.cuenta_empresa_id]
     );
     return res.json({ ok: true, token });
   } catch (err) {
     console.error("ERROR login-empresa:", err);
     return res.status(500).json({ ok: false, message: "No fue posible iniciar sesion" });
+  }
+});
+
+app.get("/empresa-cuentas", async (req, res) => {
+  try {
+    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const session = await getEmpresaManagementSession(db, token);
+    if (!session) return res.status(401).json({ ok:false, message:"Sesion expirada" });
+    const [accounts] = await db.query(
+      `SELECT id,nombre,usuario,activo,creado_en,actualizado_en
+       FROM cuentas_empresa WHERE empresa_id=? ORDER BY activo DESC, creado_en ASC`,
+      [session.empresa_id]
+    );
+    return res.json({ ok:true, cuentas:accounts, cuentaActualId:session.cuenta_empresa_id });
+  } catch (err) {
+    console.error("ERROR empresa-cuentas:", err);
+    return res.status(500).json({ ok:false, message:"No fue posible consultar las cuentas" });
+  }
+});
+
+app.post("/empresa-cuentas", async (req, res) => {
+  let connection;
+  try {
+    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const nombre = String(req.body.nombre || "").trim();
+    const usuario = String(req.body.usuario || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
+    if (!nombre || nombre.length > 120) return res.status(400).json({ ok:false, message:"Indica el nombre del administrador" });
+    if (!/^[a-z0-9._-]{4,80}$/.test(usuario)) return res.status(400).json({ ok:false, message:"El usuario debe tener al menos 4 caracteres y usar letras, numeros, punto, guion o guion bajo" });
+    if (password.length < 8) return res.status(400).json({ ok:false, message:"La contrasena debe tener al menos 8 caracteres" });
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    const session = await getEmpresaManagementSession(connection, token, true);
+    if (!session) {
+      await connection.rollback();
+      return res.status(401).json({ ok:false, message:"Sesion expirada" });
+    }
+    const salt = crypto.randomBytes(16).toString("hex");
+    const [result] = await connection.query(
+      `INSERT INTO cuentas_empresa (empresa_id,nombre,usuario,password_hash,password_salt)
+       VALUES (?,?,?,?,?)`,
+      [session.empresa_id, nombre, usuario, hashPassword(password, salt), salt]
+    );
+    await connection.commit();
+    return res.status(201).json({ ok:true, cuenta:{ id:result.insertId, nombre, usuario, activo:1 } });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    if (err.code === "ER_DUP_ENTRY") return res.status(409).json({ ok:false, message:"El nombre de usuario ya existe" });
+    console.error("ERROR crear-cuenta-empresa:", err);
+    return res.status(500).json({ ok:false, message:"No fue posible crear la cuenta" });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+app.patch("/empresa-cuentas/:id/estado", async (req, res) => {
+  let connection;
+  try {
+    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const accountId = Number(req.params.id);
+    const activo = req.body.activo === true || req.body.activo === 1 || req.body.activo === "1";
+    if (!Number.isInteger(accountId) || accountId < 1) return res.status(400).json({ ok:false, message:"Cuenta invalida" });
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    const session = await getEmpresaManagementSession(connection, token, true);
+    if (!session) {
+      await connection.rollback();
+      return res.status(401).json({ ok:false, message:"Sesion expirada" });
+    }
+    if (!activo && accountId === Number(session.cuenta_empresa_id)) {
+      await connection.rollback();
+      return res.status(409).json({ ok:false, message:"No puedes suspender tu propia cuenta" });
+    }
+    const [accounts] = await connection.query(
+      "SELECT id,nombre,usuario,activo FROM cuentas_empresa WHERE id=? AND empresa_id=? FOR UPDATE",
+      [accountId, session.empresa_id]
+    );
+    const account = accounts[0];
+    if (!account) {
+      await connection.rollback();
+      return res.status(404).json({ ok:false, message:"Cuenta no encontrada" });
+    }
+    if (Number(account.activo) === Number(activo)) {
+      await connection.rollback();
+      return res.json({ ok:true, cuenta:account, unchanged:true });
+    }
+    await connection.query("UPDATE cuentas_empresa SET activo=? WHERE id=?", [activo ? 1 : 0, accountId]);
+    if (!activo) await connection.query("DELETE FROM sesiones_empresa WHERE cuenta_empresa_id=?", [accountId]);
+    await connection.commit();
+    return res.json({ ok:true, cuenta:{ ...account, activo:activo ? 1 : 0 } });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error("ERROR estado-cuenta-empresa:", err);
+    return res.status(500).json({ ok:false, message:"No fue posible actualizar la cuenta" });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
@@ -969,13 +1082,8 @@ app.post("/registro-persona", async (req, res) => {
 
     connection = await db.getConnection();
     await connection.beginTransaction();
-    const [sessions] = await connection.query(
-      `SELECT se.empresa_id, e.nombre AS empresa
-       FROM sesiones_empresa se JOIN empresas e ON e.id=se.empresa_id
-       WHERE se.token=? AND se.proposito='GESTIONAR_PERSONAS' AND se.usado_en IS NULL AND se.expira_en>NOW()
-       FOR UPDATE`, [token]
-    );
-    if (!sessions.length) {
+    const session = await getEmpresaManagementSession(connection, token, true);
+    if (!session) {
       await connection.rollback();
       return res.status(401).json({ ok: false, message: "La sesion expiro" });
     }
@@ -984,13 +1092,13 @@ app.post("/registro-persona", async (req, res) => {
     const [userResult] = await connection.query(
       `INSERT INTO users (name, company, puesto, telefono, correo, folio, loginTime)
        VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [fullName, sessions[0].empresa, data.puesto, data.telefono, data.correo, personFolio]
+      [fullName, session.empresa, data.puesto, data.telefono, data.correo, personFolio]
     );
     const [result] = await connection.query(
       `INSERT INTO personas_curso
        (empresa_id,folio,user_id,nombres,apellido_paterno,apellido_materno,puesto,telefono,correo)
        VALUES (?,?,?,?,?,?,?,?,?)`,
-      [sessions[0].empresa_id, personFolio, userResult.insertId, data.nombres,
+      [session.empresa_id, personFolio, userResult.insertId, data.nombres,
         data.apellidoPaterno, data.apellidoMaterno || null, data.puesto, data.telefono, data.correo]
     );
     await connection.commit();
@@ -1007,14 +1115,8 @@ app.post("/registro-persona", async (req, res) => {
 app.get("/empresa-personas", async (req, res) => {
   try {
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
-    const [sessions] = await db.query(
-      `SELECT se.empresa_id, e.nombre AS empresa
-       FROM sesiones_empresa se JOIN empresas e ON e.id=se.empresa_id
-       WHERE se.token=? AND se.proposito='GESTIONAR_PERSONAS'
-         AND se.usado_en IS NULL AND se.expira_en>NOW() LIMIT 1`,
-      [token]
-    );
-    if (!sessions.length) return res.status(401).json({ ok: false, message: "Sesion expirada" });
+    const session = await getEmpresaManagementSession(db, token);
+    if (!session) return res.status(401).json({ ok: false, message: "Sesion expirada" });
     const [people] = await db.query(
       `SELECT pc.id, pc.folio, pc.nombres, pc.apellido_paterno, pc.apellido_materno,
               pc.puesto, pc.telefono, pc.correo, pc.estatus, pc.creado_en,
@@ -1027,9 +1129,9 @@ app.get("/empresa-personas", async (req, res) => {
        LEFT JOIN video_progress vp ON vp.userId=u.id
        WHERE pc.empresa_id=?
        GROUP BY pc.id,u.id ORDER BY pc.creado_en DESC`,
-      [sessions[0].empresa_id]
+      [session.empresa_id]
     );
-    return res.json({ ok: true, empresa: sessions[0].empresa, personas: people });
+    return res.json({ ok: true, empresa: session.empresa, personas: people });
   } catch (err) {
     console.error("ERROR empresa-personas:", err);
     return res.status(500).json({ ok: false, message: "No fue posible consultar las personas" });
@@ -1047,17 +1149,12 @@ app.post("/empresa-personas/:id/suspender", async (req, res) => {
 
     connection = await db.getConnection();
     await connection.beginTransaction();
-    const [sessions] = await connection.query(
-      `SELECT se.empresa_id,e.nombre AS empresa,e.correo_1
-       FROM sesiones_empresa se JOIN empresas e ON e.id=se.empresa_id
-       WHERE se.token=? AND se.proposito='GESTIONAR_PERSONAS'
-         AND se.usado_en IS NULL AND se.expira_en>NOW() FOR UPDATE`, [token]
-    );
-    if (!sessions.length) {
+    const session = await getEmpresaManagementSession(connection, token, true);
+    if (!session) {
       await connection.rollback();
       return res.status(401).json({ ok:false, message:"Sesión expirada" });
     }
-    const empresa = sessions[0];
+    const empresa = session;
     const [people] = await connection.query(
       `SELECT pc.id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,u.id AS user_id
        FROM personas_curso pc JOIN users u ON u.id=pc.user_id
@@ -1152,6 +1249,7 @@ app.get("/empresa-personas/:id/constancia", async (req, res) => {
       `SELECT pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,
               e.nombre AS empresa,u.exam,u.fecha,u.aprobado,u.photo,u.foto_estatus
        FROM sesiones_empresa se JOIN empresas e ON e.id=se.empresa_id
+       JOIN cuentas_empresa ce ON ce.id=se.cuenta_empresa_id AND ce.empresa_id=se.empresa_id AND ce.activo=1
        JOIN personas_curso pc ON pc.empresa_id=e.id JOIN users u ON u.id=pc.user_id
        WHERE se.token=? AND se.proposito='GESTIONAR_PERSONAS'
          AND se.usado_en IS NULL AND se.expira_en>NOW() AND pc.id=? LIMIT 1`,

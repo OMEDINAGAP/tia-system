@@ -142,3 +142,69 @@ document.getElementById('personForm').addEventListener('submit', async event => 
 });
 
 loadPeople();
+
+function openAccountsModal() {
+  document.getElementById('accountsModal').classList.add('open');
+  loadAccounts();
+}
+
+function closeAccountsModal() {
+  document.getElementById('accountsModal').classList.remove('open');
+  document.getElementById('accountForm').reset();
+}
+
+async function accountRequest(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    sessionStorage.clear();
+    await Swal.fire('Sesion expirada', data.message || 'Ingresa nuevamente', 'warning');
+    location.replace('/');
+    throw new Error('Sesion expirada');
+  }
+  return { response, data };
+}
+
+async function loadAccounts() {
+  try {
+    const { response, data } = await accountRequest('/empresa-cuentas');
+    if (!response.ok || !data.ok) throw new Error(data.message || 'No fue posible cargar las cuentas');
+    document.getElementById('accountRows').innerHTML = data.cuentas.map(account => {
+      const current = Number(account.id) === Number(data.cuentaActualId);
+      const active = Number(account.activo) === 1;
+      const state = active ? '<span class="complete">Activo</span>' : '<span class="suspended">Suspendido</span>';
+      const action = current ? '<small>Tu cuenta actual</small>' : `<button class="${active ? 'danger' : 'secondary'} download" onclick="changeAccountStatus(${Number(account.id)}, ${!active}, ${esc(JSON.stringify(account.nombre || account.usuario))})">${active ? 'Suspender' : 'Reactivar'}</button>`;
+      return `<tr><td>${esc(account.nombre || account.usuario)}</td><td class="folio">${esc(account.usuario)}</td><td>${state}</td><td>${action}</td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="empty">No hay cuentas registradas.</td></tr>';
+  } catch (error) {
+    if (error.message !== 'Sesion expirada') Swal.fire('Error', error.message, 'error');
+  }
+}
+
+async function changeAccountStatus(id, activate, name) {
+  const action = activate ? 'reactivar' : 'suspender';
+  const confirmation = await Swal.fire({
+    icon: activate ? 'question' : 'warning',
+    title: `¿${action[0].toUpperCase() + action.slice(1)} acceso?`,
+    html: activate ? `<p>Se reactivara el acceso de <strong>${esc(name)}</strong>.</p>` : `<p>Se suspendera unicamente el acceso de <strong>${esc(name)}</strong>.</p><p>Los colaboradores y las demas cuentas autorizadas seguiran disponibles.</p>`,
+    showCancelButton: true, confirmButtonText: `Si, ${action}`, cancelButtonText: 'Cancelar', confirmButtonColor: activate ? '#16a34a' : '#b91c1c'
+  });
+  if (!confirmation.isConfirmed) return;
+  const { response, data } = await accountRequest(`/empresa-cuentas/${id}/estado`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo: activate }) });
+  if (!response.ok || !data.ok) return Swal.fire('No fue posible actualizar', data.message || 'Intenta nuevamente', 'error');
+  await Swal.fire('Listo', activate ? 'La cuenta fue reactivada.' : 'La cuenta fue suspendida y sus sesiones quedaron cerradas.', 'success');
+  loadAccounts();
+}
+
+document.getElementById('accountForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(event.currentTarget));
+  const { response, data } = await accountRequest('/empresa-cuentas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!response.ok || !data.ok) return Swal.fire('Error', data.message || 'No fue posible crear la cuenta', 'error');
+  event.currentTarget.reset();
+  await Swal.fire('Cuenta creada', 'El administrador autorizado ya puede iniciar sesion con el folio de la empresa.', 'success');
+  loadAccounts();
+});
