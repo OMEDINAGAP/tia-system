@@ -465,6 +465,53 @@ app.post("/admin-tokens",auth,async(req,res)=>{
   }finally{if(connection)connection.release()}
 });
 
+app.get("/admin-tokens/:id/detalle",auth,async(req,res)=>{
+  try{
+    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede consultar cuentas empresariales"});
+    const tokenId=Number(req.params.id);
+    if(!Number.isInteger(tokenId)||tokenId<1)return res.status(400).json({ok:false,error:"Token invalido"});
+    const [tokens]=await db.query(
+      `SELECT fa.id,fa.folio,fa.fecha_emision,fa.caducidad,fa.estatus,fa.empresa,
+              e.id AS empresa_id,e.nombre,e.razon_social,e.representante_legal,e.correo_1,e.telefono_1
+       FROM folios_acceso fa LEFT JOIN empresas e ON e.folio_acceso_id=fa.id
+       WHERE fa.id=? LIMIT 1`,[tokenId]
+    );
+    const detail=tokens[0];
+    if(!detail)return res.status(404).json({ok:false,error:"Token no encontrado"});
+    const [accounts]=detail.empresa_id?await db.query(
+      `SELECT id,nombre,usuario,activo,creado_en,actualizado_en
+       FROM cuentas_empresa WHERE empresa_id=? ORDER BY activo DESC,creado_en ASC`,[detail.empresa_id]
+    ):[[]];
+    return res.json({ok:true,token:detail,cuentas:accounts});
+  }catch(err){console.error("ADMIN TOKEN DETAIL ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible consultar el token"});}
+});
+
+app.post("/admin-tokens/:tokenId/cuentas/:accountId/restablecer-password",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede restablecer contrasenas"});
+    const tokenId=Number(req.params.tokenId),accountId=Number(req.params.accountId),password=String(req.body.password||"");
+    if(!Number.isInteger(tokenId)||!Number.isInteger(accountId)||tokenId<1||accountId<1)return res.status(400).json({ok:false,error:"Solicitud invalida"});
+    if(password.length<8)return res.status(400).json({ok:false,error:"La contrasena debe tener al menos 8 caracteres"});
+    connection=await db.getConnection();
+    await connection.beginTransaction();
+    const [accounts]=await connection.query(
+      `SELECT ce.id,ce.usuario FROM folios_acceso fa
+       JOIN empresas e ON e.folio_acceso_id=fa.id
+       JOIN cuentas_empresa ce ON ce.empresa_id=e.id
+       WHERE fa.id=? AND ce.id=? FOR UPDATE`,[tokenId,accountId]
+    );
+    const account=accounts[0];
+    if(!account){await connection.rollback();return res.status(404).json({ok:false,error:"La cuenta no pertenece a este token empresarial"});}
+    const salt=crypto.randomBytes(16).toString("hex");
+    await connection.query("UPDATE cuentas_empresa SET password_hash=?,password_salt=? WHERE id=?",[hashPassword(password,salt),salt,account.id]);
+    await connection.query("DELETE FROM sesiones_empresa WHERE cuenta_empresa_id=?",[account.id]);
+    await connection.commit();
+    return res.json({ok:true,usuario:account.usuario});
+  }catch(err){if(connection)await connection.rollback();console.error("ADMIN TOKEN PASSWORD RESET ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible restablecer la contrasena"});}
+  finally{if(connection)connection.release();}
+});
+
 app.patch("/admin-tokens/:id/status",auth,async(req,res)=>{
   try{
     if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede modificar tokens"});
