@@ -1850,12 +1850,55 @@ async function generateCommitmentPdf(res, record) {
   doc.end();
 }
 
+async function generateProfessionalCommitmentPdf(res, record) {
+  const filename=`carta-compromiso-${String(record.folio).replace(/[^a-z0-9_-]/gi,"_")}.pdf`;
+  res.setHeader("Content-Type","application/pdf");
+  res.setHeader("Content-Disposition",`attachment; filename="${filename}"`);
+  const doc=new PDFDocument({size:"LETTER",margin:0});
+  doc.pipe(res);
+  const width=612, height=792, left=52, contentWidth=508;
+  const navy="#082f49", ink="#24364a", gold="#c6923b", pale="#edf3f8";
+  doc.rect(0,0,width,height).fill("#f8fafc");
+  doc.rect(18,18,width-36,height-36).lineWidth(1).stroke("#cbd5e1");
+  doc.rect(18,18,width-36,82).fill(navy);
+  const logo=path.join(__dirname,"public","assets","logo-gap.png");
+  if(fs.existsSync(logo)) doc.image(logo,42,34,{fit:[54,45]});
+  doc.font("Helvetica-Bold").fillColor("#ffffff").fontSize(8).text("SISTEMA TIA  |  SEGURIDAD AEROPORTUARIA",116,37,{characterSpacing:1.1});
+  doc.font("Helvetica-Bold").fontSize(17).text("CARTA COMPROMISO",116,51);
+  doc.font("Helvetica").fontSize(10).text("DE CONFIDENCIALIDAD",116,71,{characterSpacing:1.6});
+  doc.rect(18,100,width-36,4).fill(gold);
+  let y=121;
+  const section=(title)=>{doc.roundedRect(left,y,contentWidth,20,3).fill(pale);doc.rect(left,y,4,20).fill(gold);doc.font("Helvetica-Bold").fontSize(8.5).fillColor(navy).text(title,left+12,y+6,{characterSpacing:.35});y+=29;};
+  const paragraph=(text,size=8.45,gap=5)=>{doc.font("Helvetica").fontSize(size).fillColor(ink).text(text,left,y,{width:contentWidth,lineGap:2.2,align:"justify"});y=doc.y+gap;};
+  section("ADVERTENCIA");
+  paragraph("La información contenida en el curso de Seguridad de la Aviación Civil y en el Programa Local de Seguridad Aeroportuaria es propiedad de San Jose del Cabo S.A. de C.V.");
+  paragraph("La información proporcionada en este curso es únicamente para fines de capacitación y no modifica ni sustituye las políticas, criterios y/o restricciones contenidos en el PLSA del aeropuerto, autorizado por la Autoridad Aeroportuaria.",8.45,9);
+  section("COMPROMISOS DE CONFIDENCIALIDAD");
+  paragraph("1. No difundir de ninguna manera, ya sea oral, escrita o por cualquier medio electrónico, directo o indirectamente, el contenido total o parcial de este curso a cualquier persona, dependencia o empresa que no tenga necesidad directa y autorizada por escrito de la Jefatura de Seguridad del Aeropuerto de San Jose del Cabo S.A. de C.V.",8.15,5);
+  paragraph("2. No prestar, facilitar ni de ningún modo, directo o indirecto o por medio de terceros, fotocopiar, digitalizar, copiar, leer, difundir y/o obtener información de este curso para cualquier uso que no sea autorizado por la Jefatura de Seguridad del Aeropuerto de San Jose del Cabo S.A. de C.V.",8.15,8);
+  paragraph("Asimismo, estoy enterado de que el curso de seguridad de la aviación civil del Aeropuerto de San Jose del Cabo S.A. de C.V. contiene información restringida cuyo mal uso o inadecuada e ilegal difusión pudiera poner en peligro la seguridad de las operaciones del aeropuerto, con las consecuencias legales que esto constituye.",8.15,5);
+  paragraph("Es propiedad material e intelectual del Aeropuerto de San Jose del Cabo S.A. de C.V., motivo por el cual se reserva todos los derechos de autor; cualquier violación a estos derechos será sancionada conforme a las leyes correspondientes.",8.15,10);
+  doc.roundedRect(left,y,contentWidth,48,4).fillAndStroke("#eef4f8","#cbd5e1");
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#64748b").text("COLABORADOR",left+12,y+9);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(navy).text(record.name,left+12,y+21,{width:250});
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#64748b").text("FOLIO / FECHA DE ACEPTACIÓN",left+285,y+9);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(navy).text(`${record.folio}  ·  ${new Date(record.aceptado_en).toLocaleDateString("es-MX")}`,left+285,y+22,{width:208});
+  y+=62;
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(navy).text("FIRMA DIGITAL DE ACEPTACIÓN",left,y);
+  doc.roundedRect(left,y+13,235,66,4).lineWidth(1).stroke("#94a3b8");
+  if(record.firma_data) doc.image(record.firma_data,left+12,y+18,{fit:[210,53],align:"left",valign:"center"});
+  doc.moveTo(left,y+82).lineTo(left+235,y+82).lineWidth(.8).stroke("#64748b");
+  doc.font("Helvetica").fontSize(7.5).fillColor("#64748b").text("Firma del colaborador",left,y+86,{width:235,align:"center"});
+  doc.font("Helvetica").fontSize(7.2).fillColor("#64748b").text(`Control documental: ${record.folio}`,left+280,y+36,{width:220,align:"right"});
+  doc.end();
+}
+
 app.get("/admin-personas/:id/carta-compromiso", auth, async (req,res) => {
   try {
     if (!req.isAdmin) return res.status(403).json({error:"No autorizado"});
     const [rows]=await db.query(`SELECT u.name,u.folio,c.firma_data,c.aceptado_en FROM users u JOIN cartas_compromiso c ON c.user_id=u.id WHERE u.id=(SELECT user_id FROM personas_curso WHERE id=? LIMIT 1) LIMIT 1`,[Number(req.params.id)]);
     if (!rows.length) return res.status(404).json({error:"Carta de aceptación no disponible"});
-    await generateCommitmentPdf(res,rows[0]);
+    await generateProfessionalCommitmentPdf(res,rows[0]);
   } catch(err) { console.error("ADMIN COMMITMENT PDF ERROR:",err); if(!res.headersSent)return res.status(500).json({error:"No fue posible generar la carta"}); res.end(); }
 });
 
