@@ -1847,7 +1847,6 @@ async function generateCommitmentPdf(res, record) {
   doc.moveDown(.8).font("Helvetica-Bold").text(`Nombre: ${record.name}`); doc.font("Helvetica").text(`Folio: ${record.folio}    Fecha: ${new Date(record.aceptado_en).toLocaleDateString("es-MX")}`);
   doc.moveDown(.45).font("Helvetica-Bold").text("Firma digital de aceptación:");
   if (record.firma_data) doc.image(record.firma_data,{fit:[230,85],align:"left"});
-  doc.moveDown(.3).fontSize(8).fillColor("#64748b").text("Documento generado electrónicamente por el Sistema TIA.");
   doc.end();
 }
 
