@@ -87,3 +87,45 @@ async function suspendCompanyAccess(){
   render();
   Swal.fire('Folios suspendidos','La empresa no fue eliminada. Su acceso y el de sus colaboradores quedaron suspendidos; la información permanece disponible para consulta.','success');
 }
+
+const renderWithCourseDate=render;
+render=function(){
+  renderWithCourseDate();
+  if(activeView!=="people")return;
+  const table=document.getElementById('peopleRows');
+  const header=table?.closest('table')?.querySelector('thead tr');
+  if(!table||!header)return;
+  if(header.children.length===9){
+    const cell=document.createElement('th');
+    cell.textContent='Fecha de curso';
+    header.insertBefore(cell,header.children[6]);
+  }
+  [...table.rows].forEach((row,index)=>{
+    if(row.children.length!==9)return;
+    const cell=document.createElement('td');
+    const person=visible[index];
+    cell.textContent=person?.fecha_aprobacion?date(person.fecha_aprobacion):'--';
+    row.insertBefore(cell,row.children[6]);
+  });
+};
+
+const exportWithCourseDate=exportExcel;
+exportExcel=function(){
+  if(activeView!=="people")return exportWithCourseDate();
+  const rows=visible.map(person=>({
+    Folio:person.folio,
+    Nombre:[person.nombres,person.apellido_paterno,person.apellido_materno].filter(Boolean).join(' '),
+    Empresa:person.empresa,
+    Puesto:person.puesto,
+    Correo:person.correo,
+    Avance:person.progreso,
+    Calificacion:person.calificacion,
+    'Fecha de curso':person.fecha_aprobacion?date(person.fecha_aprobacion):'',
+    Intentos:person.intentos,
+    Estado:person.suspendido_en?'SUSPENDIDO':person.aprobado?'APROBADO':person.estatus
+  }));
+  if(!rows.length)return Swal.fire('Sin datos','No hay colaboradores para exportar','info');
+  const headers=Object.keys(rows[0]),csv='\ufeff'+[headers.join(','),...rows.map(row=>headers.map(key=>'"'+String(row[key]??'').replace(/"/g,'""')+'"').join(','))].join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),anchor=document.createElement('a');
+  anchor.href=url;anchor.download=`TIA-colaboradores-${new Date().toISOString().slice(0,10)}.csv`;anchor.click();URL.revokeObjectURL(url);
+};
