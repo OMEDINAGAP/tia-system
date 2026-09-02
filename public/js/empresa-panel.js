@@ -30,6 +30,7 @@ function progressMarkup(progress) {
 }
 
 function statusMarkup(person) {
+  if (person.suspendido_en) return '<span class="suspended">Acceso suspendido</span>';
   if (!person.aprobado) return progressMarkup(person.progreso);
   if (person.foto_estatus === 'APROBADA') return '<span class="complete">Curso concluido</span>';
   if (person.foto_estatus === 'PENDIENTE') return '<span style="color:#fbbf24;font-weight:bold">Fotografía en revisión</span>';
@@ -38,12 +39,19 @@ function statusMarkup(person) {
 }
 
 function certificateMarkup(person) {
+  if (person.suspendido_en) return '<small>No disponible</small>';
   if (person.aprobado && person.foto_estatus === 'APROBADA') {
     return `<button class="download" onclick="downloadCertificate(${Number(person.id)},'${esc(person.folio)}')">Descargar PDF</button>`;
   }
   if (person.aprobado && person.foto_estatus === 'PENDIENTE') return '<small>Pendiente de validación</small>';
   if (person.aprobado && person.foto_estatus === 'RECHAZADA') return '<small>Debe tomar una nueva foto</small>';
   return '<small>No disponible</small>';
+}
+
+function actionMarkup(person) {
+  if (person.suspendido_en) return '<small class="suspended">Suspendido</small>';
+  const name = [person.nombres, person.apellido_paterno, person.apellido_materno].filter(Boolean).join(' ');
+  return `<button class="danger" onclick="suspendAccess(${Number(person.id)}, ${esc(JSON.stringify(name))})">Suspender acceso</button>`;
 }
 
 async function loadPeople() {
@@ -63,12 +71,41 @@ async function loadPeople() {
         <td>${esc(person.correo)}</td>
         <td>${statusMarkup(person)}</td>
         <td>${certificateMarkup(person)}</td>
+        <td>${actionMarkup(person)}</td>
       </tr>`).join('');
   } catch (error) {
     sessionStorage.clear();
     await Swal.fire('Sesión expirada', error.message || 'Ingresa nuevamente', 'warning');
     location.replace('/');
   }
+}
+
+async function suspendAccess(id, name) {
+  const confirmation = await Swal.fire({
+    icon: 'warning',
+    title: '¿Suspender acceso al sistema?',
+    html: `<p>Se inhabilitará de inmediato el acceso de <strong>${esc(name)}</strong> al sistema TIA.</p><p><strong>Esto no es una baja formal.</strong> Para concluirla, la empresa debe acudir al módulo TIA en sitio y entregar el documento de baja junto con la TIA.</p>`,
+    showCancelButton: true,
+    confirmButtonText: 'Sí, suspender acceso',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#b91c1c'
+  });
+  if (!confirmation.isConfirmed) return;
+
+  const response = await fetch(`/empresa-personas/${id}/suspender`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) return Swal.fire('No fue posible suspender', data.message || 'Intenta nuevamente', 'error');
+  await Swal.fire({
+    icon: data.emailSent ? 'success' : 'warning',
+    title: 'Acceso suspendido',
+    html: data.emailSent
+      ? 'El perfil quedó inhabilitado y se notificó a la empresa. La baja formal debe concluirse en el módulo TIA en sitio.'
+      : `El perfil quedó inhabilitado. La baja formal debe concluirse en el módulo TIA en sitio.<br><small>${esc(data.warning || '')}</small>`
+  });
+  loadPeople();
 }
 
 async function downloadCertificate(id, folio) {

@@ -184,9 +184,11 @@ async function auth(req, res, next) {
 
     // 🔍 BUSCAR SESIÓN
     const [rows] = await db.query(
-      `SELECT * FROM sessions
-       WHERE token=?
-       LIMIT 1`,
+      `SELECT s.*, sc.persona_id AS suspendida
+       FROM sessions s
+       LEFT JOIN personas_curso pc ON pc.user_id=s.userId
+       LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
+       WHERE s.token=? LIMIT 1`,
       [token]
     );
 
@@ -199,6 +201,11 @@ async function auth(req, res, next) {
     }
 
     const session = rows[0];
+
+    if (session.suspendida) {
+      await db.query("DELETE FROM sessions WHERE userId=?", [session.userId]);
+      return res.status(403).json({ error: "El acceso de este colaborador se encuentra suspendido. La baja formal debe concluirse en el módulo TIA." });
+    }
 
     console.log("AUTH SESSION:", session);
 
@@ -631,11 +638,15 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
 
     // El folio estable de la persona vive en personas_curso y nunca cambia.
     const [registeredPeople] = await db.query(
-      `SELECT u.id,u.name,pc.folio,u.aprobado,u.photo,u.foto_registrada_en,u.foto_estatus
+      `SELECT u.id,u.name,pc.folio,u.aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,sc.persona_id AS suspendida
        FROM personas_curso pc JOIN users u ON u.id=pc.user_id
+       LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
        WHERE UPPER(pc.folio)=? LIMIT 1`,
       [folio]
     );
+    if (registeredPeople.length && registeredPeople[0].suspendida) {
+      return res.status(403).json({ ok:false, suspended:true, message:"El acceso de este colaborador está suspendido. Esta acción no constituye una baja formal; la empresa debe concluirla en el módulo TIA." });
+    }
     if (registeredPeople.length && registeredPeople[0].aprobado && registeredPeople[0].photo && registeredPeople[0].foto_estatus==="APROBADA") {
       return res.status(403).json({
         ok: false,
@@ -648,7 +659,8 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
     const [people] = await db.query(
       `SELECT u.id,u.name,pc.folio,u.aprobado,u.photo,u.foto_estatus
        FROM personas_curso pc JOIN users u ON u.id=pc.user_id
-       WHERE UPPER(pc.folio)=? LIMIT 1`,
+       LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
+       WHERE UPPER(pc.folio)=? AND sc.persona_id IS NULL LIMIT 1`,
       [folio]
     );
     if (people.length) {
@@ -941,10 +953,11 @@ app.get("/empresa-personas", async (req, res) => {
       `SELECT pc.id, pc.folio, pc.nombres, pc.apellido_paterno, pc.apellido_materno,
               pc.puesto, pc.telefono, pc.correo, pc.estatus, pc.creado_en,
               COALESCE(u.aprobado,0) AS aprobado, u.photo, u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo, COALESCE(u.exam,0) AS calificacion,
-              u.fecha AS fecha_aprobacion,
+              u.fecha AS fecha_aprobacion, sc.suspendido_en,
               LEAST(100,COALESCE(SUM(vp.progress),0)/2) AS progreso
        FROM personas_curso pc
        LEFT JOIN users u ON u.id=pc.user_id
+       LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
        LEFT JOIN video_progress vp ON vp.userId=u.id
        WHERE pc.empresa_id=?
        GROUP BY pc.id,u.id ORDER BY pc.creado_en DESC`,
@@ -954,6 +967,83 @@ app.get("/empresa-personas", async (req, res) => {
   } catch (err) {
     console.error("ERROR empresa-personas:", err);
     return res.status(500).json({ ok: false, message: "No fue posible consultar las personas" });
+  }
+});
+
+app.post("/empresa-personas/:id/suspender", async (req, res) => {
+  let connection;
+  try {
+    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const personId = Number(req.params.id);
+    if (!token || !Number.isInteger(personId) || personId < 1) {
+      return res.status(400).json({ ok:false, message:"Solicitud inválida" });
+    }
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+    const [sessions] = await connection.query(
+      `SELECT se.empresa_id,e.nombre AS empresa,e.correo_1
+       FROM sesiones_empresa se JOIN empresas e ON e.id=se.empresa_id
+       WHERE se.token=? AND se.proposito='GESTIONAR_PERSONAS'
+         AND se.usado_en IS NULL AND se.expira_en>NOW() FOR UPDATE`, [token]
+    );
+    if (!sessions.length) {
+      await connection.rollback();
+      return res.status(401).json({ ok:false, message:"Sesión expirada" });
+    }
+    const empresa = sessions[0];
+    const [people] = await connection.query(
+      `SELECT pc.id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,u.id AS user_id
+       FROM personas_curso pc JOIN users u ON u.id=pc.user_id
+       WHERE pc.id=? AND pc.empresa_id=? FOR UPDATE`, [personId, empresa.empresa_id]
+    );
+    const person = people[0];
+    if (!person) {
+      await connection.rollback();
+      return res.status(404).json({ ok:false, message:"Colaborador no encontrado" });
+    }
+    const [existing] = await connection.query(
+      "SELECT persona_id FROM suspensiones_colaborador WHERE persona_id=? FOR UPDATE", [person.id]
+    );
+    if (existing.length) {
+      await connection.rollback();
+      return res.status(409).json({ ok:false, message:"El acceso de este colaborador ya está suspendido" });
+    }
+    await connection.query(
+      "INSERT INTO suspensiones_colaborador(persona_id,empresa_id) VALUES(?,?)", [person.id, empresa.empresa_id]
+    );
+    await connection.query("DELETE FROM sessions WHERE userId=?", [person.user_id]);
+    await connection.commit();
+
+    const nombre = [person.nombres, person.apellido_paterno, person.apellido_materno].filter(Boolean).join(" ");
+    const subject = `Suspensión de acceso TIA - ${nombre}`;
+    let emailSent = false, emailError = null;
+    try {
+      const transporter = createMailTransport();
+      if (!transporter) throw new Error("SMTP no configurado");
+      await transporter.sendMail({
+        from: process.env.MAIL_FROM || process.env.SMTP_USER,
+        to: empresa.correo_1,
+        subject,
+        html: `<p>Se suspendió el acceso al sistema TIA del colaborador <strong>${nombre}</strong> (folio <strong>${person.folio}</strong>).</p><p><strong>Esta suspensión únicamente inhabilita el perfil en el sistema y no constituye la baja formal del colaborador.</strong></p><p>Para continuar con la baja, deberán acudir al módulo TIA en sitio y entregar el documento de baja junto con la TIA correspondiente. La baja se considera concluida únicamente cuando el módulo TIA confirme el trámite.</p>`
+      });
+      emailSent = true;
+    } catch (mailErr) {
+      emailError = mailErr.message;
+      console.error("COLLABORATOR SUSPENSION EMAIL ERROR:", emailError);
+    }
+    await db.query(
+      `INSERT INTO notificaciones_correo(tipo,destinatario,asunto,persona_id,estatus,detalle)
+       VALUES('SUSPENSION_COLABORADOR',?,?,?,?,?)`,
+      [empresa.correo_1, subject, person.id, emailSent ? "ENVIADO" : "ERROR", emailSent ? "Notificación enviada" : emailError]
+    );
+    return res.json({ ok:true, emailSent, warning:emailSent ? null : "El acceso fue suspendido, pero no se pudo enviar el correo: " + emailError });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error("COLLABORATOR SUSPENSION ERROR:", err);
+    return res.status(500).json({ ok:false, message:"No fue posible suspender el acceso" });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
@@ -1482,6 +1572,17 @@ app.get("/me", auth, async (req, res) => {
 
 
 const PORT = process.env.PORT || 3000;
+async function ensureOperationalTables(){
+  await db.query(`CREATE TABLE IF NOT EXISTS suspensiones_colaborador (
+    persona_id BIGINT UNSIGNED NOT NULL,
+    empresa_id BIGINT UNSIGNED NOT NULL,
+    suspendido_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (persona_id),
+    KEY idx_suspensiones_empresa (empresa_id),
+    CONSTRAINT fk_suspensiones_persona FOREIGN KEY (persona_id) REFERENCES personas_curso(id) ON DELETE CASCADE,
+    CONSTRAINT fk_suspensiones_empresa FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+}
 async function prepareProductionAdmin(){
   if(process.env.NODE_ENV!=="production")return;
   const password=String(process.env.ADMIN_PASSWORD||"");
@@ -1495,7 +1596,8 @@ async function prepareProductionAdmin(){
     [name,usuario,hashPassword(password,salt),salt]
   );
 }
-prepareProductionAdmin()
+ensureOperationalTables()
+  .then(prepareProductionAdmin)
   .then(()=>app.listen(PORT,()=>console.log(`TIA running on port ${PORT}`)))
   .catch(err=>{console.error("STARTUP ERROR:",err.message);process.exit(1)});
 
