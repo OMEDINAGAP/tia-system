@@ -39,5 +39,16 @@
     (async()=>{const r=await fetch('/estado-finalizacion',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok){sessionStorage.clear();return location.replace('/')}document.getElementById('personName').textContent=d.nombre||'Colaborador';document.getElementById('personFolio').textContent=d.folio||'';if(!d.aprobado)return location.replace('/curso.html');if(d.fotoEstatus==='APROBADA')return location.replace('/certificado.html');if(d.fotoEstatus==='PENDIENTE'&&d.fotoRegistrada){await Swal.fire({icon:'info',title:'Fotografía en revisión',text:'Tu fotografía fue enviada y debe ser validada por administración antes de habilitar la constancia.',confirmButtonText:'Terminar'});sessionStorage.clear();return location.replace('/')}if(d.fotoEstatus==='RECHAZADA'){Swal.fire({icon:'warning',title:'Fotografía rechazada',text:d.motivoRechazo||'Debes tomar una nueva fotografía para concluir el curso.'})}})();
     window.addEventListener('beforeunload',stopCamera);
   </script>
+  <script>
+    (async()=>{
+      const token=sessionStorage.getItem('token');
+      if(!token)return;
+      const response=await fetch('/estado-finalizacion',{headers:{Authorization:'Bearer '+token}});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok||!data.tomaFisica)return;
+      document.querySelector('main').innerHTML='<section class="card"><h2>Fotografía en módulo TIA</h2><p>Tu fotografía deberá tomarse de forma física en el módulo TIA.</p><p>Acude al módulo para continuar con la conclusión de tu trámite.</p></section>';
+      await Swal.fire({icon:'info',title:'Debes presentarte al módulo TIA',text:'Después de tres fotografías rechazadas, la toma deberá realizarse físicamente en el módulo TIA.',confirmButtonText:'Entendido'});
+    })();
+  </script>
 </body>
 </html>

@@ -112,6 +112,17 @@ function createMailTransport(){
   });
 }
 
+function repairMojibake(value){
+  if(typeof value!=="string")return value;
+  let repaired=value;
+  for(let attempt=0;attempt<2&&/[ÃÂâ]/.test(repaired);attempt++){
+    const candidate=Buffer.from(repaired,"latin1").toString("utf8");
+    if(candidate.includes("�"))break;
+    repaired=candidate;
+  }
+  return repaired;
+}
+
 
 // arriba
 const sessions = new Map(); // token -> userId
@@ -639,17 +650,28 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
         warning:emailSent?null:"La fotografía fue aceptada, pero el correo no pudo enviarse: "+emailError
       });
     }
+    const [rejectionCountRows]=await connection.query(
+      "SELECT COUNT(*) AS total FROM notificaciones_correo WHERE persona_id=? AND tipo='FOTO_RECHAZADA'",
+      [person.id]
+    );
+    const requiereTomaFisica=Number(rejectionCountRows[0]?.total||0)>=2;
     await connection.query(
       "UPDATE users SET photo=NULL,photo_data=NULL,photo_mime=NULL,foto_estatus='RECHAZADA',foto_revisada_en=NOW(),foto_revisada_por=?,foto_motivo_rechazo=? WHERE id=?",
       [req.admin.id,motivo,person.user_id]
     );
+    if(requiereTomaFisica){
+      await connection.query(
+        "INSERT INTO fotografias_toma_fisica(user_id) VALUES(?) ON DUPLICATE KEY UPDATE solicitado_en=solicitado_en",
+        [person.user_id]
+      );
+    }
     await connection.commit();
     if(person.photo&&person.photo!=="DB"){
       const oldPhoto=path.resolve(__dirname,person.photo),uploadsRoot=path.resolve(__dirname,"uploads");
       if(oldPhoto.startsWith(uploadsRoot+path.sep))fs.unlink(oldPhoto,()=>{});
     }
     const nombre=[person.nombres,person.apellido_paterno,person.apellido_materno].filter(Boolean).join(" ");
-    const subject=`Fotografía rechazada - ${nombre}`;
+    const subject=requiereTomaFisica?`Toma física de fotografía requerida - ${nombre}`:`Fotografía rechazada - ${nombre}`;
     let emailSent=false,emailError="";
     try{
       const transporter=createMailTransport();
@@ -658,17 +680,17 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
         from:process.env.MAIL_FROM||process.env.SMTP_USER,
         to:person.correo_1,
         subject,
-        text:`La fotografía de ${nombre}, folio ${person.folio}, fue rechazada. Motivo: ${motivo}. El colaborador debe ingresar nuevamente al módulo TIA y tomarse una nueva fotografía.`,
-        html:`<p>La fotografía del colaborador <strong>${nombre}</strong>, folio <strong>${person.folio}</strong>, fue rechazada.</p><p><strong>Motivo:</strong> ${motivo.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}</p><p>El colaborador debe ingresar nuevamente al módulo TIA con su folio y tomarse una nueva fotografía.</p>`
+        text:requiereTomaFisica?`La fotografía de ${nombre}, folio ${person.folio}, fue rechazada por tercera ocasión. El colaborador debe presentarse al módulo TIA para la toma física de la fotografía. Motivo del último rechazo: ${motivo}.`:`La fotografía de ${nombre}, folio ${person.folio}, fue rechazada. Motivo: ${motivo}. El colaborador debe ingresar nuevamente al módulo TIA y tomarse una nueva fotografía.`,
+        html:requiereTomaFisica?`<p>La fotografía del colaborador <strong>${nombre}</strong>, folio <strong>${person.folio}</strong>, fue rechazada por tercera ocasión.</p><p><strong>El colaborador debe presentarse al módulo TIA para la toma física de la fotografía.</strong></p><p><strong>Motivo del último rechazo:</strong> ${motivo.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}</p>`:`<p>La fotografía del colaborador <strong>${nombre}</strong>, folio <strong>${person.folio}</strong>, fue rechazada.</p><p><strong>Motivo:</strong> ${motivo.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}</p><p>El colaborador debe ingresar nuevamente al módulo TIA con su folio y tomarse una nueva fotografía.</p>`
       });
       emailSent=true;
     }catch(mailErr){emailError=mailErr.message;console.error("PHOTO REJECTION EMAIL ERROR:",mailErr.message)}
     await db.query(
       `INSERT INTO notificaciones_correo(tipo,destinatario,asunto,persona_id,estatus,detalle)
-       VALUES('FOTO_RECHAZADA',?,?,?,?,?)`,
-      [person.correo_1,subject,person.id,emailSent?"ENVIADO":"ERROR",emailSent?"Notificación enviada":emailError]
+       VALUES(?,?,?,?,?,?)`,
+      [requiereTomaFisica?"FOTO_TOMA_FISICA":"FOTO_RECHAZADA",person.correo_1,subject,person.id,emailSent?"ENVIADO":"ERROR",emailSent?"Notificación enviada":emailError]
     );
-    return res.json({ok:true,decision:"RECHAZADA",emailSent,email:person.correo_1,warning:emailSent?null:"La fotografía fue rechazada, pero el correo no pudo enviarse: "+emailError});
+    return res.json({ok:true,decision:"RECHAZADA",requiereTomaFisica,emailSent,email:person.correo_1,warning:emailSent?null:"La fotografía fue rechazada, pero el correo no pudo enviarse: "+emailError});
   }catch(err){if(connection)await connection.rollback();console.error("PHOTO REVIEW ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible revisar la fotografía"})}
   finally{if(connection)connection.release()}
 });
@@ -1626,6 +1648,12 @@ async function ensureOperationalTables(){
     CONSTRAINT fk_suspensiones_persona FOREIGN KEY (persona_id) REFERENCES personas_curso(id) ON DELETE CASCADE,
     CONSTRAINT fk_suspensiones_empresa FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await db.query(`CREATE TABLE IF NOT EXISTS fotografias_toma_fisica (
+    user_id BIGINT UNSIGNED NOT NULL,
+    solicitado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id),
+    CONSTRAINT fk_fotografias_toma_fisica_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 }
 async function prepareProductionAdmin(){
   if(process.env.NODE_ENV!=="production")return;
@@ -1750,9 +1778,14 @@ const upload = multer({
 app.get("/estado-finalizacion",auth,async(req,res)=>{
   try{
     if(req.isAdmin)return res.status(403).json({ok:false,error:"Acceso no disponible"});
-    const [rows]=await db.query("SELECT name,folio,aprobado,photo,foto_registrada_en,foto_estatus,foto_motivo_rechazo FROM users WHERE id=? LIMIT 1",[req.userId]);
+    const [rows]=await db.query(
+      `SELECT u.name,u.folio,u.aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo,
+              tf.user_id AS toma_fisica
+       FROM users u LEFT JOIN fotografias_toma_fisica tf ON tf.user_id=u.id
+       WHERE u.id=? LIMIT 1`,[req.userId]
+    );
     if(!rows.length)return res.status(404).json({ok:false,error:"Colaborador no encontrado"});
-    return res.json({ok:true,nombre:rows[0].name,folio:rows[0].folio,aprobado:!!rows[0].aprobado,fotoRegistrada:!!rows[0].photo,fotoEstatus:rows[0].foto_estatus,motivoRechazo:rows[0].foto_motivo_rechazo,fechaFoto:rows[0].foto_registrada_en});
+    return res.json({ok:true,nombre:rows[0].name,folio:rows[0].folio,aprobado:!!rows[0].aprobado,fotoRegistrada:!!rows[0].photo,fotoEstatus:rows[0].toma_fisica?"TOMA_FISICA":rows[0].foto_estatus,motivoRechazo:rows[0].foto_motivo_rechazo,fechaFoto:rows[0].foto_registrada_en,tomaFisica:!!rows[0].toma_fisica});
   }catch(err){console.error("FINALIZACION STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible consultar el estado"})}
 });
 
@@ -1775,10 +1808,11 @@ app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
     const userId = req.userId;
 
     const [result]=await db.query(
-      "UPDATE users SET photo='DB',photo_data=?,photo_mime=?,foto_registrada_en=NOW(),foto_estatus='PENDIENTE',foto_revisada_en=NULL,foto_revisada_por=NULL,foto_motivo_rechazo=NULL WHERE id=? AND aprobado=1",
+      `UPDATE users SET photo='DB',photo_data=?,photo_mime=?,foto_registrada_en=NOW(),foto_estatus='PENDIENTE',foto_revisada_en=NULL,foto_revisada_por=NULL,foto_motivo_rechazo=NULL
+       WHERE id=? AND aprobado=1 AND NOT EXISTS (SELECT 1 FROM fotografias_toma_fisica WHERE user_id=users.id)`,
       [req.file.buffer,req.file.mimetype,userId]
     );
-    if(!result.affectedRows)return res.status(403).json({ok:false,error:"Primero debes aprobar el examen"});
+    if(!result.affectedRows)return res.status(403).json({ok:false,error:"Debes presentarte al módulo TIA para la toma física de la fotografía"});
 
     res.json({ ok: true, certificado:"/certificado.html" });
 
@@ -1827,7 +1861,10 @@ app.get("/questions", auth, async (req, res) => {
        VALUES(?,?,?,DATE_ADD(NOW(),INTERVAL 60 MINUTE))`,
       [examToken,req.userId,JSON.stringify(rows.map(q=>q.id))]
     );
-    return res.json({ok:true,examToken,questions:rows});
+    const questions=rows.map(question=>Object.fromEntries(
+      Object.entries(question).map(([key,value])=>[key,repairMojibake(value)])
+    ));
+    return res.json({ok:true,examToken,questions});
   } catch(err) {
     console.error("QUESTIONS ERROR:",err);
     return res.status(500).json({ok:false,error:"No fue posible cargar el examen"});
