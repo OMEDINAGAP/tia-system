@@ -144,8 +144,14 @@ document.getElementById('personForm').addEventListener('submit', async event => 
 loadPeople();
 
 function openAccountsModal() {
+  const form = document.getElementById('accountForm');
+  form.reset();
+  for (const field of form.querySelectorAll('input')) field.value = '';
   document.getElementById('accountsModal').classList.add('open');
   loadAccounts();
+  setTimeout(() => {
+    for (const field of form.querySelectorAll('input')) field.value = '';
+  }, 50);
 }
 
 function closeAccountsModal() {
