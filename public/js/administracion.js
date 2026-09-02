@@ -51,4 +51,39 @@ function acceptPhoto(){Swal.fire({title:'¿Aceptar fotografía?',text:'Esto habi
 async function rejectPhoto(){const r=await Swal.fire({title:'Rechazar fotografía',input:'textarea',inputLabel:'Motivo que recibirá la empresa',inputPlaceholder:'Ejemplo: el rostro no se aprecia de frente.',inputValidator:v=>String(v||'').trim().length<5?'Escribe el motivo del rechazo':undefined,showCancelButton:true,confirmButtonText:'Rechazar y notificar',cancelButtonText:'Cancelar',confirmButtonColor:'#b91c1c'});if(r.isConfirmed)decidePhoto('RECHAZAR',r.value.trim())}
 reviewPhoto=async function(id){closePhotoReview();const person=data.people.find(p=>Number(p.id)===Number(id)),r=await fetch(`/admin-personas/${id}/fotografia?preview=1`,{headers:{Authorization:'Bearer '+token}});if(!r.ok)return Swal.fire('Error','Fotografía no disponible','error');reviewPhotoId=id;reviewPhotoUrl=URL.createObjectURL(await r.blob());document.getElementById('reviewPhotoImage').src=reviewPhotoUrl;document.getElementById('reviewPhotoInfo').textContent=person?`${[person.nombres,person.apellido_paterno,person.apellido_materno].filter(Boolean).join(' ')} · ${person.folio}`:'Colaborador';document.getElementById('photoReviewModal').classList.add('open')};
 const reviewAwareOpenCompany=openCompany;openCompany=function(id){reviewAwareOpenCompany(id);const c=data.companies.find(x=>Number(x.id)===Number(id));if(!c)return;const people=data.people.filter(p=>Number(p.empresa_id)===Number(c.empresa_id));document.getElementById('modalPeople').innerHTML=people.length?people.map(p=>{let st=p.estatus;if(p.aprobado&&p.foto_estatus==='APROBADA')st='CONCLUIDO';else if(p.aprobado&&p.foto_estatus==='PENDIENTE')st='FOTO POR VALIDAR';else if(p.aprobado&&p.foto_estatus==='RECHAZADA')st='FOTO RECHAZADA';else if(p.aprobado)st='FOTO PENDIENTE';return `<tr><td>${esc(p.folio)}</td><td>${full(p)}</td><td>${esc(p.puesto)}</td><td>${bar(p.progreso)}</td><td>${p.calificacion}%</td><td>${p.intentos}</td><td>${badge(st)}</td></tr>`}).join(''):'<tr><td colspan="7" class="empty">Esta empresa aun no tiene colaboradores.</td></tr>'};
-const originalOpenCompanyWithPhoto=openCompany;openCompany=function(id){originalOpenCompanyWithPhoto(id);const c=data.companies.find(x=>Number(x.id)===Number(id));if(!c)return;const people=data.people.filter(p=>Number(p.empresa_id)===Number(c.empresa_id));document.getElementById('modalPeople').innerHTML=people.length?people.map(p=>{const st=p.aprobado?(p.photo?'CONCLUIDO':'FOTO PENDIENTE'):p.estatus;return `<tr><td>${esc(p.folio)}</td><td>${full(p)}</td><td>${esc(p.puesto)}</td><td>${bar(p.progreso)}</td><td>${p.calificacion}%</td><td>${p.intentos}</td><td>${badge(st)}</td></tr>`}).join(''):'<tr><td colspan="7" class="empty">Esta empresa aun no tiene colaboradores.</td></tr>'};
+const originalOpenCompanyWithPhoto=openCompany;openCompany=function(id){originalOpenCompanyWithPhoto(id);const c=data.companies.find(x=>Number(x.id)===Number(id));if(!c)return;const people=data.people.filter(p=>Number(p.empresa_id)===Number(c.empresa_id));document.getElementById('modalPeople').innerHTML=people.length?people.map(p=>{const st=p.suspendido_en?'SUSPENDIDO':p.aprobado?(p.photo?'CONCLUIDO':'FOTO PENDIENTE'):p.estatus;return `<tr><td>${esc(p.folio)}</td><td>${full(p)}</td><td>${esc(p.puesto)}</td><td>${bar(p.progreso)}</td><td>${p.calificacion}%</td><td>${p.intentos}</td><td>${badge(st)}</td></tr>`}).join(''):'<tr><td colspan="7" class="empty">Esta empresa aun no tiene colaboradores.</td></tr>'};
+
+let selectedCompanyForSuspension=null;
+const companySuspendControl=document.createElement('div');
+companySuspendControl.style.cssText='display:flex;justify-content:flex-end;margin:0 0 18px';
+document.getElementById('companyDetails').after(companySuspendControl);
+const openCompanyWithSuspensionControl=openCompany;
+openCompany=function(id){
+  openCompanyWithSuspensionControl(id);
+  const company=data.companies.find(item=>Number(item.id)===Number(id));
+  selectedCompanyForSuspension=company||null;
+  const canSuspend=company&&company.estatus!=="SUSPENDIDO"&&data.admin?.rol==='SUPERADMIN';
+  companySuspendControl.innerHTML=canSuspend?'<button type="button" style="background:#b91c1c;border:0;color:#fff;font-weight:700;padding:9px 13px;border-radius:8px;cursor:pointer" onclick="suspendCompanyAccess()">Suspender folio y accesos</button>':company?.estatus==='SUSPENDIDO'?'<span class="badge red">FOLIO SUSPENDIDO</span>':'';
+};
+async function suspendCompanyAccess(){
+  const company=selectedCompanyForSuspension;
+  if(!company)return;
+  const result=await Swal.fire({
+    icon:'warning',
+    title:'¿Suspender folio de empresa?',
+    html:`<p>La empresa <strong>${esc(company.nombre||company.empresa_autorizada||company.folio)}</strong> no será eliminada.</p><p>Su folio, cuenta empresarial y los folios de acceso de todos sus colaboradores quedarán suspendidos de inmediato.</p><p>La información seguirá disponible para consulta desde administración.</p>`,
+    showCancelButton:true,
+    confirmButtonText:'Sí, suspender accesos',
+    cancelButtonText:'Cancelar',
+    confirmButtonColor:'#b91c1c'
+  });
+  if(!result.isConfirmed)return;
+  const response=await fetch(`/admin-empresas/${company.id}/suspender`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:'{}'});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.ok)return Swal.fire('No fue posible suspender',payload.error||'Intenta nuevamente','error');
+  closeCompany();
+  await load();
+  activeView='companies';
+  render();
+  Swal.fire('Folios suspendidos','La empresa no fue eliminada. Su acceso y el de sus colaboradores quedaron suspendidos; la información permanece disponible para consulta.','success');
+}

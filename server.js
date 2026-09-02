@@ -405,10 +405,11 @@ app.get("/admin-overview",auth,async(req,res)=>{
       SELECT pc.id,pc.empresa_id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,
              pc.puesto,pc.telefono,pc.correo,pc.estatus,e.nombre AS empresa,
              COALESCE(u.exam,0) AS calificacion,COALESCE(u.intentos,0) AS intentos,
-             COALESCE(u.aprobado,0) AS aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo,u.fecha AS fecha_aprobacion,
+             COALESCE(u.aprobado,0) AS aprobado,u.photo,u.foto_registrada_en,u.foto_estatus,u.foto_motivo_rechazo,u.fecha AS fecha_aprobacion,sc.suspendido_en,
              ROUND(COALESCE(pg.progreso,0),1) AS progreso,pc.creado_en
       FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id
       LEFT JOIN users u ON u.id=pc.user_id
+      LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
       LEFT JOIN (SELECT userId,LEAST(100,SUM(progress)/2) AS progreso FROM video_progress GROUP BY userId) pg ON pg.userId=u.id
       ORDER BY pc.creado_en DESC`);
     const stats={
@@ -465,6 +466,49 @@ app.patch("/admin-tokens/:id/status",auth,async(req,res)=>{
     if(!result.affectedRows)return res.status(409).json({ok:false,error:"Solo pueden modificarse tokens pendientes o suspendidos"});
     return res.json({ok:true});
   }catch(err){console.error("ADMIN TOKEN STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar el token"})}
+});
+
+app.patch("/admin-empresas/:id/suspender",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede suspender folios empresariales"});
+    const folioId=Number(req.params.id);
+    if(!Number.isInteger(folioId)||folioId<1)return res.status(400).json({ok:false,error:"Empresa inválida"});
+    connection=await db.getConnection();
+    await connection.beginTransaction();
+    const [companies]=await connection.query(
+      `SELECT fa.id,fa.estatus,e.id AS empresa_id,e.nombre
+       FROM folios_acceso fa LEFT JOIN empresas e ON e.folio_acceso_id=fa.id
+       WHERE fa.id=? FOR UPDATE`,[folioId]
+    );
+    const company=companies[0];
+    if(!company){await connection.rollback();return res.status(404).json({ok:false,error:"Empresa no encontrada"});}
+    if(company.estatus==="SUSPENDIDO"){await connection.rollback();return res.status(409).json({ok:false,error:"El folio de esta empresa ya está suspendido"});}
+    if(!["ACTIVO","CONFIGURANDO","USADO"].includes(company.estatus)){
+      await connection.rollback();
+      return res.status(409).json({ok:false,error:"Este folio no puede suspenderse en su estado actual"});
+    }
+    await connection.query("UPDATE folios_acceso SET estatus='SUSPENDIDO' WHERE id=?",[folioId]);
+    if(company.empresa_id){
+      await connection.query("UPDATE cuentas_empresa SET activo=0 WHERE empresa_id=?",[company.empresa_id]);
+      await connection.query(
+        `INSERT INTO suspensiones_colaborador(persona_id,empresa_id)
+         SELECT id,empresa_id FROM personas_curso WHERE empresa_id=?
+         ON DUPLICATE KEY UPDATE empresa_id=VALUES(empresa_id)`,[company.empresa_id]
+      );
+      await connection.query(
+        "DELETE s FROM sessions s JOIN personas_curso pc ON pc.user_id=s.userId WHERE pc.empresa_id=?",[company.empresa_id]
+      );
+      await connection.query("DELETE FROM sesiones_empresa WHERE empresa_id=?",[company.empresa_id]);
+      await connection.query("DELETE FROM sesiones_registro_empresa WHERE folio_acceso_id=?",[folioId]);
+    }
+    await connection.commit();
+    return res.json({ok:true,empresa:company.nombre||null});
+  }catch(err){
+    if(connection)await connection.rollback();
+    console.error("ADMIN COMPANY SUSPEND ERROR:",err);
+    return res.status(500).json({ok:false,error:"No fue posible suspender el folio empresarial"});
+  }finally{if(connection)connection.release()}
 });
 
 app.get("/admin-users",auth,async(req,res)=>{
