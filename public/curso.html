@@ -75,6 +75,15 @@
       z-index: 10;
     }
 
+    .presence-modal { display:none; position:fixed; inset:0; z-index:100; background:rgba(2,6,23,.86); padding:20px; align-items:center; justify-content:center; }
+    .presence-modal.open { display:flex; }
+    .presence-card { width:min(500px,100%); background:#1e293b; border:1px solid #334155; border-radius:18px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.55); text-align:center; }
+    .presence-icon { width:58px; height:58px; display:grid; place-items:center; margin:0 auto 14px; border-radius:50%; background:#123d28; color:#6ee7a0; font-size:28px; }
+    .presence-card h2 { margin:0 0 10px; font-size:22px; }
+    .presence-card p { color:#cbd5e1; line-height:1.55; margin:0 0 20px; }
+    .presence-card small { display:block; color:#94a3b8; margin-top:14px; }
+    .presence-card button { width:100%; background:#22c55e; color:white; border:0; padding:13px; border-radius:9px; font-weight:700; cursor:pointer; }
+
     /* PROGRESS */
     .progress-bar {
       width: 100%;
@@ -280,6 +289,14 @@
   let lastSent = 0; // 🔥 ESTA FALTABA
   let videoProgressMap = {};
   let allowTracking = false;
+  const PRESENCE_CHECKS_PER_VIDEO = 3;
+  let presenceChecks = [];
+  let presenceCheckIndex = 0;
+  let presenceAwaiting = false;
+  let presenceAuthorized = false;
+  let presenceStream = null;
+
+  document.body.insertAdjacentHTML('beforeend', `<div class="presence-modal" id="presenceModal" role="dialog" aria-modal="true"><div class="presence-card"><div class="presence-icon">✓</div><h2 id="presenceTitle">Validación de presencia</h2><p id="presenceText">Para iniciar el curso, autoriza la cámara frontal y realiza una validación de presencia.</p><video id="presencePreview" autoplay playsinline muted style="display:none;width:100%;max-height:220px;object-fit:cover;border-radius:10px;background:#020617;margin-bottom:14px"></video><canvas id="presenceCanvas" width="640" height="480" hidden></canvas><button type="button" id="presenceConfirm">Activar cámara y validar</button><small>La cámara solo se usa para esta validación en vivo. La imagen no se guarda.</small></div></div>`);
 
   // 🔒 CONTROL DE PESTAÑA
   document.addEventListener("visibilitychange", () => {
@@ -295,12 +312,76 @@
       }
       document.getElementById("status").innerText = "⏸ Video pausado";
     } else {
-      if (wasPlaying) {
+      if (wasPlaying && !presenceAwaiting) {
         player.playVideo();
         wasPlaying = false;
       }
     }
 
+  });
+
+  function stopPresenceCamera() {
+    if (presenceStream) presenceStream.getTracks().forEach(track => track.stop());
+    presenceStream = null;
+    const preview = document.getElementById('presencePreview');
+    preview.srcObject = null;
+    preview.style.display = 'none';
+  }
+
+  function openPresenceCheck(initial = false) {
+    if (presenceAwaiting) return;
+    presenceAwaiting = true;
+    if (player && player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo();
+    document.getElementById('status').innerText = 'Validación de presencia requerida';
+    document.getElementById('presenceTitle').innerText = initial ? 'Antes de iniciar el curso' : 'Validación de presencia';
+    document.getElementById('presenceText').innerText = initial ? 'Autoriza la cámara frontal y realiza una validación de presencia antes de reproducir el video.' : 'El video se pausó. Activa la cámara frontal y realiza una validación de presencia para continuar.';
+    const button = document.getElementById('presenceConfirm');
+    button.innerText = 'Activar cámara y validar';
+    button.dataset.initial = initial ? '1' : '0';
+    button.dataset.cameraReady = '0';
+    document.getElementById('presenceModal').classList.add('open');
+  }
+
+  async function startPresenceCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Este navegador no permite usar la cámara para la validación.');
+    presenceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    const preview = document.getElementById('presencePreview');
+    preview.srcObject = presenceStream;
+    preview.style.display = 'block';
+    await preview.play();
+  }
+
+  document.getElementById('presenceConfirm').addEventListener('click', async () => {
+    const button = document.getElementById('presenceConfirm');
+    try {
+      if (button.dataset.cameraReady !== '1') {
+        button.disabled = true;
+        button.innerText = 'Activando cámara...';
+        await startPresenceCamera();
+        button.dataset.cameraReady = '1';
+        button.disabled = false;
+        button.innerText = 'Confirmar presencia y continuar';
+        return;
+      }
+      const preview = document.getElementById('presencePreview');
+      if (preview.readyState < 2) throw new Error('La cámara aún no está lista. Intenta de nuevo.');
+      const canvas = document.getElementById('presenceCanvas');
+      canvas.getContext('2d').drawImage(preview, 0, 0, canvas.width, canvas.height);
+      stopPresenceCamera();
+      const isInitial = button.dataset.initial === '1';
+      presenceAuthorized = true;
+      presenceAwaiting = false;
+      if (!isInitial) presenceCheckIndex++;
+      document.getElementById('presenceModal').classList.remove('open');
+      updateStatus();
+      if (!isInitial && player) player.playVideo();
+    } catch (error) {
+      stopPresenceCamera();
+      button.disabled = false;
+      button.dataset.cameraReady = '0';
+      button.innerText = 'Reintentar validación';
+      document.getElementById('presenceText').innerText = error.message || 'No fue posible acceder a la cámara. Autoriza el permiso para continuar.';
+    }
   });
 
   // 🎥 YOUTUBE READY
@@ -328,6 +409,7 @@
     player.unMute();
     player.setVolume(100);
     player.setPlaybackRate(1);
+    openPresenceCheck(true);
 
     // 🔥 cargar progreso
     setTimeout(() => {
@@ -467,6 +549,21 @@
     duration = 0;
     maxTime = 0;
     lastSent = 0; // 🔥 ESTE ES EL QUE TE FALTABA
+    presenceChecks = [];
+    presenceCheckIndex = 0;
+  }
+
+  function setupPresenceChecks() {
+    if (presenceChecks.length || !duration) return;
+    const savedProgress = Number(videoProgressMap[currentVideoIndex]?.progress || 0);
+    const start = Math.max(12, Math.min(72, savedProgress + 8));
+    const end = 91;
+    const checks = [];
+    for (let index = 0; index < PRESENCE_CHECKS_PER_VIDEO; index++) {
+      const base = start + ((end - start) * (index + 1) / (PRESENCE_CHECKS_PER_VIDEO + 1));
+      checks.push(Math.round(Math.max(start, Math.min(end, base + (Math.random() * 10 - 5)))));
+    }
+    presenceChecks = [...new Set(checks)].sort((a,b) => a - b);
   }
 
 
@@ -488,6 +585,7 @@
       duration = player.getDuration();
       if (!duration || duration === 0) return;
     }
+    setupPresenceChecks();
 
 /* console.log("allowTracking:", allowTracking); */
     // 🚫 BLOQUEO ANTI-SKIP
@@ -504,6 +602,10 @@
        100,
        Math.max(0, (maxTime / duration) * 100)
      );
+    if (!presenceAwaiting && presenceChecks[presenceCheckIndex] !== undefined && percentCurrentVideo >= presenceChecks[presenceCheckIndex]) {
+      openPresenceCheck(false);
+      return;
+    }
     /* const percentCurrentVideo = (maxTime / duration) * 100; */
     // 🎯 PROGRESO REAL DEL VIDEO (0–100)
 
@@ -612,6 +714,11 @@
 
 
   function togglePlay() {
+    if (!presenceAuthorized) {
+      openPresenceCheck(true);
+      return;
+    }
+    if (presenceAwaiting) return;
     const state = player.getPlayerState();
 
     if (state === YT.PlayerState.PLAYING) {
@@ -626,6 +733,10 @@
   }
 
   async function toggleFullscreen() {
+    if (!presenceAuthorized || presenceAwaiting) {
+      openPresenceCheck(true);
+      return;
+    }
     const wrapper = document.getElementById("videoWrapper");
     try {
       if (!document.fullscreenElement) {
