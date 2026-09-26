@@ -212,6 +212,14 @@ render=function(){
   });
 };
 
+// Los filtros originales conservaron una referencia al render antiguo. Esta
+// escucha en captura garantiza que siempre se use el render actual con documentos.
+document.querySelectorAll('#peopleToolbar input,#peopleToolbar select').forEach(control=>{
+  const refreshPeopleWithDocuments=event=>{event.stopImmediatePropagation();render();};
+  control.addEventListener('input',refreshPeopleWithDocuments,true);
+  control.addEventListener('change',refreshPeopleWithDocuments,true);
+});
+
 async function getEnterpriseAccountDetail(tokenId){
   const response=await fetch(`/admin-tokens/${tokenId}/detalle`,{headers:{Authorization:'Bearer '+token}});
   const payload=await response.json().catch(()=>({}));
