@@ -588,7 +588,8 @@
       // 🔥 RESET DEL SEEK (IMPORTANTE)
       window._seekDone = false;
 
-      player.loadVideoById(videos[currentVideoIndex]);
+      if (presenceAuthorized) player.loadVideoById(videos[currentVideoIndex]);
+      else player.cueVideoById(videos[currentVideoIndex]);
 
     } catch (err) {
       console.error("ERROR loadProgress:", err);
@@ -597,6 +598,14 @@
 
   // 🔄 CAMBIO DE ESTADO (cuando termina video)
   function onStateChange(event) {
+
+    // YouTube puede intentar reproducir al cargar el video: nunca permitimos
+    // reproducción ni avance antes de aprobar la validación inicial.
+    if (event.data === YT.PlayerState.PLAYING && !presenceAuthorized) {
+      player.pauseVideo();
+      openPresenceCheck(true);
+      return;
+    }
 
     // 🔥 REANUDAR EN EL MOMENTO CORRECTO
     if (event.data === YT.PlayerState.PLAYING) {
