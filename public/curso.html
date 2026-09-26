@@ -446,7 +446,7 @@
     document.getElementById('presencePreview').style.display = 'none';
     document.getElementById('presenceModal').classList.remove('open');
     updateStatus();
-    if (!initial && player) player.playVideo();
+    if (player) player.playVideo();
   }
 
   function blendshapeScore(result, name) {
