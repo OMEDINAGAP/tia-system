@@ -1567,6 +1567,35 @@ app.get("/video-progress", auth, async (req, res) => {
 });
 
 
+const COURSE_INTERACTIONS = {
+  "0-28": { videoIndex:0, question:"Al detectar una situación que puede afectar la seguridad aeroportuaria, ¿cuál es la acción adecuada?", options:["Reportarla por los canales establecidos y seguir las indicaciones", "Ignorarla si no afecta directamente mi área", "Publicarla en redes sociales"], correct:0 },
+  "0-72": { videoIndex:0, question:"¿Por qué es importante cumplir los controles de acceso en zonas restringidas?", options:["Para proteger las operaciones y prevenir accesos no autorizados", "Solo para evitar retrasos administrativos", "Únicamente cuando hay supervisión"], correct:0 },
+  "1-28": { videoIndex:1, question:"Ante una credencial o identificación que parece irregular, ¿qué debes hacer?", options:["Informar de inmediato al personal o canal autorizado", "Permitir el acceso para evitar conflictos", "Prestarle mi identificación"], correct:0 },
+  "1-72": { videoIndex:1, question:"La seguridad aeroportuaria es responsabilidad de:", options:["Todas las personas que participan en la operación", "Solo el área de seguridad", "Únicamente los supervisores"], correct:0 }
+};
+
+app.get("/curso-interacciones", auth, async (req,res) => {
+  try {
+    if (req.isAdmin) return res.status(403).json({ok:false,error:"Acceso no disponible"});
+    const [rows] = await db.query("SELECT checkpoint FROM interacciones_curso WHERE user_id=?",[req.userId]);
+    return res.json({ok:true,completed:rows.map(row=>row.checkpoint)});
+  } catch(err) { console.error("COURSE INTERACTIONS GET ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible cargar las interacciones"}); }
+});
+
+app.post("/curso-interacciones", auth, async (req,res) => {
+  try {
+    if (req.isAdmin) return res.status(403).json({ok:false,error:"Acceso no disponible"});
+    const checkpoint=String(req.body.checkpoint||"");
+    const answer=Number(req.body.answer);
+    const interaction=COURSE_INTERACTIONS[checkpoint];
+    if(!interaction||!Number.isInteger(answer))return res.status(400).json({ok:false,error:"Interacción inválida"});
+    if(answer!==interaction.correct)return res.status(422).json({ok:false,correct:false,error:"Respuesta incorrecta. Revisa el contenido y vuelve a intentarlo."});
+    await db.query(`INSERT INTO interacciones_curso(user_id,video_index,checkpoint,respuesta,completado_en)
+                    VALUES(?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE respuesta=VALUES(respuesta),completado_en=NOW()`,[req.userId,interaction.videoIndex,checkpoint,answer]);
+    return res.json({ok:true,correct:true});
+  } catch(err) { console.error("COURSE INTERACTIONS POST ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible guardar la interacción"}); }
+});
+
 app.post("/log-video", auth, async (req, res) => {
   try {
     const userId = req.userId;
@@ -2078,6 +2107,16 @@ async function ensureOperationalTables(){
     version_documento VARCHAR(80) NOT NULL,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_cartas_compromiso_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await db.query(`CREATE TABLE IF NOT EXISTS interacciones_curso (
+    user_id BIGINT UNSIGNED NOT NULL,
+    video_index TINYINT UNSIGNED NOT NULL,
+    checkpoint VARCHAR(20) NOT NULL,
+    respuesta TINYINT UNSIGNED NOT NULL,
+    completado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id,checkpoint),
+    KEY idx_interacciones_video (user_id,video_index),
+    CONSTRAINT fk_interacciones_curso_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   await db.query(`CREATE TABLE IF NOT EXISTS examenes_aprobados (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

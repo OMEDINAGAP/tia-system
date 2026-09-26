@@ -83,6 +83,16 @@
     .presence-card p { color:#cbd5e1; line-height:1.55; margin:0 0 20px; }
     .presence-card small { display:block; color:#94a3b8; margin-top:14px; }
     .presence-card button { width:100%; background:#22c55e; color:white; border:0; padding:13px; border-radius:9px; font-weight:700; cursor:pointer; }
+    .interaction-modal { display:none; position:fixed; inset:0; z-index:110; background:rgba(2,6,23,.86); padding:20px; align-items:center; justify-content:center; }
+    .interaction-modal.open { display:flex; }
+    .interaction-card { width:min(580px,100%); background:#1e293b; border:1px solid #334155; border-radius:18px; padding:26px; box-shadow:0 20px 60px rgba(0,0,0,.55); }
+    .interaction-card .eyebrow { color:#6ee7a0; font-size:12px; font-weight:800; letter-spacing:.8px; }
+    .interaction-card h2 { margin:8px 0 12px; font-size:22px; }
+    .interaction-card p { color:#cbd5e1; line-height:1.5; }
+    .interaction-options { display:grid; gap:9px; margin:18px 0; }
+    .interaction-options button { text-align:left; border:1px solid #334155; border-radius:9px; background:#0f172a; color:#eef4fb; padding:12px; cursor:pointer; }
+    .interaction-options button:hover { border-color:#22c55e; background:#163326; }
+    .interaction-feedback { min-height:20px; color:#fca5a5; font-size:13px; }
 
     /* PROGRESS */
     .progress-bar {
@@ -300,8 +310,51 @@
   let faceMonitorTimer = null;
   let lastFaceSeenAt = 0;
   let activePresenceChallenge = null;
+  const COURSE_INTERACTIONS = [
+    { checkpoint:'0-28', videoIndex:0, at:28, question:'Al detectar una situación que puede afectar la seguridad aeroportuaria, ¿cuál es la acción adecuada?', options:['Reportarla por los canales establecidos y seguir las indicaciones','Ignorarla si no afecta directamente mi área','Publicarla en redes sociales'] },
+    { checkpoint:'0-72', videoIndex:0, at:72, question:'¿Por qué es importante cumplir los controles de acceso en zonas restringidas?', options:['Para proteger las operaciones y prevenir accesos no autorizados','Solo para evitar retrasos administrativos','Únicamente cuando hay supervisión'] },
+    { checkpoint:'1-28', videoIndex:1, at:28, question:'Ante una credencial o identificación que parece irregular, ¿qué debes hacer?', options:['Informar de inmediato al personal o canal autorizado','Permitir el acceso para evitar conflictos','Prestarle mi identificación'] },
+    { checkpoint:'1-72', videoIndex:1, at:72, question:'La seguridad aeroportuaria es responsabilidad de:', options:['Todas las personas que participan en la operación','Solo el área de seguridad','Únicamente los supervisores'] }
+  ];
+  let completedCourseInteractions = new Set();
+  let interactionAwaiting = false;
 
   document.body.insertAdjacentHTML('beforeend', `<div class="presence-modal" id="presenceModal" role="dialog" aria-modal="true"><div class="presence-card"><div class="presence-icon">✓</div><h2 id="presenceTitle">Validación de presencia</h2><p id="presenceText">Para iniciar el curso, autoriza la cámara frontal y realiza una validación de presencia.</p><video id="presencePreview" autoplay playsinline muted style="display:none;width:100%;max-height:220px;object-fit:cover;border-radius:10px;background:#020617;margin-bottom:14px"></video><canvas id="presenceCanvas" width="640" height="480" hidden></canvas><button type="button" id="presenceConfirm">Activar cámara y validar</button><small>La cámara solo se usa para esta validación en vivo. La imagen no se guarda.</small></div></div>`);
+  document.body.insertAdjacentHTML('beforeend', `<div class="interaction-modal" id="interactionModal" role="dialog" aria-modal="true"><div class="interaction-card"><div class="eyebrow">PUNTO DE APRENDIZAJE</div><h2>Verificación de contenido</h2><p id="interactionQuestion"></p><div class="interaction-options" id="interactionOptions"></div><div class="interaction-feedback" id="interactionFeedback"></div><p style="font-size:12px;color:#94a3b8;margin-bottom:0">Esta interacción es obligatoria para continuar, pero no modifica la calificación del examen final.</p></div></div>`);
+
+  async function loadCourseInteractions() {
+    const response = await fetch('/curso-interacciones',{headers:{Authorization:'Bearer '+token}});
+    const data = await response.json().catch(()=>({}));
+    if (response.ok && data.ok) completedCourseInteractions = new Set(data.completed || []);
+  }
+
+  function openCourseInteraction(interaction) {
+    if (interactionAwaiting || completedCourseInteractions.has(interaction.checkpoint)) return;
+    interactionAwaiting = true;
+    if (player && player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo();
+    document.getElementById('status').innerText = 'Interacción de aprendizaje requerida';
+    document.getElementById('interactionQuestion').innerText = interaction.question;
+    document.getElementById('interactionFeedback').innerText = '';
+    document.getElementById('interactionOptions').innerHTML = interaction.options.map((option,index)=>`<button type="button" onclick="submitCourseInteraction('${interaction.checkpoint}',${index})">${String.fromCharCode(65+index)}) ${option}</button>`).join('');
+    document.getElementById('interactionModal').classList.add('open');
+  }
+
+  async function submitCourseInteraction(checkpoint, answer) {
+    const options = document.querySelectorAll('#interactionOptions button');
+    options.forEach(button=>button.disabled=true);
+    const response = await fetch('/curso-interacciones',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({checkpoint,answer})});
+    const data = await response.json().catch(()=>({}));
+    if (!response.ok || !data.ok) {
+      document.getElementById('interactionFeedback').innerText = data.error || 'Respuesta incorrecta. Vuelve a intentarlo.';
+      options.forEach(button=>button.disabled=false);
+      return;
+    }
+    completedCourseInteractions.add(checkpoint);
+    interactionAwaiting = false;
+    document.getElementById('interactionModal').classList.remove('open');
+    updateStatus();
+    if (player) player.playVideo();
+  }
 
   // 🔒 CONTROL DE PESTAÑA
   document.addEventListener("visibilitychange", () => {
@@ -560,6 +613,8 @@
 
       const data = await res.json();
 
+      await loadCourseInteractions();
+
       console.log("PROGRESO RECIBIDO:", data);
 
       videoProgressMap = {};
@@ -737,6 +792,11 @@
      );
     if (!presenceAwaiting && presenceChecks[presenceCheckIndex] !== undefined && percentCurrentVideo >= presenceChecks[presenceCheckIndex]) {
       openPresenceCheck(false);
+      return;
+    }
+    const pendingInteraction = COURSE_INTERACTIONS.find(interaction => interaction.videoIndex === currentVideoIndex && percentCurrentVideo >= interaction.at && !completedCourseInteractions.has(interaction.checkpoint));
+    if (!presenceAwaiting && pendingInteraction) {
+      openCourseInteraction(pendingInteraction);
       return;
     }
     /* const percentCurrentVideo = (maxTime / duration) * 100; */
