@@ -267,6 +267,7 @@
   }
 
   function logout() {
+    if (typeof stopPresenceCamera === 'function') stopPresenceCamera();
     sessionStorage.clear();
     window.location.href = "/";
   }
@@ -295,6 +296,10 @@
   let presenceAwaiting = false;
   let presenceAuthorized = false;
   let presenceStream = null;
+  let faceLandmarker = null;
+  let faceMonitorTimer = null;
+  let lastFaceSeenAt = 0;
+  let activePresenceChallenge = null;
 
   document.body.insertAdjacentHTML('beforeend', `<div class="presence-modal" id="presenceModal" role="dialog" aria-modal="true"><div class="presence-card"><div class="presence-icon">✓</div><h2 id="presenceTitle">Validación de presencia</h2><p id="presenceText">Para iniciar el curso, autoriza la cámara frontal y realiza una validación de presencia.</p><video id="presencePreview" autoplay playsinline muted style="display:none;width:100%;max-height:220px;object-fit:cover;border-radius:10px;background:#020617;margin-bottom:14px"></video><canvas id="presenceCanvas" width="640" height="480" hidden></canvas><button type="button" id="presenceConfirm">Activar cámara y validar</button><small>La cámara solo se usa para esta validación en vivo. La imagen no se guarda.</small></div></div>`);
 
@@ -385,6 +390,125 @@
   });
 
   // 🎥 YOUTUBE READY
+  /* Presencia automatizada: rostro continuo y reto aleatorio, sin guardar imágenes. */
+  async function prepareFaceDetector() {
+    if (faceLandmarker) return faceLandmarker;
+    const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+    const fileset = await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    faceLandmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task', delegate: 'GPU' },
+      runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true
+    });
+    return faceLandmarker;
+  }
+
+  stopPresenceCamera = function() {
+    clearInterval(faceMonitorTimer);
+    faceMonitorTimer = null;
+    if (presenceStream) presenceStream.getTracks().forEach(track => track.stop());
+    presenceStream = null;
+    const preview = document.getElementById('presencePreview');
+    preview.srcObject = null;
+    preview.style.display = 'none';
+  };
+
+  function makePresenceChallenge(initial) {
+    if (initial) return { type: 'face', text: 'Coloca tu rostro dentro del recuadro. La validación se completará automáticamente.' };
+    const challenges = [
+      { type: 'blink', text: 'Para continuar, parpadea mirando a la cámara.' },
+      { type: 'right', text: 'Para continuar, gira ligeramente tu rostro hacia tu derecha.' },
+      { type: 'left', text: 'Para continuar, gira ligeramente tu rostro hacia tu izquierda.' }
+    ];
+    return challenges[Math.floor(Math.random() * challenges.length)];
+  }
+
+  openPresenceCheck = function(initial = false) {
+    if (presenceAwaiting) return;
+    presenceAwaiting = true;
+    if (player && player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo();
+    activePresenceChallenge = makePresenceChallenge(initial);
+    document.getElementById('status').innerText = 'Validación de presencia requerida';
+    document.getElementById('presenceTitle').innerText = initial ? 'Antes de iniciar el curso' : 'Validación de presencia';
+    document.getElementById('presenceText').innerText = presenceStream ? activePresenceChallenge.text : 'Autoriza la cámara frontal. Después se realizará una validación automática de presencia.';
+    const button = document.getElementById('presenceConfirm');
+    button.innerText = presenceStream ? 'Validando presencia...' : 'Activar cámara y validar';
+    button.disabled = Boolean(presenceStream);
+    document.getElementById('presencePreview').style.display = presenceStream ? 'block' : 'none';
+    document.getElementById('presenceModal').classList.add('open');
+  };
+
+  function completePresenceCheck() {
+    const initial = !presenceAuthorized;
+    presenceAuthorized = true;
+    presenceAwaiting = false;
+    if (!initial) presenceCheckIndex++;
+    activePresenceChallenge = null;
+    document.getElementById('presencePreview').style.display = 'none';
+    document.getElementById('presenceModal').classList.remove('open');
+    updateStatus();
+    if (!initial && player) player.playVideo();
+  }
+
+  function blendshapeScore(result, name) {
+    const categories = result.faceBlendshapes?.[0]?.categories || [];
+    return categories.find(item => item.categoryName === name)?.score || 0;
+  }
+
+  function evaluateDetectedFace(result) {
+    const landmarks = result.faceLandmarks?.[0];
+    if (!landmarks) return;
+    lastFaceSeenAt = Date.now();
+    if (!presenceAwaiting || !activePresenceChallenge) return;
+    const type = activePresenceChallenge.type;
+    if (type === 'face') return completePresenceCheck();
+    if (type === 'blink' && blendshapeScore(result, 'eyeBlinkLeft') > .35 && blendshapeScore(result, 'eyeBlinkRight') > .35) return completePresenceCheck();
+    const left = landmarks[234], right = landmarks[454], nose = landmarks[1];
+    if (!left || !right || !nose) return;
+    const ratio = (nose.x - left.x) / Math.max(.001, right.x - left.x);
+    if ((type === 'right' && ratio > .60) || (type === 'left' && ratio < .40)) completePresenceCheck();
+  }
+
+  function monitorFacePresence() {
+    if (!faceLandmarker || !presenceStream) return;
+    const preview = document.getElementById('presencePreview');
+    if (preview.readyState < 2) return;
+    const result = faceLandmarker.detectForVideo(preview, performance.now());
+    evaluateDetectedFace(result);
+    const playing = player && player.getPlayerState() === YT.PlayerState.PLAYING;
+    if (playing && lastFaceSeenAt && Date.now() - lastFaceSeenAt > 15000) openPresenceCheck(false);
+  }
+
+  startPresenceCamera = async function() {
+    if (presenceStream) return;
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Este navegador no permite usar la cámara para la validación.');
+    presenceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+    const preview = document.getElementById('presencePreview');
+    preview.srcObject = presenceStream;
+    preview.style.display = 'block';
+    await preview.play();
+    await prepareFaceDetector();
+    lastFaceSeenAt = Date.now();
+    clearInterval(faceMonitorTimer);
+    faceMonitorTimer = setInterval(monitorFacePresence, 700);
+  };
+
+  document.getElementById('presenceConfirm').addEventListener('click', async event => {
+    event.stopImmediatePropagation();
+    const button = document.getElementById('presenceConfirm');
+    try {
+      button.disabled = true;
+      button.innerText = 'Activando cámara...';
+      await startPresenceCamera();
+      document.getElementById('presenceText').innerText = activePresenceChallenge?.text || 'Buscando un rostro frente a la cámara...';
+      button.innerText = 'Validando presencia...';
+    } catch (error) {
+      stopPresenceCamera();
+      button.disabled = false;
+      button.innerText = 'Reintentar validación';
+      document.getElementById('presenceText').innerText = error.message || 'No fue posible acceder a la cámara. Autoriza el permiso para continuar.';
+    }
+  }, true);
+
   function onYouTubeIframeAPIReady() {
     player = new YT.Player('player', {
       height: '400',
