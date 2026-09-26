@@ -212,14 +212,12 @@
       document.getElementById("questionBox").innerHTML = `
     <h3>${q.question}</h3>
 
-    ${["A", "B", "C", "D"].map(letter => {
-        const text = q["option_" + letter.toLowerCase()];
-        if (!text) return "";
+    ${(q.options || []).map(option => {
         return `
         <label class="option">
-          <input type="radio" name="q" value="${letter}"
-          ${answers[current] === letter ? "checked" : ""}>
-          ${letter}) ${text}
+          <input type="radio" name="q" value="${option.key}"
+          ${answers[current] === option.key ? "checked" : ""}>
+          ${option.label}) ${option.text}
         </label>
       `;
       }).join("")}

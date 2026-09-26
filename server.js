@@ -2302,10 +2302,22 @@ app.get("/questions", auth, async (req, res) => {
     if (!eligibility.eligible) {
       return res.status(403).json({ok:false,error:eligibility.reason,progress:eligibility.progress});
     }
-    const [rows] = await db.query(`
+    const [previousSessions] = await db.query(
+      `SELECT question_ids FROM exam_sessions
+       WHERE user_id=? AND submitted_at IS NOT NULL
+       ORDER BY submitted_at DESC`, [req.userId]
+    );
+    const previouslyUsed = new Set();
+    previousSessions.forEach(session => {
+      const ids = typeof session.question_ids === "string" ? JSON.parse(session.question_ids) : session.question_ids;
+      (Array.isArray(ids) ? ids : []).forEach(id => previouslyUsed.add(Number(id)));
+    });
+    const [allQuestions] = await db.query(`
       SELECT id,question,option_a,option_b,option_c,option_d
-      FROM questions WHERE active=1 ORDER BY RAND() LIMIT 15
+      FROM questions WHERE active=1 ORDER BY RAND()
     `);
+    const unused = allQuestions.filter(question => !previouslyUsed.has(Number(question.id)));
+    const rows = [...unused, ...allQuestions.filter(question => previouslyUsed.has(Number(question.id)))].slice(0,15);
     if(rows.length<15) return res.status(503).json({ok:false,error:"Banco de preguntas insuficiente"});
     const examToken=crypto.randomBytes(32).toString("hex");
     await db.query(
@@ -2313,9 +2325,21 @@ app.get("/questions", auth, async (req, res) => {
        VALUES(?,?,?,DATE_ADD(NOW(),INTERVAL 60 MINUTE))`,
       [examToken,req.userId,JSON.stringify(rows.map(q=>q.id))]
     );
-    const questions=rows.map(question=>Object.fromEntries(
-      Object.entries(question).map(([key,value])=>[key,repairMojibake(value)])
-    ));
+    const shuffle = items => {
+      const result = [...items];
+      for (let index=result.length-1; index>0; index--) {
+        const other=crypto.randomInt(index+1);
+        [result[index],result[other]]=[result[other],result[index]];
+      }
+      return result;
+    };
+    const questions=rows.map(question=>({
+      id:question.id,
+      question:repairMojibake(question.question),
+      options:shuffle([
+        ["A",question.option_a], ["B",question.option_b], ["C",question.option_c], ["D",question.option_d]
+      ].filter(([,text])=>text)).map(([key,text],index)=>({key,label:String.fromCharCode(65+index),text:repairMojibake(text)}))
+    }));
     return res.json({ok:true,examToken,questions});
   } catch(err) {
     console.error("QUESTIONS ERROR:",err);
