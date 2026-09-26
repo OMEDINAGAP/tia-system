@@ -515,6 +515,45 @@ app.post("/admin-tokens/:tokenId/cuentas/:accountId/restablecer-password",auth,a
   finally{if(connection)connection.release();}
 });
 
+app.post("/admin-tokens/:tokenId/cuentas",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede administrar cuentas empresariales"});
+    const tokenId=Number(req.params.tokenId),nombre=String(req.body.nombre||"").trim(),usuario=String(req.body.usuario||"").trim().toLowerCase(),password=String(req.body.password||"");
+    if(!Number.isInteger(tokenId)||tokenId<1)return res.status(400).json({ok:false,error:"Token inválido"});
+    if(!nombre||nombre.length>120)return res.status(400).json({ok:false,error:"Indica el nombre del administrador"});
+    if(!/^[a-z0-9._-]{4,80}$/.test(usuario))return res.status(400).json({ok:false,error:"El usuario debe tener al menos 4 caracteres y usar letras, números, punto, guion o guion bajo"});
+    if(password.length<8)return res.status(400).json({ok:false,error:"La contraseña debe tener al menos 8 caracteres"});
+    connection=await db.getConnection();await connection.beginTransaction();
+    const [companies]=await connection.query(`SELECT e.id FROM folios_acceso fa JOIN empresas e ON e.folio_acceso_id=fa.id WHERE fa.id=? FOR UPDATE`,[tokenId]);
+    const company=companies[0];
+    if(!company){await connection.rollback();return res.status(404).json({ok:false,error:"Primero debe estar activado el perfil de la empresa"});}
+    const salt=crypto.randomBytes(16).toString("hex");
+    const [result]=await connection.query(`INSERT INTO cuentas_empresa (empresa_id,nombre,usuario,password_hash,password_salt) VALUES (?,?,?,?,?)`,[company.id,nombre,usuario,hashPassword(password,salt),salt]);
+    await connection.commit();
+    return res.status(201).json({ok:true,cuenta:{id:result.insertId,nombre,usuario,activo:1}});
+  }catch(err){if(connection)await connection.rollback();if(err.code==="ER_DUP_ENTRY")return res.status(409).json({ok:false,error:"El nombre de usuario ya existe"});console.error("ADMIN CREATE COMPANY ACCOUNT ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible crear la cuenta"});}
+  finally{if(connection)connection.release();}
+});
+
+app.patch("/admin-tokens/:tokenId/cuentas/:accountId/estado",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede administrar cuentas empresariales"});
+    const tokenId=Number(req.params.tokenId),accountId=Number(req.params.accountId),activo=req.body.activo===true||req.body.activo===1||req.body.activo==="1";
+    if(!Number.isInteger(tokenId)||!Number.isInteger(accountId)||tokenId<1||accountId<1)return res.status(400).json({ok:false,error:"Solicitud inválida"});
+    connection=await db.getConnection();await connection.beginTransaction();
+    const [accounts]=await connection.query(`SELECT ce.id,ce.nombre,ce.usuario,ce.activo FROM folios_acceso fa JOIN empresas e ON e.folio_acceso_id=fa.id JOIN cuentas_empresa ce ON ce.empresa_id=e.id WHERE fa.id=? AND ce.id=? FOR UPDATE`,[tokenId,accountId]);
+    const account=accounts[0];
+    if(!account){await connection.rollback();return res.status(404).json({ok:false,error:"La cuenta no pertenece a este token empresarial"});}
+    await connection.query("UPDATE cuentas_empresa SET activo=? WHERE id=?",[activo?1:0,account.id]);
+    if(!activo)await connection.query("DELETE FROM sesiones_empresa WHERE cuenta_empresa_id=?",[account.id]);
+    await connection.commit();
+    return res.json({ok:true,cuenta:{...account,activo:activo?1:0}});
+  }catch(err){if(connection)await connection.rollback();console.error("ADMIN COMPANY ACCOUNT STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar la cuenta"});}
+  finally{if(connection)connection.release();}
+});
+
 app.patch("/admin-tokens/:id/status",auth,async(req,res)=>{
   try{
     if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede modificar tokens"});
@@ -1050,6 +1089,7 @@ app.post("/login-empresa", accessLoginLimiter, async (req, res) => {
 });
 
 app.get("/empresa-cuentas", async (req, res) => {
+  return res.status(403).json({ ok:false, message:"La gestión de cuentas está disponible únicamente para el administrador del sistema" });
   try {
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
     const session = await getEmpresaManagementSession(db, token);
@@ -1067,6 +1107,7 @@ app.get("/empresa-cuentas", async (req, res) => {
 });
 
 app.post("/empresa-cuentas", async (req, res) => {
+  return res.status(403).json({ ok:false, message:"La gestión de cuentas está disponible únicamente para el administrador del sistema" });
   let connection;
   try {
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
@@ -1103,6 +1144,7 @@ app.post("/empresa-cuentas", async (req, res) => {
 });
 
 app.patch("/empresa-cuentas/:id/estado", async (req, res) => {
+  return res.status(403).json({ ok:false, message:"La gestión de cuentas está disponible únicamente para el administrador del sistema" });
   let connection;
   try {
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();

@@ -2,6 +2,10 @@ const token = sessionStorage.getItem('gestionEmpresaToken');
 
 if (!token) location.replace('/');
 
+// La autorización de cuentas la administra exclusivamente el portal administrativo.
+document.querySelector('[onclick="openAccountsModal()"]')?.remove();
+document.getElementById('accountsModal')?.remove();
+
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
 }[char]));

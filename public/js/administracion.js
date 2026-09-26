@@ -211,3 +211,42 @@ render=function(){
     cell.innerHTML=`<div class="action-icons">${actionIcon({kind:'document',label:person.carta_aceptada_en?'Descargar carta de aceptación':'Carta de aceptación no disponible',enabled:Boolean(person.carta_aceptada_en),onClick:`downloadCommitment(${Number(person.id)},'${esc(person.folio)}')`})}${actionIcon({kind:'photo',label:hasApprovedPhoto?'Descargar fotografía':hasPendingPhoto?'Revisar fotografía':'Fotografía no disponible',enabled:canReviewOrDownloadPhoto,onClick:photoClick})}${actionIcon({kind:'exam',label:person.examen_auditado_id?'Descargar examen aprobado':'Examen auditado no disponible',enabled:Boolean(person.examen_auditado_id),onClick:`downloadApprovedExam(${Number(person.id)},'${esc(person.folio)}')`})}${actionIcon({kind:'pdf',label:canDownloadCertificate?'Descargar constancia PDF':'Constancia no disponible',enabled:canDownloadCertificate,onClick:`certificate(${Number(person.id)},'${esc(person.folio)}')`})}</div>`;
   });
 };
+
+async function getEnterpriseAccountDetail(tokenId){
+  const response=await fetch(`/admin-tokens/${tokenId}/detalle`,{headers:{Authorization:'Bearer '+token}});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.ok)throw new Error(payload.error||'No fue posible consultar las cuentas');
+  return payload;
+}
+
+async function openAccountManagement(tokenId){
+  let payload;
+  try{payload=await getEnterpriseAccountDetail(tokenId)}catch(error){return Swal.fire('Error',error.message,'error')}
+  const enterprise=payload.token.nombre||payload.token.empresa||'Empresa vinculada';
+  const rows=(payload.cuentas||[]).map(account=>`<tr><td>${esc(account.nombre||'--')}</td><td><b>${esc(account.usuario)}</b></td><td>${badge(Number(account.activo)?'USADO':'SUSPENDIDO')}</td><td style="white-space:nowrap"><button class="view-btn" onclick="adminResetManagedAccount(${Number(tokenId)},${Number(account.id)},${esc(JSON.stringify(account.usuario))})">Contraseña</button> <button class="${Number(account.activo)?'secondary':'primary'}" style="padding:7px 9px" onclick="changeManagedAccountStatus(${Number(tokenId)},${Number(account.id)},${Number(account.activo)?0:1})">${Number(account.activo)?'Suspender':'Reactivar'}</button></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Aún no hay cuentas autorizadas.</td></tr>';
+  await Swal.fire({title:'Gestión de cuentas',width:940,html:`<div style="text-align:left"><p style="margin-top:0;color:#93a4ba">${esc(enterprise)} · Token <strong style="color:#6ee7a0">${esc(payload.token.folio)}</strong></p><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;min-width:720px"><thead><tr><th>Nombre</th><th>Usuario</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${rows}</tbody></table></div><hr style="border-color:#263449;margin:24px 0"><h3 style="margin:0 0 14px">Autorizar nueva cuenta</h3><form id="adminManagedAccountForm" autocomplete="off" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><label style="color:#cbd5e1;font-size:13px">Nombre completo<input name="nombre" required maxlength="120" style="display:block;width:100%;margin-top:5px"></label><label style="color:#cbd5e1;font-size:13px">Usuario propio<input name="usuario" required minlength="4" maxlength="80" pattern="[a-zA-Z0-9._-]+" placeholder="Ej. nombre.apellido" style="display:block;width:100%;margin-top:5px"></label><label style="color:#cbd5e1;font-size:13px;grid-column:1/-1">Contraseña temporal<input name="password" type="password" required minlength="8" placeholder="Mínimo 8 caracteres" style="display:block;width:100%;margin-top:5px"></label><div style="grid-column:1/-1;text-align:right"><button class="primary" type="submit">Crear acceso</button></div></form><p style="color:#93a4ba;font-size:12px">Por seguridad, las contraseñas existentes no se consultan; solo pueden restablecerse.</p></div>`,showConfirmButton:true,confirmButtonText:'Cerrar',buttonsStyling:false,customClass:{popup:'tia-modal',confirmButton:'tia-secondary'},didOpen:()=>{const form=document.getElementById('adminManagedAccountForm');form.addEventListener('submit',async event=>{event.preventDefault();const submit=form.querySelector('button[type="submit"]');submit.disabled=true;try{const response=await fetch(`/admin-tokens/${tokenId}/cuentas`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(Object.fromEntries(new FormData(form)))}),result=await response.json().catch(()=>({}));if(!response.ok||!result.ok)return Swal.showValidationMessage(result.error||'No fue posible crear el acceso');Swal.close();await Swal.fire('Cuenta autorizada','La cuenta ya puede ingresar con el folio de la empresa.','success');openAccountManagement(tokenId)}finally{submit.disabled=false}})}});
+}
+
+async function changeManagedAccountStatus(tokenId,accountId,activate){
+  const confirmation=await Swal.fire({title:activate?'¿Reactivar cuenta?':'¿Suspender cuenta?',text:activate?'La cuenta podrá ingresar nuevamente.':'Se cerrarán sus sesiones y ya no podrá ingresar.',icon:activate?'question':'warning',showCancelButton:true,confirmButtonText:activate?'Reactivar':'Suspender',cancelButtonText:'Cancelar',confirmButtonColor:activate?'#16a34a':'#b91c1c'});
+  if(!confirmation.isConfirmed)return;
+  const response=await fetch(`/admin-tokens/${tokenId}/cuentas/${accountId}/estado`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({activo:Boolean(activate)})}),payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.ok)return Swal.fire('Error',payload.error||'No fue posible actualizar la cuenta','error');
+  openAccountManagement(tokenId);
+}
+
+async function adminResetManagedAccount(tokenId,accountId,usuario){
+  const prompt=await Swal.fire({title:'Restablecer contraseña',html:`Define una nueva contraseña para <strong>${esc(usuario)}</strong>.`,input:'password',inputPlaceholder:'Nueva contraseña (mínimo 8 caracteres)',inputAttributes:{minlength:'8',autocomplete:'new-password'},showCancelButton:true,confirmButtonText:'Restablecer',cancelButtonText:'Cancelar',preConfirm:value=>{if(!value||value.length<8){Swal.showValidationMessage('La contraseña debe tener al menos 8 caracteres');return false}return value}});
+  if(!prompt.isConfirmed)return;
+  const response=await fetch(`/admin-tokens/${tokenId}/cuentas/${accountId}/restablecer-password`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({password:prompt.value})}),payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.ok)return Swal.fire('Error',payload.error||'No fue posible restablecer la contraseña','error');
+  await Swal.fire('Contraseña restablecida','Las sesiones activas de esa cuenta se cerraron.','success');openAccountManagement(tokenId);
+}
+
+const tokenDetailWithoutAccountManagement=openTokenDetail;
+openTokenDetail=async function(tokenId){
+  const response=await fetch(`/admin-tokens/${tokenId}/detalle`,{headers:{Authorization:'Bearer '+token}}),payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.ok)return Swal.fire('Error',payload.error||'No fue posible consultar el token','error');
+  const detail=payload.token,company=detail.nombre||detail.empresa||'Sin empresa vinculada',count=(payload.cuentas||[]).length;
+  await Swal.fire({title:'Detalle del token',width:920,html:`<div style="text-align:left"><p><b>Token:</b> <span style="font-family:Consolas;color:#6ee7a0">${esc(detail.folio)}</span><br><b>Empresa:</b> ${esc(company)}<br><b>Estado:</b> ${esc(detail.estatus)}<br><b>Representante:</b> ${esc(detail.representante_legal||'--')}<br><b>Contacto:</b> ${esc(detail.correo_1||detail.telefono_1||'--')}</p><hr style="border-color:#263449"><h3>Cuentas autorizadas</h3><p style="color:#93a4ba">${count} cuenta${count===1?'':'s'} registrada${count===1?'':'s'} para la empresa.</p><button class="primary" onclick="Swal.close();openAccountManagement(${Number(tokenId)})">Gestión de cuentas</button></div>`,showConfirmButton:true,confirmButtonText:'Cerrar',buttonsStyling:false,customClass:{popup:'tia-modal',confirmButton:'tia-secondary'}});
+};
