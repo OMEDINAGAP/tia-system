@@ -1390,7 +1390,7 @@ async function generateCertificatePdf(req,res,person,disposition="attachment") {
   doc.font("Helvetica-Bold").fontSize(22).fillColor("#8a5b13").text("CURSO DE SEGURIDAD AEROPORTUARIA",95,286,{width:610,align:"center"});
   doc.font("Helvetica").fontSize(11).fillColor("#475569").text("Formacion orientada a la cultura de seguridad, control de accesos, prevencion de riesgos y cumplimiento de los procedimientos operativos aplicables en instalaciones aeroportuarias.",125,330,{width:550,align:"center",lineGap:3});
   doc.roundedRect(145,405,500,55,6).fillAndStroke("#f8fafc","#d4a64f");
-  doc.font("Helvetica-Bold").fontSize(11).fillColor("#0f3d5e").text(`FOLIO  ${person.folio}`,160,420,{width:155,align:"center"}).text(`RESULTADO  ${Number(person.exam).toFixed(0)}%`,320,420,{width:145,align:"center"}).text(`FECHA  ${person.fecha?new Date(person.fecha).toLocaleDateString("es-MX"):"--"}`,470,420,{width:160,align:"center"});
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#0f3d5e").text(`FOLIO  ${person.folio}`,160,420,{width:210,align:"center"}).text(`FECHA  ${person.fecha?new Date(person.fecha).toLocaleDateString("es-MX"):"--"}`,415,420,{width:210,align:"center"});
   doc.moveTo(245,510).lineTo(545,510).lineWidth(1).stroke("#64748b");
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#334155").text("COORDINACION DE SEGURIDAD AEROPORTUARIA",195,518,{width:400,align:"center"});
   doc.font("Helvetica").fontSize(8).fillColor("#64748b").text("Documento emitido electronicamente por el Sistema TIA",195,535,{width:400,align:"center"});
