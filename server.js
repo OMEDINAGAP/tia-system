@@ -123,6 +123,39 @@ function repairMojibake(value){
   return repaired;
 }
 
+/* Auditoria: solo almacena referencias y cambios operativos; nunca secretos, contraseñas ni archivos. */
+function auditActor(req, fallback={}) {
+  if (req?.isAdmin && req.admin) return { tipo:"ADMIN", id:req.admin.id, nombre:req.admin.usuario || req.admin.name };
+  return { tipo:fallback.tipo || "SISTEMA", id:fallback.id || null, nombre:fallback.nombre || "Sistema TIA" };
+}
+function auditSafe(value) {
+  if (!value || typeof value !== "object") return value ?? null;
+  const result={};
+  for (const [key,item] of Object.entries(value)) {
+    if (/pass|password|salt|hash|firma|photo|imagen|token/i.test(key)) continue;
+    result[key]=item;
+  }
+  return result;
+}
+async function auditEvent(executor, req, event, details={}) {
+  try {
+    const actor=auditActor(req, details.actor);
+    await executor.query(`INSERT INTO auditoria_eventos
+      (actor_tipo,actor_id,actor_nombre,empresa_id,persona_id,folio,entidad,entidad_id,evento,antes_json,despues_json,detalle,ip,user_agent)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[
+      actor.tipo,actor.id,actor.nombre,details.empresaId || null,details.personaId || null,details.folio || null,
+      details.entidad || null,details.entidadId || null,event,
+      JSON.stringify(auditSafe(details.antes)),JSON.stringify(auditSafe(details.despues)),details.detalle || null,
+      String(req?.ip || "").slice(0,64),String(req?.get?.("user-agent") || "").slice(0,500)
+    ]);
+  } catch (error) { console.error("AUDIT EVENT ERROR:",error.message); }
+}
+async function auditPersonContext(executor,userId) {
+  const [rows]=await executor.query(`SELECT pc.id AS persona_id,pc.empresa_id,pc.folio,u.name
+    FROM personas_curso pc JOIN users u ON u.id=pc.user_id WHERE u.id=? LIMIT 1`,[userId]);
+  return rows[0] || {};
+}
+
 
 // arriba
 const sessions = new Map(); // token -> userId
@@ -383,6 +416,7 @@ app.post("/admin-login", adminLoginLimiter, async (req, res) => {
        VALUES(?,?,DATE_ADD(NOW(),INTERVAL 8 HOUR))`,
       [token,admin.id]
     );
+    await auditEvent(db,req,"INICIO_SESION_ADMINISTRATIVO",{actor:{tipo:"ADMIN",id:admin.id,nombre:admin.usuario||admin.name},entidad:"ADMIN",entidadId:admin.id});
 
     res.json({
       ok: true,
@@ -438,6 +472,38 @@ app.get("/admin-overview",auth,async(req,res)=>{
   }catch(err){console.error("ADMIN OVERVIEW ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible cargar la administracion"});}
 });
 
+app.get("/admin-auditoria",auth,async(req,res)=>{
+  try {
+    if(!req.isAdmin || req.admin.rol!=="SUPERADMIN") return res.status(403).json({ok:false,error:"Solo el administrador principal puede consultar la auditoria"});
+    const search=String(req.query.q||"").trim();
+    const event=String(req.query.evento||"").trim();
+    const from=String(req.query.desde||"").slice(0,10);
+    const to=String(req.query.hasta||"").slice(0,10);
+    const where=[],params=[];
+    if(search){ where.push("(ae.folio LIKE ? OR ae.actor_nombre LIKE ? OR e.nombre LIKE ? OR CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) LIKE ? OR ae.detalle LIKE ?)"); for(let i=0;i<5;i++)params.push(`%${search}%`); }
+    if(event){where.push("ae.evento=?");params.push(event);}
+    if(from){where.push("ae.creado_en>=?");params.push(`${from} 00:00:00`);}
+    if(to){where.push("ae.creado_en<?");params.push(`${to} 23:59:59`);}
+    const filter=where.length?`WHERE ${where.join(" AND ")}`:"";
+    const [events]=await db.query(`SELECT ae.*,e.nombre AS empresa,CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador
+      FROM auditoria_eventos ae LEFT JOIN empresas e ON e.id=ae.empresa_id LEFT JOIN personas_curso pc ON pc.id=ae.persona_id
+      ${filter} ORDER BY ae.creado_en DESC,ae.id DESC LIMIT 1000`,params);
+    const [eventTypes]=await db.query("SELECT evento,COUNT(*) total FROM auditoria_eventos GROUP BY evento ORDER BY evento");
+    const [kpis]=await db.query(`SELECT pc.id,pc.folio,e.nombre AS empresa,CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador,
+      MIN(CASE WHEN ae.evento='COLABORADOR_REGISTRADO' THEN ae.creado_en END) AS alta_en,
+      MIN(CASE WHEN ae.evento='CARTA_ACEPTADA' THEN ae.creado_en END) AS carta_en,
+      MIN(CASE WHEN ae.evento='VIDEO_COMPLETADO' THEN ae.creado_en END) AS video_en,
+      MIN(CASE WHEN ae.evento='EXAMEN_APROBADO' THEN ae.creado_en END) AS examen_en,
+      MIN(CASE WHEN ae.evento='FOTOGRAFIA_APROBADA' THEN ae.creado_en END) AS constancia_lista_en,
+      MIN(CASE WHEN ae.evento='CONSTANCIA_DESCARGADA' THEN ae.creado_en END) AS constancia_descargada_en
+      FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id LEFT JOIN auditoria_eventos ae ON ae.persona_id=pc.id
+      GROUP BY pc.id,e.nombre ORDER BY pc.creado_en DESC LIMIT 1000`);
+    const completed=kpis.filter(row=>row.alta_en&&row.constancia_lista_en);
+    const averageHours=completed.length?Math.round(completed.reduce((sum,row)=>sum+(new Date(row.constancia_lista_en)-new Date(row.alta_en))/3600000,0)/completed.length*10)/10:null;
+    return res.json({ok:true,events,eventTypes,kpis,summary:{eventos:events.length,procesosConcluidos:completed.length,tiempoPromedioHoras:averageHours}});
+  } catch(err) { console.error("ADMIN AUDIT ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible cargar la auditoria"}); }
+});
+
 app.post("/admin-tokens",auth,async(req,res)=>{
   let connection;
   try{
@@ -459,6 +525,7 @@ app.post("/admin-tokens",auth,async(req,res)=>{
       );
       tokens.push({id:result.insertId,token:folio,caducidad:expiry});
     }
+    for(const created of tokens) await auditEvent(connection,req,"TOKEN_EMPRESARIAL_CREADO",{folio:created.token,entidad:"TOKEN",entidadId:created.id,despues:{caducidad:created.caducidad}});
     await connection.commit();
     return res.status(201).json({ok:true,tokens});
   }catch(err){
@@ -509,6 +576,7 @@ app.post("/admin-tokens/:tokenId/cuentas/:accountId/restablecer-password",auth,a
     const salt=crypto.randomBytes(16).toString("hex");
     await connection.query("UPDATE cuentas_empresa SET password_hash=?,password_salt=? WHERE id=?",[hashPassword(password,salt),salt,account.id]);
     await connection.query("DELETE FROM sesiones_empresa WHERE cuenta_empresa_id=?",[account.id]);
+    await auditEvent(connection,req,"CUENTA_EMPRESA_CONTRASENA_RESTABLECIDA",{entidad:"CUENTA_EMPRESA",entidadId:account.id,folio:String(tokenId),despues:{usuario:account.usuario},detalle:"Las sesiones empresariales fueron cerradas"});
     await connection.commit();
     return res.json({ok:true,usuario:account.usuario});
   }catch(err){if(connection)await connection.rollback();console.error("ADMIN TOKEN PASSWORD RESET ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible restablecer la contrasena"});}
@@ -530,6 +598,7 @@ app.post("/admin-tokens/:tokenId/cuentas",auth,async(req,res)=>{
     if(!company){await connection.rollback();return res.status(404).json({ok:false,error:"Primero debe estar activado el perfil de la empresa"});}
     const salt=crypto.randomBytes(16).toString("hex");
     const [result]=await connection.query(`INSERT INTO cuentas_empresa (empresa_id,nombre,usuario,password_hash,password_salt) VALUES (?,?,?,?,?)`,[company.id,nombre,usuario,hashPassword(password,salt),salt]);
+    await auditEvent(connection,req,"CUENTA_EMPRESA_AUTORIZADA",{empresaId:company.id,entidad:"CUENTA_EMPRESA",entidadId:result.insertId,folio:String(tokenId),despues:{nombre,usuario,activo:true}});
     await connection.commit();
     return res.status(201).json({ok:true,cuenta:{id:result.insertId,nombre,usuario,activo:1}});
   }catch(err){if(connection)await connection.rollback();if(err.code==="ER_DUP_ENTRY")return res.status(409).json({ok:false,error:"El nombre de usuario ya existe"});console.error("ADMIN CREATE COMPANY ACCOUNT ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible crear la cuenta"});}
@@ -548,6 +617,7 @@ app.patch("/admin-tokens/:tokenId/cuentas/:accountId/estado",auth,async(req,res)
     if(!account){await connection.rollback();return res.status(404).json({ok:false,error:"La cuenta no pertenece a este token empresarial"});}
     await connection.query("UPDATE cuentas_empresa SET activo=? WHERE id=?",[activo?1:0,account.id]);
     if(!activo)await connection.query("DELETE FROM sesiones_empresa WHERE cuenta_empresa_id=?",[account.id]);
+    await auditEvent(connection,req,activo?"CUENTA_EMPRESA_REACTIVADA":"CUENTA_EMPRESA_SUSPENDIDA",{entidad:"CUENTA_EMPRESA",entidadId:account.id,folio:String(tokenId),antes:{activo:account.activo},despues:{activo},detalle:account.usuario});
     await connection.commit();
     return res.json({ok:true,cuenta:{...account,activo:activo?1:0}});
   }catch(err){if(connection)await connection.rollback();console.error("ADMIN COMPANY ACCOUNT STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar la cuenta"});}
@@ -564,6 +634,7 @@ app.patch("/admin-tokens/:id/status",auth,async(req,res)=>{
        WHERE id=? AND estatus IN ('ACTIVO','SUSPENDIDO')`,[status,Number(req.params.id)]
     );
     if(!result.affectedRows)return res.status(409).json({ok:false,error:"Solo pueden modificarse tokens pendientes o suspendidos"});
+    await auditEvent(db,req,status==="SUSPENDIDO"?"TOKEN_SUSPENDIDO":"TOKEN_REACTIVADO",{entidad:"TOKEN",entidadId:Number(req.params.id),despues:{estatus:status}});
     return res.json({ok:true});
   }catch(err){console.error("ADMIN TOKEN STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar el token"})}
 });
@@ -602,6 +673,7 @@ app.patch("/admin-empresas/:id/suspender",auth,async(req,res)=>{
       await connection.query("DELETE FROM sesiones_empresa WHERE empresa_id=?",[company.empresa_id]);
       await connection.query("DELETE FROM sesiones_registro_empresa WHERE folio_acceso_id=?",[folioId]);
     }
+    await auditEvent(connection,req,"EMPRESA_Y_ACCESOS_SUSPENDIDOS",{empresaId:company.empresa_id,entidad:"EMPRESA",entidadId:company.empresa_id,folio:String(folioId),antes:{estatus:company.estatus},despues:{estatus:"SUSPENDIDO"},detalle:"Se suspendieron cuentas y colaboradores vinculados"});
     await connection.commit();
     return res.json({ok:true,empresa:company.nombre||null});
   }catch(err){
@@ -632,6 +704,7 @@ app.patch("/admin-empresas/:id/reactivar",auth,async(req,res)=>{
       await connection.query("DELETE FROM suspensiones_colaborador WHERE empresa_id=?",[company.empresa_id]);
     }
     await connection.query("UPDATE folios_acceso SET estatus=? WHERE id=?",[status,folioId]);
+    await auditEvent(connection,req,"EMPRESA_Y_ACCESOS_REACTIVADOS",{empresaId:company.empresa_id,entidad:"EMPRESA",entidadId:company.empresa_id,folio:String(folioId),antes:{estatus:"SUSPENDIDO"},despues:{estatus:status},detalle:"Se reactivaron cuentas y colaboradores vinculados"});
     await connection.commit();
     return res.json({ok:true,estatus:status});
   }catch(err){if(connection)await connection.rollback();console.error("ADMIN COMPANY REACTIVATE ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible reactivar los accesos"});}
@@ -661,6 +734,7 @@ app.post("/admin-users",auth,async(req,res)=>{
       `INSERT INTO admins(name,usuario,pin,password_hash,password_salt,rol,activo)
        VALUES(?,?,NULL,?,?,'GESTOR',1)`,[name,usuario,passwordHash,salt]
     );
+    await auditEvent(db,req,"USUARIO_INTERNO_CREADO",{entidad:"ADMIN",entidadId:result.insertId,despues:{nombre:name,usuario,rol:"GESTOR",activo:true}});
     return res.status(201).json({ok:true,id:result.insertId});
   }catch(err){
     if(err.code==="ER_DUP_ENTRY")return res.status(409).json({ok:false,error:"Ese nombre de usuario ya existe"});
@@ -676,6 +750,7 @@ app.patch("/admin-users/:id/status",auth,async(req,res)=>{
     const [result]=await db.query("UPDATE admins SET activo=? WHERE id=? AND rol='GESTOR'",[activo,id]);
     if(!result.affectedRows)return res.status(404).json({ok:false,error:"Usuario de gestión no encontrado"});
     if(!activo)await db.query("DELETE FROM admin_sessions WHERE admin_id=?",[id]);
+    await auditEvent(db,req,activo?"USUARIO_INTERNO_REACTIVADO":"USUARIO_INTERNO_SUSPENDIDO",{entidad:"ADMIN",entidadId:id,despues:{activo:Boolean(activo)}});
     return res.json({ok:true});
   }catch(err){console.error("ADMIN USER STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar el usuario"})}
 });
@@ -687,6 +762,7 @@ app.get("/admin-personas/:id/constancia",auth,async(req,res)=>{
     const person=rows[0];
     if(!person) return res.status(404).json({error:"Persona no encontrada"});
     if(!person.aprobado||!person.photo||person.foto_estatus!=="APROBADA") return res.status(403).json({error:"Constancia pendiente de aprobación de fotografía"});
+    await auditEvent(db,req,"CONSTANCIA_DESCARGADA",{personaId:Number(req.params.id),folio:person.folio,entidad:"CONSTANCIA",entidadId:Number(req.params.id),detalle:"Descarga desde administracion"});
     await generateCertificatePdf(req,res,person,"attachment");
   }catch(err){console.error("ADMIN CERT ERROR:",err);if(!res.headersSent)return res.status(500).json({error:"No fue posible generar la constancia"});res.end();}
 });
@@ -695,12 +771,13 @@ app.get("/admin-personas/:id/fotografia",auth,async(req,res)=>{
   try{
     if(!req.isAdmin)return res.status(403).json({error:"No autorizado"});
     const [rows]=await db.query(
-      `SELECT pc.folio,u.photo,u.photo_data,u.photo_mime,u.aprobado,u.foto_estatus
+      `SELECT pc.id,pc.empresa_id,pc.folio,u.photo,u.photo_data,u.photo_mime,u.aprobado,u.foto_estatus
        FROM personas_curso pc JOIN users u ON u.id=pc.user_id
        WHERE pc.id=? LIMIT 1`,[Number(req.params.id)]
     );
     const person=rows[0];
     if(!person||!person.aprobado||!person.photo||!['PENDIENTE','APROBADA'].includes(person.foto_estatus))return res.status(404).json({error:"Fotografía no disponible"});
+    await auditEvent(db,req,req.query.preview==="1"?"FOTOGRAFIA_CONSULTADA":"FOTOGRAFIA_DESCARGADA",{empresaId:person.empresa_id,personaId:person.id,folio:person.folio,entidad:"FOTOGRAFIA",entidadId:person.id});
     const filename=`fotografia-${String(person.folio).replace(/[^a-z0-9_-]/gi,"_")}.jpg`;
     if(person.photo_data){
       res.setHeader("Content-Type",person.photo_mime||"image/jpeg");
@@ -724,7 +801,7 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
     if(decision==="RECHAZAR"&&motivo.length<5)return res.status(400).json({ok:false,error:"Indica el motivo del rechazo"});
     connection=await db.getConnection();await connection.beginTransaction();
     const [rows]=await connection.query(
-      `SELECT pc.id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,
+      `SELECT pc.id,pc.empresa_id,pc.folio,pc.nombres,pc.apellido_paterno,pc.apellido_materno,
               u.id AS user_id,u.photo,u.photo_data,u.foto_estatus,e.nombre AS empresa,e.correo_1
        FROM personas_curso pc JOIN users u ON u.id=pc.user_id JOIN empresas e ON e.id=pc.empresa_id
        WHERE pc.id=? FOR UPDATE`,[Number(req.params.id)]
@@ -738,6 +815,7 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
         "UPDATE users SET foto_estatus='APROBADA',foto_revisada_en=NOW(),foto_revisada_por=?,foto_motivo_rechazo=NULL WHERE id=?",
         [req.admin.id,person.user_id]
       );
+      await auditEvent(connection,req,"FOTOGRAFIA_APROBADA",{empresaId:person.empresa_id,personaId:person.id,folio:person.folio,entidad:"FOTOGRAFIA",entidadId:person.user_id,despues:{estatus:"APROBADA"}});
       await connection.commit();
       const nombre=[person.nombres,person.apellido_paterno,person.apellido_materno].filter(Boolean).join(" ");
       const subject=`Fotografía aceptada - ${nombre}`;
@@ -781,6 +859,7 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
         [person.user_id]
       );
     }
+    await auditEvent(connection,req,"FOTOGRAFIA_RECHAZADA",{empresaId:person.empresa_id,personaId:person.id,folio:person.folio,entidad:"FOTOGRAFIA",entidadId:person.user_id,despues:{estatus:"RECHAZADA",tomaFisica:requiereTomaFisica},detalle:motivo});
     await connection.commit();
     if(person.photo&&person.photo!=="DB"){
       const oldPhoto=path.resolve(__dirname,person.photo),uploadsRoot=path.resolve(__dirname,"uploads");
@@ -966,6 +1045,7 @@ app.post("/registro-empresa", async (req, res) => {
       [values.nombre, folioId]
     );
     await connection.query("UPDATE sesiones_registro_empresa SET usado_en=NOW() WHERE token=?", [token]);
+    await auditEvent(connection,req,"EMPRESA_REGISTRADA",{empresaId:empresaResult.insertId,entidad:"EMPRESA",entidadId:empresaResult.insertId,folio:String(folioId),despues:{nombre:values.nombre,razonSocial:values.razonSocial,representanteLegal:values.representanteLegal}});
     await connection.commit();
 
     return res.json({ ok: true, setupToken });
@@ -1044,6 +1124,7 @@ app.post("/configurar-cuenta", async (req, res) => {
        VALUES (?, ?, ?, 'GESTIONAR_PERSONAS', DATE_ADD(NOW(), INTERVAL 8 HOUR))`,
       [personaToken, empresaId, accountResult.insertId]
     );
+    await auditEvent(connection,req,"CUENTA_EMPRESA_CONFIGURADA",{actor:{tipo:"EMPRESA",id:accountResult.insertId,nombre:usuario},empresaId,entidad:"CUENTA_EMPRESA",entidadId:accountResult.insertId,despues:{usuario,activo:true}});
     await connection.commit();
     return res.json({ ok: true, gestionToken: personaToken });
   } catch (err) {
@@ -1081,6 +1162,7 @@ app.post("/login-empresa", accessLoginLimiter, async (req, res) => {
        VALUES (?, ?, ?, 'GESTIONAR_PERSONAS', DATE_ADD(NOW(), INTERVAL 8 HOUR))`,
       [token, account.empresa_id, account.cuenta_empresa_id]
     );
+    await auditEvent(db,req,"INICIO_SESION_EMPRESA",{actor:{tipo:"EMPRESA",id:account.cuenta_empresa_id,nombre:usuario},empresaId:account.empresa_id,entidad:"CUENTA_EMPRESA",entidadId:account.cuenta_empresa_id});
     return res.json({ ok: true, token });
   } catch (err) {
     console.error("ERROR login-empresa:", err);
@@ -1220,6 +1302,7 @@ app.post("/registro-persona", async (req, res) => {
       [session.empresa_id, personFolio, userResult.insertId, data.nombres,
         data.apellidoPaterno, data.apellidoMaterno || null, data.puesto, data.telefono, data.correo]
     );
+    await auditEvent(connection,req,"COLABORADOR_REGISTRADO",{actor:{tipo:"EMPRESA",id:session.cuenta_empresa_id,nombre:session.usuario},empresaId:session.empresa_id,personaId:result.insertId,folio:personFolio,entidad:"COLABORADOR",entidadId:result.insertId,despues:{nombre:fullName,puesto:data.puesto,correo:data.correo}});
     await connection.commit();
     return res.json({ ok: true, personaId: result.insertId, folio: personFolio });
   } catch (err) {
@@ -1295,6 +1378,7 @@ app.post("/empresa-personas/:id/suspender", async (req, res) => {
       "INSERT INTO suspensiones_colaborador(persona_id,empresa_id) VALUES(?,?)", [person.id, empresa.empresa_id]
     );
     await connection.query("DELETE FROM sessions WHERE userId=?", [person.user_id]);
+    await auditEvent(connection,req,"COLABORADOR_SUSPENDIDO",{actor:{tipo:"EMPRESA",id:empresa.cuenta_empresa_id,nombre:empresa.usuario},empresaId:empresa.empresa_id,personaId:person.id,folio:person.folio,entidad:"COLABORADOR",entidadId:person.id,detalle:"Inhabilitacion solicitada por empresa; requiere baja formal en modulo TIA"});
     await connection.commit();
 
     const nombre = [person.nombres, person.apellido_paterno, person.apellido_materno].filter(Boolean).join(" ");
@@ -1345,7 +1429,7 @@ app.post("/empresa-personas/:id/reactivar", async (req, res) => {
       return res.status(401).json({ ok:false, message:"Sesión expirada" });
     }
     const [people] = await connection.query(
-      "SELECT id FROM personas_curso WHERE id=? AND empresa_id=? FOR UPDATE", [personId, session.empresa_id]
+      "SELECT id,folio FROM personas_curso WHERE id=? AND empresa_id=? FOR UPDATE", [personId, session.empresa_id]
     );
     if (!people.length) {
       await connection.rollback();
@@ -1358,6 +1442,7 @@ app.post("/empresa-personas/:id/reactivar", async (req, res) => {
       await connection.rollback();
       return res.status(409).json({ ok:false, message:"El acceso de este colaborador no está suspendido" });
     }
+    await auditEvent(connection,req,"COLABORADOR_REACTIVADO",{actor:{tipo:"EMPRESA",id:session.cuenta_empresa_id,nombre:session.usuario},empresaId:session.empresa_id,personaId:personId,folio:people[0].folio,entidad:"COLABORADOR",entidadId:personId,detalle:"Se conservaron avance y documentos"});
     await connection.commit();
     return res.json({ ok:true, message:"El acceso fue reactivado. El avance y los documentos del colaborador se conservaron." });
   } catch (err) {
@@ -1417,6 +1502,8 @@ app.get("/empresa-personas/:id/constancia", async (req, res) => {
     const person = rows[0];
     if (!person) return res.status(404).json({ ok:false, message:"Persona no encontrada" });
     if (!person.aprobado || !person.photo || person.foto_estatus!=="APROBADA") return res.status(403).json({ ok:false, message:"La constancia estará disponible después de aprobar la fotografía" });
+    const session=await getEmpresaManagementSession(db,token);
+    await auditEvent(db,req,"CONSTANCIA_DESCARGADA",{actor:{tipo:"EMPRESA",id:session?.cuenta_empresa_id,nombre:session?.usuario||"Empresa"},personaId:Number(req.params.id),folio:person.folio,entidad:"CONSTANCIA",entidadId:Number(req.params.id),detalle:"Descarga desde panel empresarial"});
     await generateCertificatePdf(req,res,person,"attachment");
   } catch(err) {
     console.error("ERROR descargar-constancia:",err);
@@ -1437,6 +1524,8 @@ app.get("/mi-constancia",auth,async(req,res)=>{
     if(!person) return res.status(404).json({ok:false,message:"Persona no encontrada"});
     if(!person.aprobado) return res.status(403).json({ok:false,message:"Aún no has aprobado el curso"});
     if(!person.photo||person.foto_estatus!=="APROBADA") return res.status(403).json({ok:false,message:"Tu fotografía debe ser aprobada antes de consultar la constancia"});
+    const context=await auditPersonContext(db,req.userId);
+    await auditEvent(db,req,"CONSTANCIA_DESCARGADA",{actor:{tipo:"COLABORADOR",id:req.userId,nombre:context.name||"Colaborador"},empresaId:context.empresa_id,personaId:context.persona_id,folio:context.folio,entidad:"CONSTANCIA",entidadId:req.userId,detalle:"Consulta del colaborador"});
     await generateCertificatePdf(req,res,person,"inline");
   } catch(err) {
     console.error("ERROR mi-constancia:",err);
@@ -1638,8 +1727,17 @@ app.post("/log-video", auth, async (req, res) => {
       VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         progress = GREATEST(progress, VALUES(progress)),
-        completed = GREATEST(completed, VALUES(completed))
+      completed = GREATEST(completed, VALUES(completed))
     `, [userId, videoIndex, progress, completed]);
+
+    if (completed && savedProgress <= 95) {
+      const [finished]=await db.query("SELECT COUNT(*) total FROM video_progress WHERE userId=? AND completed=1",[userId]);
+      if(Number(finished[0]?.total||0)>=2){
+        const context=await auditPersonContext(db,userId);
+        const [already]=await db.query("SELECT id FROM auditoria_eventos WHERE persona_id=? AND evento='VIDEO_COMPLETADO' LIMIT 1",[context.persona_id||0]);
+        if(!already.length)await auditEvent(db,req,"VIDEO_COMPLETADO",{actor:{tipo:"COLABORADOR",id:userId,nombre:context.name||"Colaborador"},empresaId:context.empresa_id,personaId:context.persona_id,folio:context.folio,entidad:"CURSO",entidadId:userId,despues:{videosCompletos:2}});
+      }
+    }
 
     console.log("GUARDANDO PARA USER:", req.userId);
 
@@ -1937,6 +2035,8 @@ app.post("/carta-compromiso", auth, async (req, res) => {
        VALUES(?,?, 'image/png', NOW(), 'SAN_JOSE_DEL_CABO_2026_01')`,
       [req.userId,Buffer.from(match[1],"base64")]
     );
+    const context=await auditPersonContext(db,req.userId);
+    await auditEvent(db,req,"CARTA_ACEPTADA",{actor:{tipo:"COLABORADOR",id:req.userId,nombre:context.name||"Colaborador"},empresaId:context.empresa_id,personaId:context.persona_id,folio:context.folio,entidad:"CARTA_COMPROMISO",entidadId:req.userId,despues:{version:"SAN_JOSE_DEL_CABO_2026_01"}});
     return res.status(201).json({ok:true});
   } catch (err) { console.error("COMMITMENT SAVE ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible guardar la carta compromiso"}); }
 });
@@ -2049,6 +2149,7 @@ app.get("/admin-personas/:id/carta-compromiso", auth, async (req,res) => {
     if (!req.isAdmin) return res.status(403).json({error:"No autorizado"});
     const [rows]=await db.query(`SELECT u.name,u.folio,c.firma_data,c.aceptado_en FROM users u JOIN cartas_compromiso c ON c.user_id=u.id WHERE u.id=(SELECT user_id FROM personas_curso WHERE id=? LIMIT 1) LIMIT 1`,[Number(req.params.id)]);
     if (!rows.length) return res.status(404).json({error:"Carta de aceptación no disponible"});
+    await auditEvent(db,req,"CARTA_COMPROMISO_DESCARGADA",{personaId:Number(req.params.id),folio:rows[0].folio,entidad:"CARTA_COMPROMISO",entidadId:Number(req.params.id)});
     await generateProfessionalCommitmentPdf(res,rows[0]);
   } catch(err) { console.error("ADMIN COMMITMENT PDF ERROR:",err); if(!res.headersSent)return res.status(500).json({error:"No fue posible generar la carta"}); res.end(); }
 });
@@ -2063,6 +2164,7 @@ app.get("/admin-personas/:id/examen", auth, async (req,res) => {
     exam.company=exam.empresa||exam.company;
     const [answers]=await db.query("SELECT orden,pregunta,opcion_a,opcion_b,opcion_c,opcion_d,respuesta_colaborador,respuesta_correcta,es_correcta FROM respuestas_examen_aprobado WHERE examen_id=? ORDER BY orden",[exam.id]);
     if(!answers.length)return res.status(404).json({error:"Respuestas del examen no disponibles"});
+    await auditEvent(db,req,"EXAMEN_AUDITABLE_DESCARGADO",{personaId:personId,folio:exam.folio,entidad:"EXAMEN",entidadId:exam.id});
     await generateApprovedExamPdf(res,exam,answers);
   } catch(err) { console.error("ADMIN EXAM PDF ERROR:",err);if(!res.headersSent)return res.status(500).json({error:"No fue posible generar el examen"});res.end(); }
 });
@@ -2084,6 +2186,31 @@ app.get("/me", auth, async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 async function ensureOperationalTables(){
+  await db.query(`CREATE TABLE IF NOT EXISTS auditoria_eventos (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actor_tipo ENUM('ADMIN','EMPRESA','COLABORADOR','SISTEMA') NOT NULL,
+    actor_id BIGINT UNSIGNED NULL,
+    actor_nombre VARCHAR(180) NOT NULL,
+    empresa_id BIGINT UNSIGNED NULL,
+    persona_id BIGINT UNSIGNED NULL,
+    folio VARCHAR(60) NULL,
+    entidad VARCHAR(60) NULL,
+    entidad_id BIGINT UNSIGNED NULL,
+    evento VARCHAR(80) NOT NULL,
+    antes_json JSON NULL,
+    despues_json JSON NULL,
+    detalle VARCHAR(1000) NULL,
+    ip VARCHAR(64) NULL,
+    user_agent VARCHAR(500) NULL,
+    PRIMARY KEY (id),
+    KEY idx_auditoria_fecha (creado_en),
+    KEY idx_auditoria_evento (evento),
+    KEY idx_auditoria_empresa (empresa_id,creado_en),
+    KEY idx_auditoria_persona (persona_id,creado_en),
+    KEY idx_auditoria_actor (actor_tipo,actor_id,creado_en),
+    KEY idx_auditoria_folio (folio)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   await db.query(`CREATE TABLE IF NOT EXISTS suspensiones_colaborador (
     persona_id BIGINT UNSIGNED NOT NULL,
     empresa_id BIGINT UNSIGNED NOT NULL,
@@ -2145,6 +2272,22 @@ async function ensureOperationalTables(){
     UNIQUE KEY uq_respuestas_examen_orden (examen_id,orden),
     CONSTRAINT fk_respuestas_examen_aprobado FOREIGN KEY (examen_id) REFERENCES examenes_aprobados(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  /* Recupera hitos existentes como registros heredados; no inventa actor ni tiempos de video no disponibles. */
+  await db.query(`INSERT INTO auditoria_eventos(actor_tipo,actor_nombre,empresa_id,persona_id,folio,entidad,entidad_id,evento,detalle,creado_en)
+    SELECT 'SISTEMA','Registro histórico',pc.empresa_id,pc.id,pc.folio,'COLABORADOR',pc.id,'COLABORADOR_REGISTRADO','Evento recuperado de registro previo',pc.creado_en
+    FROM personas_curso pc WHERE NOT EXISTS (SELECT 1 FROM auditoria_eventos ae WHERE ae.persona_id=pc.id AND ae.evento='COLABORADOR_REGISTRADO')`);
+  await db.query(`INSERT INTO auditoria_eventos(actor_tipo,actor_nombre,empresa_id,persona_id,folio,entidad,entidad_id,evento,detalle,creado_en)
+    SELECT 'SISTEMA','Registro histórico',pc.empresa_id,pc.id,pc.folio,'CARTA_COMPROMISO',u.id,'CARTA_ACEPTADA','Evento recuperado de registro previo',cc.aceptado_en
+    FROM cartas_compromiso cc JOIN users u ON u.id=cc.user_id JOIN personas_curso pc ON pc.user_id=u.id
+    WHERE NOT EXISTS (SELECT 1 FROM auditoria_eventos ae WHERE ae.persona_id=pc.id AND ae.evento='CARTA_ACEPTADA')`);
+  await db.query(`INSERT INTO auditoria_eventos(actor_tipo,actor_nombre,empresa_id,persona_id,folio,entidad,entidad_id,evento,detalle,creado_en)
+    SELECT 'SISTEMA','Registro histórico',pc.empresa_id,pc.id,pc.folio,'EXAMEN',u.id,'EXAMEN_APROBADO','Evento recuperado de examen aprobado previo',ea.aprobado_en
+    FROM examenes_aprobados ea JOIN users u ON u.id=ea.user_id JOIN personas_curso pc ON pc.user_id=u.id
+    WHERE NOT EXISTS (SELECT 1 FROM auditoria_eventos ae WHERE ae.persona_id=pc.id AND ae.evento='EXAMEN_APROBADO')`);
+  await db.query(`INSERT INTO auditoria_eventos(actor_tipo,actor_nombre,empresa_id,persona_id,folio,entidad,entidad_id,evento,detalle,creado_en)
+    SELECT 'SISTEMA','Registro histórico',pc.empresa_id,pc.id,pc.folio,'FOTOGRAFIA',u.id,'FOTOGRAFIA_APROBADA','Evento recuperado de fotografía aprobada previa',u.foto_revisada_en
+    FROM users u JOIN personas_curso pc ON pc.user_id=u.id WHERE u.foto_estatus='APROBADA'
+    AND NOT EXISTS (SELECT 1 FROM auditoria_eventos ae WHERE ae.persona_id=pc.id AND ae.evento='FOTOGRAFIA_APROBADA')`);
 }
 async function prepareProductionAdmin(){
   if(process.env.NODE_ENV!=="production")return;
@@ -2305,6 +2448,9 @@ app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
     );
     if(!result.affectedRows)return res.status(403).json({ok:false,error:"Debes presentarte al módulo TIA para la toma física de la fotografía"});
 
+    const context=await auditPersonContext(db,userId);
+    await auditEvent(db,req,"FOTOGRAFIA_ENVIADA",{actor:{tipo:"COLABORADOR",id:userId,nombre:context.name||"Colaborador"},empresaId:context.empresa_id,personaId:context.persona_id,folio:context.folio,entidad:"FOTOGRAFIA",entidadId:userId,despues:{estatus:"PENDIENTE"}});
+
     res.json({ ok: true, certificado:"/certificado.html" });
 
   } catch (err) {
@@ -2416,6 +2562,8 @@ app.post("/submit-exam", auth, async (req, res) => {
       score >= 80;
 
     await db.query("UPDATE exam_sessions SET score=?,submitted_at=NOW() WHERE token=?",[score,examToken]);
+    const auditContext=await auditPersonContext(db,userId);
+    await auditEvent(db,req,aprobado?"EXAMEN_APROBADO":"EXAMEN_REPROBADO",{actor:{tipo:"COLABORADOR",id:userId,nombre:auditContext.name||"Colaborador"},empresaId:auditContext.empresa_id,personaId:auditContext.persona_id,folio:auditContext.folio,entidad:"EXAMEN",entidadId:userId,despues:{calificacion:score,aprobado},detalle:`Intento de examen registrado`});
 
     if (aprobado) {
       const [existingAudit] = await db.query("SELECT id FROM examenes_aprobados WHERE user_id=? LIMIT 1", [userId]);
