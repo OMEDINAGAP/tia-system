@@ -479,28 +479,51 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
     const event=String(req.query.evento||"").trim();
     const from=String(req.query.desde||"").slice(0,10);
     const to=String(req.query.hasta||"").slice(0,10);
+    const empresaId=Number(req.query.empresaId)||0;
+    const page=Math.max(1,Number(req.query.page)||1), exportAll=String(req.query.export||"")==="1", pageSize=exportAll?10000:20, offset=(page-1)*pageSize;
     const where=[],params=[];
     if(search){ where.push("(ae.folio LIKE ? OR ae.actor_nombre LIKE ? OR e.nombre LIKE ? OR CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) LIKE ? OR ae.detalle LIKE ?)"); for(let i=0;i<5;i++)params.push(`%${search}%`); }
     if(event){where.push("ae.evento=?");params.push(event);}
+    if(empresaId){where.push("ae.empresa_id=?");params.push(empresaId);}
     if(from){where.push("ae.creado_en>=?");params.push(`${from} 00:00:00`);}
     if(to){where.push("ae.creado_en<?");params.push(`${to} 23:59:59`);}
     const filter=where.length?`WHERE ${where.join(" AND ")}`:"";
+    const [countRows]=await db.query(`SELECT COUNT(*) total FROM auditoria_eventos ae LEFT JOIN empresas e ON e.id=ae.empresa_id LEFT JOIN personas_curso pc ON pc.id=ae.persona_id ${filter}`,params);
     const [events]=await db.query(`SELECT ae.*,e.nombre AS empresa,CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador
       FROM auditoria_eventos ae LEFT JOIN empresas e ON e.id=ae.empresa_id LEFT JOIN personas_curso pc ON pc.id=ae.persona_id
-      ${filter} ORDER BY ae.creado_en DESC,ae.id DESC LIMIT 1000`,params);
+      ${filter} ORDER BY ae.creado_en DESC,ae.id DESC LIMIT ? OFFSET ?`,[...params,pageSize,offset]);
     const [eventTypes]=await db.query("SELECT evento,COUNT(*) total FROM auditoria_eventos GROUP BY evento ORDER BY evento");
+    const kpiClauses=[],kpiParams=[];
+    if(empresaId){kpiClauses.push("pc.empresa_id=?");kpiParams.push(empresaId);}
+    if(search){kpiClauses.push("(pc.folio LIKE ? OR e.nombre LIKE ? OR CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) LIKE ?)");kpiParams.push(`%${search}%`,`%${search}%`,`%${search}%`);}
+    if(from){kpiClauses.push("pc.creado_en>=?");kpiParams.push(`${from} 00:00:00`);}
+    if(to){kpiClauses.push("pc.creado_en<?");kpiParams.push(`${to} 23:59:59`);}
+    const kpiWhere=kpiClauses.length?`WHERE ${kpiClauses.join(" AND ")}`:"";
+    const [kpiCountRows]=await db.query(`SELECT COUNT(*) total FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id ${kpiWhere}`,kpiParams);
     const [kpis]=await db.query(`SELECT pc.id,pc.folio,e.nombre AS empresa,CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador,
       MIN(CASE WHEN ae.evento='COLABORADOR_REGISTRADO' THEN ae.creado_en END) AS alta_en,
+      MIN(CASE WHEN ae.evento='INICIO_SESION_COLABORADOR' THEN ae.creado_en END) AS sesion_en,
       MIN(CASE WHEN ae.evento='CARTA_ACEPTADA' THEN ae.creado_en END) AS carta_en,
+      MIN(CASE WHEN ae.evento='CURSO_INICIADO' THEN ae.creado_en END) AS curso_inicio_en,
       MIN(CASE WHEN ae.evento='VIDEO_COMPLETADO' THEN ae.creado_en END) AS video_en,
+      MAX(CASE WHEN ae.evento='EXAMEN_INICIADO' THEN ae.creado_en END) AS examen_inicio_en,
       MIN(CASE WHEN ae.evento='EXAMEN_APROBADO' THEN ae.creado_en END) AS examen_en,
       MIN(CASE WHEN ae.evento='FOTOGRAFIA_APROBADA' THEN ae.creado_en END) AS constancia_lista_en,
       MIN(CASE WHEN ae.evento='CONSTANCIA_DESCARGADA' THEN ae.creado_en END) AS constancia_descargada_en
       FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id LEFT JOIN auditoria_eventos ae ON ae.persona_id=pc.id
-      GROUP BY pc.id,e.nombre ORDER BY pc.creado_en DESC LIMIT 1000`);
-    const completed=kpis.filter(row=>row.alta_en&&row.constancia_lista_en);
-    const averageHours=completed.length?Math.round(completed.reduce((sum,row)=>sum+(new Date(row.constancia_lista_en)-new Date(row.alta_en))/3600000,0)/completed.length*10)/10:null;
-    return res.json({ok:true,events,eventTypes,kpis,summary:{eventos:events.length,procesosConcluidos:completed.length,tiempoPromedioHoras:averageHours}});
+      ${kpiWhere} GROUP BY pc.id,e.nombre ORDER BY pc.creado_en DESC LIMIT ? OFFSET ?`,[...kpiParams,pageSize,offset]);
+    const [summaryRows]=await db.query(`SELECT COUNT(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN 1 END) AS concluidos,
+      AVG(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN TIMESTAMPDIFF(SECOND,pc.creado_en,u.foto_revisada_en)/3600 END) AS promedio_horas
+      FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id LEFT JOIN users u ON u.id=pc.user_id ${kpiWhere}`,kpiParams);
+    const completed=Number(summaryRows[0]?.concluidos||0);
+    const averageHours=summaryRows[0]?.promedio_horas==null?null:Math.round(Number(summaryRows[0].promedio_horas)*10)/10;
+    const [companyKpis]=await db.query(`SELECT e.id,e.nombre,fa.folio,fa.fecha_emision AS token_emitido_en,e.creado_en AS empresa_registrada_en,
+      MIN(pc.creado_en) AS primer_colaborador_en,COUNT(pc.id) AS colaboradores,
+      SUM(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN 1 ELSE 0 END) AS concluidos,
+      AVG(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN TIMESTAMPDIFF(SECOND,pc.creado_en,u.foto_revisada_en)/3600 END) AS promedio_constancia_horas
+      FROM empresas e JOIN folios_acceso fa ON fa.id=e.folio_acceso_id LEFT JOIN personas_curso pc ON pc.empresa_id=e.id LEFT JOIN users u ON u.id=pc.user_id
+      ${empresaId?"WHERE e.id=?":""} GROUP BY e.id,fa.id ORDER BY promedio_constancia_horas DESC`,empresaId?[empresaId]:[]);
+    return res.json({ok:true,events,eventTypes,kpis,companyKpis,pagination:{page,pageSize,totalEvents:Number(countRows[0].total),totalKpis:Number(kpiCountRows[0].total)},summary:{eventos:Number(countRows[0].total),procesosConcluidos:completed,tiempoPromedioHoras:averageHours}});
   } catch(err) { console.error("ADMIN AUDIT ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible cargar la auditoria"}); }
 });
 
@@ -918,7 +941,7 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
 
     // Los folios personales activos entran directamente al curso.
     const [people] = await db.query(
-      `SELECT u.id,u.name,pc.folio,u.aprobado,u.photo,u.foto_estatus
+      `SELECT u.id,u.name,pc.id AS persona_id,pc.empresa_id,pc.folio,u.aprobado,u.photo,u.foto_estatus
        FROM personas_curso pc JOIN users u ON u.id=pc.user_id
        LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
        WHERE UPPER(pc.folio)=? AND sc.persona_id IS NULL LIMIT 1`,
@@ -931,6 +954,7 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
         "INSERT INTO sessions (token, userId, expires) VALUES (?, ?, ?)",
         [token, user.id, COLLABORATOR_SESSION_EXPIRES]
       );
+      await auditEvent(db,req,"INICIO_SESION_COLABORADOR",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"COLABORADOR",entidadId:user.persona_id});
       return res.json({ ok: true, persona: true, pendingPhoto:!!user.aprobado&&user.foto_estatus!=="APROBADA", token, userId: user.id, folio: user.folio });
     }
 
@@ -1707,6 +1731,11 @@ app.post("/log-video", auth, async (req, res) => {
       [userId, videoIndex]
     );
     const savedProgress = Number(savedRows[0]?.progress || 0);
+    if(savedProgress===0 && progress>0){
+      const context=await auditPersonContext(db,userId);
+      const [alreadyStarted]=await db.query("SELECT id FROM auditoria_eventos WHERE persona_id=? AND evento='CURSO_INICIADO' LIMIT 1",[context.persona_id||0]);
+      if(!alreadyStarted.length)await auditEvent(db,req,"CURSO_INICIADO",{actor:{tipo:"COLABORADOR",id:userId,nombre:context.name||"Colaborador"},empresaId:context.empresa_id,personaId:context.persona_id,folio:context.folio,entidad:"CURSO",entidadId:userId});
+    }
     const rateKey = `${userId}:${videoIndex}`;
     const now = Date.now();
     const lastUpdate = videoProgressRate.get(rateKey) || 0;
@@ -2288,6 +2317,10 @@ async function ensureOperationalTables(){
     SELECT 'SISTEMA','Registro histórico',pc.empresa_id,pc.id,pc.folio,'FOTOGRAFIA',u.id,'FOTOGRAFIA_APROBADA','Evento recuperado de fotografía aprobada previa',u.foto_revisada_en
     FROM users u JOIN personas_curso pc ON pc.user_id=u.id WHERE u.foto_estatus='APROBADA'
     AND NOT EXISTS (SELECT 1 FROM auditoria_eventos ae WHERE ae.persona_id=pc.id AND ae.evento='FOTOGRAFIA_APROBADA')`);
+  await db.query(`INSERT INTO auditoria_eventos(actor_tipo,actor_nombre,empresa_id,persona_id,folio,entidad,entidad_id,evento,detalle,creado_en)
+    SELECT 'SISTEMA','Registro histórico',pc.empresa_id,pc.id,pc.folio,'FOTOGRAFIA',u.id,'FOTOGRAFIA_RECHAZADA',COALESCE(u.foto_motivo_rechazo,'Evento recuperado de fotografía rechazada previa'),COALESCE(u.foto_revisada_en,NOW())
+    FROM users u JOIN personas_curso pc ON pc.user_id=u.id WHERE u.foto_estatus='RECHAZADA'
+    AND NOT EXISTS (SELECT 1 FROM auditoria_eventos ae WHERE ae.persona_id=pc.id AND ae.evento='FOTOGRAFIA_RECHAZADA')`);
 }
 async function prepareProductionAdmin(){
   if(process.env.NODE_ENV!=="production")return;
@@ -2510,6 +2543,8 @@ app.get("/questions", auth, async (req, res) => {
        VALUES(?,?,?,DATE_ADD(NOW(),INTERVAL 60 MINUTE))`,
       [examToken,req.userId,JSON.stringify(rows.map(q=>q.id))]
     );
+    const auditContext=await auditPersonContext(db,req.userId);
+    await auditEvent(db,req,"EXAMEN_INICIADO",{actor:{tipo:"COLABORADOR",id:req.userId,nombre:auditContext.name||"Colaborador"},empresaId:auditContext.empresa_id,personaId:auditContext.persona_id,folio:auditContext.folio,entidad:"EXAMEN",entidadId:req.userId,detalle:"Se generó un intento de examen"});
     const shuffle = items => {
       const result = [...items];
       for (let index=result.length-1; index>0; index--) {
