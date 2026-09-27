@@ -114,7 +114,7 @@ function createMailTransport(){
 
 function repairMojibake(value){
   if(typeof value!=="string")return value;
-  let repaired=value;
+  let repaired=value.replace(/├/g,"Ã").replace(/┬/g,"Â").replace(/┼/g,"Å");
   for(let attempt=0;attempt<2&&/[ÃÂâ]/.test(repaired);attempt++){
     const candidate=Buffer.from(repaired,"latin1").toString("utf8");
     if(candidate.includes("�"))break;
@@ -492,6 +492,12 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
     const [events]=await db.query(`SELECT ae.*,e.nombre AS empresa,CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador
       FROM auditoria_eventos ae LEFT JOIN empresas e ON e.id=ae.empresa_id LEFT JOIN personas_curso pc ON pc.id=ae.persona_id
       ${filter} ORDER BY ae.creado_en DESC,ae.id DESC LIMIT ? OFFSET ?`,[...params,pageSize,offset]);
+    events.forEach(item=>{
+      item.actor_nombre=repairMojibake(item.actor_nombre);
+      item.empresa=repairMojibake(item.empresa);
+      item.colaborador=repairMojibake(item.colaborador);
+      item.detalle=repairMojibake(item.detalle);
+    });
     const [eventTypes]=await db.query("SELECT evento,COUNT(*) total FROM auditoria_eventos GROUP BY evento ORDER BY evento");
     const kpiClauses=[],kpiParams=[];
     if(empresaId){kpiClauses.push("pc.empresa_id=?");kpiParams.push(empresaId);}
