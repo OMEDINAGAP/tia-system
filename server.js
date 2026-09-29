@@ -784,6 +784,123 @@ app.patch("/admin-users/:id/status",auth,async(req,res)=>{
   }catch(err){console.error("ADMIN USER STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar el usuario"})}
 });
 
+/* Banco de preguntas. Los exámenes aprobados conservan su propia copia de
+   preguntas y respuestas, por lo que editar este catálogo no altera auditorías
+   ni constancias ya emitidas. */
+function normalizeExamQuestion(input={}){
+  const question=String(input.question||"").trim();
+  const options={
+    A:String(input.option_a||input.options?.A||"").trim(),
+    B:String(input.option_b||input.options?.B||"").trim(),
+    C:String(input.option_c||input.options?.C||"").trim(),
+    D:String(input.option_d||input.options?.D||"").trim()
+  };
+  const correct=String(input.correct||input.respuesta_correcta||"").trim().toUpperCase();
+  if(question.length<8||question.length>4000)throw new Error("La pregunta debe tener entre 8 y 4,000 caracteres");
+  if(!options.A||!options.B||!options.C)throw new Error("Las opciones A, B y C son obligatorias");
+  if(Object.values(options).some(value=>value.length>4000))throw new Error("Cada opción puede tener hasta 4,000 caracteres");
+  if(!["A","B","C","D"].includes(correct)||!options[correct])throw new Error("Selecciona una respuesta correcta que tenga contenido");
+  return {question,options,correct};
+}
+function requireQuestionAdmin(req,res){
+  if(!req.isAdmin||req.admin?.rol!=="SUPERADMIN"){
+    res.status(403).json({ok:false,error:"Solo el superadministrador puede gestionar el banco de preguntas"});
+    return false;
+  }
+  return true;
+}
+
+app.get("/admin-questions",auth,async(req,res)=>{
+  try{
+    if(!requireQuestionAdmin(req,res))return;
+    const q=String(req.query.q||"").trim();
+    const estado=String(req.query.estado||"").toLowerCase();
+    const filters=[],values=[];
+    if(q){filters.push("(question LIKE ? OR option_a LIKE ? OR option_b LIKE ? OR option_c LIKE ? OR option_d LIKE ?)");const term=`%${q}%`;values.push(term,term,term,term,term)}
+    if(estado==="active"){filters.push("active=1")}else if(estado==="inactive"){filters.push("active=0")}
+    const where=filters.length?`WHERE ${filters.join(" AND ")}`:"";
+    const [statsRows]=await db.query("SELECT COUNT(*) total,SUM(active=1) active,SUM(active=0) inactive FROM questions");
+    const stats={total:Number(statsRows[0].total||0),active:Number(statsRows[0].active||0),inactive:Number(statsRows[0].inactive||0),minimo:15};
+    if(String(req.query.export||"")==="1"){
+      const [questions]=await db.query(`SELECT id,question,option_a,option_b,option_c,option_d,correct,active,source_document,creado_en FROM questions ${where} ORDER BY id DESC LIMIT 10000`,values);
+      return res.json({ok:true,questions,stats});
+    }
+    const page=Math.max(1,Number(req.query.page)||1),pageSize=20,offset=(page-1)*pageSize;
+    const [[count]]=await db.query(`SELECT COUNT(*) total FROM questions ${where}`,values);
+    const [questions]=await db.query(`SELECT id,question,option_a,option_b,option_c,option_d,correct,active,source_document,creado_en FROM questions ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,[...values,pageSize,offset]);
+    return res.json({ok:true,questions,stats,pagination:{page,pageSize,total:Number(count.total||0)}});
+  }catch(err){console.error("ADMIN QUESTIONS LIST ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible consultar el banco de preguntas"})}
+});
+
+app.post("/admin-questions",auth,async(req,res)=>{
+  try{
+    if(!requireQuestionAdmin(req,res))return;
+    const item=normalizeExamQuestion(req.body),active=req.body.active===false||req.body.active===0||req.body.active==="0"?0:1;
+    const sourceDocument=Number(req.body.source_document)||null;
+    const [result]=await db.query("INSERT INTO questions(question,option_a,option_b,option_c,option_d,correct,active,source_document) VALUES(?,?,?,?,?,?,?,?)",[item.question,item.options.A,item.options.B,item.options.C,item.options.D||null,item.correct,active,sourceDocument]);
+    await auditEvent(db,req,"PREGUNTA_EXAMEN_CREADA",{entidad:"PREGUNTA",entidadId:result.insertId,despues:{id:result.insertId,pregunta:item.question,respuestaCorrecta:item.correct,activa:Boolean(active)}});
+    return res.status(201).json({ok:true,id:result.insertId});
+  }catch(err){if(err.code==="ER_DUP_ENTRY")return res.status(409).json({ok:false,error:"Ya existe una pregunta con ese texto"});if(err.message)return res.status(400).json({ok:false,error:err.message});console.error("ADMIN QUESTION CREATE ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible crear la pregunta"})}
+});
+
+app.patch("/admin-questions/:id",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!requireQuestionAdmin(req,res))return;
+    const id=Number(req.params.id),item=normalizeExamQuestion(req.body),active=req.body.active===false||req.body.active===0||req.body.active==="0"?0:1,sourceDocument=Number(req.body.source_document)||null;
+    if(!Number.isInteger(id)||id<1)return res.status(400).json({ok:false,error:"Pregunta no válida"});
+    connection=await db.getConnection();await connection.beginTransaction();
+    const [[before]]=await connection.query("SELECT id,question,option_a,option_b,option_c,option_d,correct,active,source_document FROM questions WHERE id=? FOR UPDATE",[id]);
+    if(!before){await connection.rollback();return res.status(404).json({ok:false,error:"Pregunta no encontrada"})}
+    if(before.active&&!active){const [[count]]=await connection.query("SELECT COUNT(*) total FROM questions WHERE active=1");if(Number(count.total)<=15){await connection.rollback();return res.status(409).json({ok:false,error:"Debe conservarse un mínimo de 15 preguntas activas"})}}
+    await connection.query("UPDATE questions SET question=?,option_a=?,option_b=?,option_c=?,option_d=?,correct=?,active=?,source_document=? WHERE id=?",[item.question,item.options.A,item.options.B,item.options.C,item.options.D||null,item.correct,active,sourceDocument,id]);
+    await auditEvent(connection,req,"PREGUNTA_EXAMEN_ACTUALIZADA",{entidad:"PREGUNTA",entidadId:id,antes:{pregunta:before.question,respuestaCorrecta:before.correct,activa:Boolean(before.active)},despues:{pregunta:item.question,respuestaCorrecta:item.correct,activa:Boolean(active)}});
+    await connection.commit();return res.json({ok:true});
+  }catch(err){if(connection)await connection.rollback();if(err.code==="ER_DUP_ENTRY")return res.status(409).json({ok:false,error:"Ya existe una pregunta con ese texto"});if(err.message)return res.status(400).json({ok:false,error:err.message});console.error("ADMIN QUESTION UPDATE ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar la pregunta"})}
+  finally{if(connection)connection.release();}
+});
+
+app.patch("/admin-questions/:id/status",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!requireQuestionAdmin(req,res))return;
+    const id=Number(req.params.id),active=req.body.active?1:0;
+    connection=await db.getConnection();await connection.beginTransaction();
+    const [[question]]=await connection.query("SELECT id,question,active FROM questions WHERE id=? FOR UPDATE",[id]);
+    if(!question){await connection.rollback();return res.status(404).json({ok:false,error:"Pregunta no encontrada"})}
+    if(!active&&question.active){const [[count]]=await connection.query("SELECT COUNT(*) total FROM questions WHERE active=1");if(Number(count.total)<=15){await connection.rollback();return res.status(409).json({ok:false,error:"Debe conservarse un mínimo de 15 preguntas activas"})}}
+    await connection.query("UPDATE questions SET active=? WHERE id=?",[active,id]);
+    await auditEvent(connection,req,active?"PREGUNTA_EXAMEN_ACTIVADA":"PREGUNTA_EXAMEN_DESACTIVADA",{entidad:"PREGUNTA",entidadId:id,antes:{activa:Boolean(question.active)},despues:{activa:Boolean(active)},detalle:question.question});
+    await connection.commit();return res.json({ok:true});
+  }catch(err){if(connection)await connection.rollback();console.error("ADMIN QUESTION STATUS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible actualizar el estado"})}
+  finally{if(connection)connection.release();}
+});
+
+app.post("/admin-questions/import",auth,async(req,res)=>{
+  let connection;
+  try{
+    if(!requireQuestionAdmin(req,res))return;
+    const rows=Array.isArray(req.body.rows)?req.body.rows:[];
+    if(!rows.length)return res.status(400).json({ok:false,error:"El archivo no contiene preguntas"});
+    if(rows.length>200)return res.status(400).json({ok:false,error:"Puedes importar hasta 200 preguntas por archivo"});
+    connection=await db.getConnection();await connection.beginTransaction();
+    let creadas=0,ignoradas=0;const errores=[];
+    for(let index=0;index<rows.length;index++){
+      try{
+        const item=normalizeExamQuestion(rows[index]);
+        const active=["0","false","no","inactivo","inactive"].includes(String(rows[index].activo??rows[index].active??"1").trim().toLowerCase())?0:1;
+        const sourceDocument=Number(rows[index].source_document)||null;
+        await connection.query("INSERT INTO questions(question,option_a,option_b,option_c,option_d,correct,active,source_document) VALUES(?,?,?,?,?,?,?,?)",[item.question,item.options.A,item.options.B,item.options.C,item.options.D||null,item.correct,active,sourceDocument]);
+        creadas++;
+      }catch(error){if(error.code==="ER_DUP_ENTRY")ignoradas++;else errores.push({fila:index+2,error:error.message||"Formato inválido"})}
+    }
+    if(!creadas&&errores.length){await connection.rollback();return res.status(400).json({ok:false,error:"No se pudo importar ninguna pregunta",creadas,ignoradas,errores})}
+    await auditEvent(connection,req,"BANCO_PREGUNTAS_IMPORTADO",{entidad:"PREGUNTAS",despues:{creadas,ignoradas,errores:errores.length},detalle:`Importación de ${creadas} pregunta(s)`});
+    await connection.commit();return res.json({ok:true,creadas,ignoradas,errores});
+  }catch(err){if(connection)await connection.rollback();console.error("ADMIN QUESTIONS IMPORT ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible importar el banco de preguntas"})}
+  finally{if(connection)connection.release();}
+});
+
 app.get("/admin-personas/:id/constancia",auth,async(req,res)=>{
   try{
     if(!req.isAdmin) return res.status(403).json({error:"No autorizado"});
