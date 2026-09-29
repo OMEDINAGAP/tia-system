@@ -537,9 +537,15 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
       AVG(CASE WHEN u.foto_registrada_en IS NOT NULL AND u.foto_revisada_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,u.foto_registrada_en,u.foto_revisada_en)/3600 END) AS promedio_revision_horas,
       SUM(CASE WHEN u.foto_estatus='PENDIENTE' THEN 1 ELSE 0 END) AS pendientes
       FROM personas_curso pc JOIN users u ON u.id=pc.user_id ${kpiWhere}`,kpiParams);
+    const [physicalTimeRows]=await db.query(`SELECT
+      COUNT(CASE WHEN tf.atendido_en IS NOT NULL THEN 1 END) AS atendidas,
+      AVG(CASE WHEN tf.llegada_en IS NOT NULL AND tf.atencion_iniciada_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,tf.llegada_en,tf.atencion_iniciada_en)/60 END) AS espera_minutos,
+      AVG(CASE WHEN tf.atencion_iniciada_en IS NOT NULL AND tf.atendido_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,tf.atencion_iniciada_en,tf.atendido_en)/60 END) AS atencion_minutos,
+      AVG(CASE WHEN tf.llegada_en IS NOT NULL AND tf.atendido_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,tf.llegada_en,tf.atendido_en)/60 END) AS total_minutos
+      FROM personas_curso pc JOIN users u ON u.id=pc.user_id LEFT JOIN fotografias_toma_fisica tf ON tf.user_id=u.id ${kpiWhere}`,kpiParams);
     const [processRows]=await db.query(`SELECT pc.id,pc.folio,pc.creado_en AS alta_en,e.nombre AS empresa,
       CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador,
-      u.aprobado,u.photo,u.foto_estatus,u.foto_registrada_en,u.foto_revisada_en,tf.solicitado_en AS toma_fisica_en,
+      u.aprobado,u.photo,u.foto_estatus,u.foto_registrada_en,u.foto_revisada_en,tf.solicitado_en AS toma_fisica_en,tf.llegada_en,tf.atencion_iniciada_en,tf.atendido_en,
       MIN(CASE WHEN ae.evento='INICIO_SESION_COLABORADOR' THEN ae.creado_en END) AS sesion_en,
       MIN(CASE WHEN ae.evento='CARTA_ACEPTADA' THEN ae.creado_en END) AS carta_en,
       MIN(CASE WHEN ae.evento='CURSO_INICIADO' THEN ae.creado_en END) AS curso_inicio_en,
@@ -571,7 +577,11 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
       slaFotoHoras:24,
       fotosRevisadas:Number(photoSlaRows[0]?.revisadas||0),
       fotosDentroSla:Number(photoSlaRows[0]?.dentro_sla||0),
-      fotosPendientes:Number(photoSlaRows[0]?.pendientes||0)
+      fotosPendientes:Number(photoSlaRows[0]?.pendientes||0),
+      tomasFisicasAtendidas:Number(physicalTimeRows[0]?.atendidas||0),
+      esperaFisicaMinutos:physicalTimeRows[0]?.espera_minutos==null?null:Math.round(Number(physicalTimeRows[0].espera_minutos)),
+      atencionFisicaMinutos:physicalTimeRows[0]?.atencion_minutos==null?null:Math.round(Number(physicalTimeRows[0].atencion_minutos)),
+      totalFisicaMinutos:physicalTimeRows[0]?.total_minutos==null?null:Math.round(Number(physicalTimeRows[0].total_minutos))
     };
     return res.json({ok:true,events,eventTypes,kpis,companyKpis,stalledCases:openCases.slice(0,20),responsibility,pagination:{page,pageSize,totalEvents:Number(countRows[0].total),totalKpis:Number(kpiCountRows[0].total)},summary:{eventos:Number(countRows[0].total),procesosConcluidos:completed,tiempoPromedioHoras:averageHours}});
   } catch(err) { console.error("ADMIN AUDIT ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible cargar la auditoria"}); }
@@ -1078,6 +1088,26 @@ app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
     return res.json({ok:true,decision:"RECHAZADA",requiereTomaFisica,emailSent,email:person.correo_1,warning:emailSent?null:"La fotografía fue rechazada, pero el correo no pudo enviarse: "+emailError});
   }catch(err){if(connection)await connection.rollback();console.error("PHOTO REVIEW ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible revisar la fotografía"})}
   finally{if(connection)connection.release()}
+});
+
+/* Kiosco de llegada: el folio sólo puede registrarse cuando ya fue enviado a toma física. */
+app.post("/toma-fisica/llegada",accessLoginLimiter,async(req,res)=>{
+  try{
+    const folio=String(req.body.folio||"").trim().toUpperCase();
+    if(!folio)return res.status(400).json({ok:false,error:"Captura tu folio personal"});
+    const [rows]=await db.query(`SELECT u.id AS user_id,u.name,u.folio,pc.id AS persona_id,pc.empresa_id,tf.llegada_en,tf.atendido_en
+      FROM users u JOIN personas_curso pc ON pc.user_id=u.id JOIN fotografias_toma_fisica tf ON tf.user_id=u.id
+      WHERE u.folio=? LIMIT 1`,[folio]);
+    const person=rows[0];
+    if(!person)return res.status(404).json({ok:false,error:"Este folio no tiene una toma física pendiente"});
+    if(person.atendido_en)return res.json({ok:true,completed:true,message:"La toma física de este folio ya fue concluida."});
+    const already=Boolean(person.llegada_en);
+    if(!already){
+      await db.query("UPDATE fotografias_toma_fisica SET llegada_en=NOW() WHERE user_id=? AND llegada_en IS NULL",[person.user_id]);
+      await auditEvent(db,req,"TOMA_FISICA_LLEGADA_REGISTRADA",{actor:{tipo:"COLABORADOR",id:person.user_id,nombre:person.name},empresaId:person.empresa_id,personaId:person.persona_id,folio:person.folio,entidad:"TOMA_FISICA",entidadId:person.user_id,detalle:"Llegada registrada desde kiosco"});
+    }
+    return res.json({ok:true,already,nombre:String(person.name||"").split(" ")[0]||"Colaborador"});
+  }catch(err){console.error("PHYSICAL CHECKIN ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible registrar la llegada"});}
 });
 
 
@@ -2422,6 +2452,14 @@ async function ensureOperationalTables(){
     PRIMARY KEY (user_id),
     CONSTRAINT fk_fotografias_toma_fisica_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  for(const definition of [
+    "ADD COLUMN llegada_en DATETIME NULL AFTER solicitado_en",
+    "ADD COLUMN atencion_iniciada_en DATETIME NULL AFTER llegada_en",
+    "ADD COLUMN atendido_en DATETIME NULL AFTER atencion_iniciada_en",
+    "ADD COLUMN atendido_por BIGINT UNSIGNED NULL AFTER atendido_en"
+  ]){
+    try{await db.query(`ALTER TABLE fotografias_toma_fisica ${definition}`)}catch(err){if(err.code!=="ER_DUP_FIELDNAME")throw err;}
+  }
   await db.query(`CREATE TABLE IF NOT EXISTS cartas_compromiso (
     user_id BIGINT UNSIGNED NOT NULL,
     firma_data LONGBLOB NOT NULL,
@@ -2607,6 +2645,62 @@ const upload = multer({
     if(["image/jpeg","image/png","image/webp"].includes(file.mimetype))return cb(null,true);
     cb(new Error("La fotografía debe ser JPG, PNG o WebP"));
   }
+});
+
+app.get("/admin-toma-fisica",auth,async(req,res)=>{
+  try{
+    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    const [queue]=await db.query(`SELECT u.id AS user_id,u.folio,u.name,e.nombre AS empresa,pc.id AS persona_id,tf.solicitado_en,tf.llegada_en,tf.atencion_iniciada_en,tf.atendido_en,
+      CASE WHEN tf.atendido_en IS NOT NULL THEN 'CONCLUIDO' WHEN tf.atencion_iniciada_en IS NOT NULL THEN 'EN_ATENCION' WHEN tf.llegada_en IS NOT NULL THEN 'EN_SITIO' ELSE 'PENDIENTE_LLEGADA' END AS estado
+      FROM fotografias_toma_fisica tf JOIN users u ON u.id=tf.user_id JOIN personas_curso pc ON pc.user_id=u.id JOIN empresas e ON e.id=pc.empresa_id
+      ORDER BY CASE WHEN tf.llegada_en IS NULL THEN 1 ELSE 0 END,tf.llegada_en ASC,tf.solicitado_en ASC LIMIT 200`);
+    const open=queue.filter(item=>!item.atendido_en),summary={pendientesLlegada:open.filter(item=>!item.llegada_en).length,enSitio:open.filter(item=>item.llegada_en&&!item.atencion_iniciada_en).length,enAtencion:open.filter(item=>item.atencion_iniciada_en).length};
+    return res.json({ok:true,queue,summary});
+  }catch(err){console.error("PHYSICAL QUEUE ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible consultar la cola de toma física"});}
+});
+
+app.post("/admin-toma-fisica/:userId/llegada",auth,async(req,res)=>{
+  try{
+    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    const userId=Number(req.params.userId),[rows]=await db.query(`SELECT tf.user_id,tf.llegada_en,pc.id persona_id,pc.empresa_id,pc.folio
+      FROM fotografias_toma_fisica tf JOIN personas_curso pc ON pc.user_id=tf.user_id WHERE tf.user_id=? LIMIT 1`,[userId]),item=rows[0];
+    if(!item)return res.status(404).json({ok:false,error:"Caso de toma física no encontrado"});
+    if(!item.llegada_en){await db.query("UPDATE fotografias_toma_fisica SET llegada_en=NOW() WHERE user_id=?",[userId]);await auditEvent(db,req,"TOMA_FISICA_LLEGADA_REGISTRADA",{empresaId:item.empresa_id,personaId:item.persona_id,folio:item.folio,entidad:"TOMA_FISICA",entidadId:userId,detalle:"Llegada registrada por personal TIA"});}
+    return res.json({ok:true,already:Boolean(item.llegada_en)});
+  }catch(err){console.error("PHYSICAL ARRIVAL ADMIN ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible registrar la llegada"});}
+});
+
+app.post("/admin-toma-fisica/:userId/iniciar",auth,async(req,res)=>{
+  try{
+    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    const userId=Number(req.params.userId),[rows]=await db.query(`SELECT tf.user_id,tf.llegada_en,tf.atendido_en,pc.id persona_id,pc.empresa_id,pc.folio
+      FROM fotografias_toma_fisica tf JOIN personas_curso pc ON pc.user_id=tf.user_id WHERE tf.user_id=? LIMIT 1`,[userId]),item=rows[0];
+    if(!item)return res.status(404).json({ok:false,error:"Caso de toma física no encontrado"});
+    if(!item.llegada_en)return res.status(409).json({ok:false,error:"Primero registra la llegada del colaborador"});
+    if(item.atendido_en)return res.status(409).json({ok:false,error:"La toma física ya fue concluida"});
+    await db.query("UPDATE fotografias_toma_fisica SET atencion_iniciada_en=COALESCE(atencion_iniciada_en,NOW()) WHERE user_id=?",[userId]);
+    await auditEvent(db,req,"TOMA_FISICA_ATENCION_INICIADA",{empresaId:item.empresa_id,personaId:item.persona_id,folio:item.folio,entidad:"TOMA_FISICA",entidadId:userId});
+    return res.json({ok:true});
+  }catch(err){console.error("PHYSICAL START ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible iniciar la atención"});}
+});
+
+app.post("/admin-toma-fisica/:userId/fotografia",auth,upload.single("photo"),async(req,res)=>{
+  let connection;
+  try{
+    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!req.file)return res.status(400).json({ok:false,error:"Captura una fotografía antes de concluir"});
+    const userId=Number(req.params.userId);connection=await db.getConnection();await connection.beginTransaction();
+    const [rows]=await connection.query(`SELECT tf.user_id,tf.llegada_en,tf.atendido_en,pc.id persona_id,pc.empresa_id,pc.folio
+      FROM fotografias_toma_fisica tf JOIN personas_curso pc ON pc.user_id=tf.user_id WHERE tf.user_id=? FOR UPDATE`,[userId]),item=rows[0];
+    if(!item){await connection.rollback();return res.status(404).json({ok:false,error:"Caso de toma física no encontrado"});}
+    if(!item.llegada_en){await connection.rollback();return res.status(409).json({ok:false,error:"Primero registra la llegada del colaborador"});}
+    if(item.atendido_en){await connection.rollback();return res.status(409).json({ok:false,error:"La toma física ya fue concluida"});}
+    await connection.query("UPDATE users SET photo='DB',photo_data=?,photo_mime=?,foto_registrada_en=NOW(),foto_estatus='APROBADA',foto_revisada_en=NOW(),foto_revisada_por=?,foto_motivo_rechazo=NULL WHERE id=?",[req.file.buffer,req.file.mimetype,req.admin.id,userId]);
+    await connection.query("UPDATE fotografias_toma_fisica SET atencion_iniciada_en=COALESCE(atencion_iniciada_en,NOW()),atendido_en=NOW(),atendido_por=? WHERE user_id=?",[req.admin.id,userId]);
+    await auditEvent(connection,req,"FOTOGRAFIA_TOMA_FISICA_APROBADA",{empresaId:item.empresa_id,personaId:item.persona_id,folio:item.folio,entidad:"TOMA_FISICA",entidadId:userId,despues:{estatus:"APROBADA",origen:"MODULO_TIA"},detalle:"Fotografía capturada y aceptada en módulo TIA"});
+    await connection.commit();return res.json({ok:true});
+  }catch(err){if(connection)await connection.rollback();console.error("PHYSICAL PHOTO ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible concluir la toma física"});}
+  finally{if(connection)connection.release();}
 });
 
 app.get("/estado-finalizacion",auth,async(req,res)=>{
