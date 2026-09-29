@@ -529,7 +529,51 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
       AVG(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN TIMESTAMPDIFF(SECOND,pc.creado_en,u.foto_revisada_en)/3600 END) AS promedio_constancia_horas
       FROM empresas e JOIN folios_acceso fa ON fa.id=e.folio_acceso_id LEFT JOIN personas_curso pc ON pc.empresa_id=e.id LEFT JOIN users u ON u.id=pc.user_id
       ${empresaId?"WHERE e.id=?":""} GROUP BY e.id,fa.id ORDER BY promedio_constancia_horas DESC`,empresaId?[empresaId]:[]);
-    return res.json({ok:true,events,eventTypes,kpis,companyKpis,pagination:{page,pageSize,totalEvents:Number(countRows[0].total),totalKpis:Number(kpiCountRows[0].total)},summary:{eventos:Number(countRows[0].total),procesosConcluidos:completed,tiempoPromedioHoras:averageHours}});
+    /* Indicadores de responsabilidad: separan el tiempo en espera de la empresa/
+       colaborador del tiempo en revisión del módulo TIA. */
+    const [photoSlaRows]=await db.query(`SELECT
+      COUNT(CASE WHEN u.foto_registrada_en IS NOT NULL AND u.foto_revisada_en IS NOT NULL THEN 1 END) AS revisadas,
+      SUM(CASE WHEN u.foto_registrada_en IS NOT NULL AND u.foto_revisada_en IS NOT NULL AND TIMESTAMPDIFF(SECOND,u.foto_registrada_en,u.foto_revisada_en)<=86400 THEN 1 ELSE 0 END) AS dentro_sla,
+      AVG(CASE WHEN u.foto_registrada_en IS NOT NULL AND u.foto_revisada_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,u.foto_registrada_en,u.foto_revisada_en)/3600 END) AS promedio_revision_horas,
+      SUM(CASE WHEN u.foto_estatus='PENDIENTE' THEN 1 ELSE 0 END) AS pendientes
+      FROM personas_curso pc JOIN users u ON u.id=pc.user_id ${kpiWhere}`,kpiParams);
+    const [processRows]=await db.query(`SELECT pc.id,pc.folio,pc.creado_en AS alta_en,e.nombre AS empresa,
+      CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador,
+      u.aprobado,u.photo,u.foto_estatus,u.foto_registrada_en,u.foto_revisada_en,tf.solicitado_en AS toma_fisica_en,
+      MIN(CASE WHEN ae.evento='INICIO_SESION_COLABORADOR' THEN ae.creado_en END) AS sesion_en,
+      MIN(CASE WHEN ae.evento='CARTA_ACEPTADA' THEN ae.creado_en END) AS carta_en,
+      MIN(CASE WHEN ae.evento='CURSO_INICIADO' THEN ae.creado_en END) AS curso_inicio_en,
+      MIN(CASE WHEN ae.evento='VIDEO_COMPLETADO' THEN ae.creado_en END) AS video_en,
+      MIN(CASE WHEN ae.evento='EXAMEN_APROBADO' THEN ae.creado_en END) AS examen_en,
+      MIN(CASE WHEN ae.evento='FOTOGRAFIA_ENVIADA' THEN ae.creado_en END) AS foto_en
+      FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id LEFT JOIN users u ON u.id=pc.user_id
+      LEFT JOIN fotografias_toma_fisica tf ON tf.user_id=u.id LEFT JOIN auditoria_eventos ae ON ae.persona_id=pc.id
+      ${kpiWhere} GROUP BY pc.id,e.nombre,u.id,tf.user_id ORDER BY pc.creado_en DESC`,kpiParams);
+    const asDate=value=>value?new Date(value):null;
+    const hoursBetween=(start,end)=>{const a=asDate(start),b=asDate(end);return a&&b?Math.max(0,(b-a)/3600000):null};
+    const stalledCases=processRows.map(row=>{
+      let etapa,esperando,responsable,inicio;
+      if(row.foto_estatus==='APROBADA'){etapa='CONCLUIDO';esperando='Proceso finalizado';responsable='SISTEMA';inicio=row.foto_revisada_en;}
+      else if(row.toma_fisica_en){etapa='TOMA_FISICA';esperando='Toma física en módulo TIA';responsable='MODULO_TIA';inicio=row.toma_fisica_en;}
+      else if(row.foto_estatus==='PENDIENTE'&&row.photo){etapa='REVISION_FOTOGRAFIA';esperando='Revisión de fotografía';responsable='MODULO_TIA';inicio=row.foto_en||row.foto_registrada_en;}
+      else if(row.examen_en){etapa='FOTOGRAFIA';esperando='Carga de fotografía';responsable='COLABORADOR';inicio=row.examen_en;}
+      else if(row.video_en){etapa='EXAMEN';esperando='Presentación de examen';responsable='COLABORADOR';inicio=row.video_en;}
+      else if(row.carta_en){etapa='CURSO';esperando='Finalizar videos del curso';responsable='COLABORADOR';inicio=row.curso_inicio_en||row.carta_en;}
+      else if(row.sesion_en){etapa='CARTA';esperando='Aceptar y firmar carta compromiso';responsable='COLABORADOR';inicio=row.sesion_en;}
+      else {etapa='INICIO_SESION';esperando='Primer inicio de sesión';responsable='EMPRESA_COLABORADOR';inicio=row.alta_en;}
+      return {...row,etapa,esperando,responsable,inicio_espera:inicio,horas_espera:hoursBetween(inicio,new Date())};
+    });
+    const openCases=stalledCases.filter(item=>item.etapa!=='CONCLUIDO');
+    const responsibility={
+      esperandoEmpresaColaborador:openCases.filter(item=>item.responsable==='EMPRESA_COLABORADOR'||item.responsable==='COLABORADOR').length,
+      esperandoModulo:openCases.filter(item=>item.responsable==='MODULO_TIA').length,
+      promedioModuloRevisionHoras:photoSlaRows[0]?.promedio_revision_horas==null?null:Math.round(Number(photoSlaRows[0].promedio_revision_horas)*10)/10,
+      slaFotoHoras:24,
+      fotosRevisadas:Number(photoSlaRows[0]?.revisadas||0),
+      fotosDentroSla:Number(photoSlaRows[0]?.dentro_sla||0),
+      fotosPendientes:Number(photoSlaRows[0]?.pendientes||0)
+    };
+    return res.json({ok:true,events,eventTypes,kpis,companyKpis,stalledCases:openCases.slice(0,20),responsibility,pagination:{page,pageSize,totalEvents:Number(countRows[0].total),totalKpis:Number(kpiCountRows[0].total)},summary:{eventos:Number(countRows[0].total),procesosConcluidos:completed,tiempoPromedioHoras:averageHours}});
   } catch(err) { console.error("ADMIN AUDIT ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible cargar la auditoria"}); }
 });
 
