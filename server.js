@@ -48,6 +48,24 @@ app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.youtube.com",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com https://www.youtube.com https://*.youtube.com https://*.googlevideo.com",
+    "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
+    "worker-src 'self' blob:",
+    "media-src 'self' blob: https:"
+  ].join("; "));
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   res.removeHeader("X-Powered-By");
   next();
 });
@@ -251,12 +269,8 @@ async function auth(req, res, next) {
       return res.status(403).json({ error: "El acceso de este colaborador se encuentra suspendido. La baja formal debe concluirse en el módulo TIA." });
     }
 
-    console.log("AUTH SESSION:", session);
-
     // ✅ USER REAL
     req.userId = Number(session.userId);
-
-    console.log("AUTH USER:", req.userId);
 
     if (!req.userId || isNaN(req.userId)) {
 
@@ -1922,7 +1936,6 @@ app.post("/log-login", async (req, res) => {
     // ✅ FORZAR NÚMERO
     const userId = Number(user.id);
 
-    console.log("LOGIN USER:", userId);
 
     // 🚨 VALIDAR
     if (!userId || isNaN(userId)) {
@@ -2072,7 +2085,6 @@ app.post("/log-video", auth, async (req, res) => {
       }
     }
 
-    console.log("GUARDANDO PARA USER:", req.userId);
 
     res.json({ ok: true });
 
@@ -2103,8 +2115,6 @@ app.post("/log-exam", auth, async (req, res) => {
     const score = Number(examRows[0].score);
     await db.query("UPDATE exam_sessions SET logged_at=NOW() WHERE token=?",[examToken]);
 
-    console.log("USER:", userId);
-    console.log("SCORE:", score);
 
     const [rows] = await db.query(
       "SELECT * FROM users WHERE id=?",
@@ -2757,6 +2767,18 @@ const upload = multer({
   }
 });
 
+function detectedImageMime(buffer){
+  if(!Buffer.isBuffer(buffer)||buffer.length<12)return null;
+  if(buffer[0]===0xff&&buffer[1]===0xd8&&buffer[2]===0xff)return "image/jpeg";
+  if(buffer.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])))return "image/png";
+  if(buffer.subarray(0,4).toString("ascii")==="RIFF"&&buffer.subarray(8,12).toString("ascii")==="WEBP")return "image/webp";
+  return null;
+}
+function hasValidImageContent(file){
+  const detected=detectedImageMime(file?.buffer);
+  return Boolean(detected&&detected===file?.mimetype);
+}
+
 app.get("/admin-toma-fisica",auth,async(req,res)=>{
   try{
     if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede consultar la toma física"))return;
@@ -2799,6 +2821,7 @@ app.post("/admin-toma-fisica/:userId/fotografia",auth,upload.single("photo"),asy
   try{
     if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede operar la toma física"))return;
     if(!req.file)return res.status(400).json({ok:false,error:"Captura una fotografía antes de concluir"});
+    if(!hasValidImageContent(req.file))return res.status(400).json({ok:false,error:"El archivo no contiene una imagen válida"});
     const userId=Number(req.params.userId);connection=await db.getConnection();await connection.beginTransaction();
     const [rows]=await connection.query(`SELECT tf.user_id,tf.llegada_en,tf.atendido_en,pc.id persona_id,pc.empresa_id,pc.folio
       FROM fotografias_toma_fisica tf JOIN personas_curso pc ON pc.user_id=tf.user_id WHERE tf.user_id=? FOR UPDATE`,[userId]),item=rows[0];
@@ -2833,6 +2856,10 @@ app.post("/upload-photo", auth, upload.single("photo"), async (req, res) => {
 
     if (!req.file) {
       return res.status(400).json({ ok: false, error: "No se recibió la fotografía" });
+    }
+
+    if(!hasValidImageContent(req.file)){
+      return res.status(400).json({ok:false,error:"El archivo no contiene una imagen válida"});
     }
 
     if(req.isAdmin)return res.status(403).json({ok:false,error:"Acceso no disponible"});
