@@ -388,3 +388,62 @@ function organizeAdminNavigation(){
  nav.replaceChildren(fragment);
 }
 organizeAdminNavigation();
+
+/* Las cuatro tablas de auditoría se consultan de forma independiente en bloques
+   de 20 registros. Los filtros globales aplican al mismo tiempo a KPI, empresas
+   y responsabilidades para evitar resultados inconsistentes. */
+let auditTablePages={events:1,processes:1,companies:1,responsibility:1};
+function auditTablePager(id,total,key,label){
+ const node=document.getElementById(id),page=auditTablePages[key]||1,pages=Math.max(1,Math.ceil(Number(total||0)/20));
+ if(!node)return;
+ node.innerHTML=`<span>${label}: página ${page} de ${pages} · ${Number(total||0)} registros</span><button type="button" ${page<=1?'disabled':''} onclick="changeAuditTablePage('${key}',-1)">Anterior</button><button type="button" ${page>=pages?'disabled':''} onclick="changeAuditTablePage('${key}',1)">Siguiente</button>`;
+}
+function changeAuditTablePage(key,delta){auditTablePages[key]=Math.max(1,(auditTablePages[key]||1)+delta);loadAudit()}
+function resetAuditTablePages(){auditTablePages={events:1,processes:1,companies:1,responsibility:1}}
+function initializeAuditTableControls(){
+ const companyTable=document.getElementById('auditCompanyRows')?.closest('.table-wrap');
+ const responsibilityTable=document.getElementById('slaStalledRows')?.closest('.table-wrap');
+ if(companyTable&&!document.getElementById('auditCompanyPages'))companyTable.insertAdjacentHTML('afterend','<div class="audit-pages" id="auditCompanyPages"></div>');
+ if(responsibilityTable&&!document.getElementById('auditResponsibilityPages'))responsibilityTable.insertAdjacentHTML('afterend','<div class="audit-pages" id="auditResponsibilityPages"></div>');
+ const toolbar=document.querySelector('#audit .audit-toolbar');
+ if(toolbar&&!document.getElementById('auditScopeNote'))toolbar.insertAdjacentHTML('afterend','<p class="audit-note" id="auditScopeNote">Los filtros se aplican a eventos, tiempos del proceso, empresas y responsabilidades. Cada tabla muestra 20 registros por página.</p>');
+}
+initializeAuditTableControls();
+renderAudit=function(){
+ const summary=auditData.summary||{},pagination=auditData.pagination||{};
+ document.getElementById('auditEvents').textContent=summary.eventos||0;
+ document.getElementById('auditCompleted').textContent=summary.procesosConcluidos||0;
+ document.getElementById('auditAverage').textContent=summary.tiempoPromedioHoras==null?'--':`${summary.tiempoPromedioHoras} h`;
+ document.getElementById('auditRows').innerHTML=(auditData.events||[]).map(event=>`<tr><td>${auditDate(event.creado_en)}</td><td><span class="audit-actor">${esc(event.actor_nombre)}</span><br><small>${esc(event.actor_tipo)}</small></td><td><span class="audit-action">${esc(String(event.evento||'').replaceAll('_',' '))}</span></td><td>${esc(event.empresa||'--')}<br><small>${esc(event.colaborador||'')}</small></td><td class="token-code">${esc(event.folio||'--')}</td><td class="audit-detail">${esc(event.detalle||'--')}</td></tr>`).join('')||'<tr><td colspan="6" class="audit-kpi-empty">No hay eventos con los filtros seleccionados.</td></tr>';
+ document.getElementById('auditKpiRows').innerHTML=(auditData.kpis||[]).map(k=>`<tr><td class="token-code">${esc(k.folio)}</td><td>${esc(k.colaborador||'--')}</td><td>${esc(k.empresa||'--')}</td><td>${auditDate(k.alta_en)}</td><td>${auditDate(k.sesion_en)}<br><small>${auditDuration(k.alta_en,k.sesion_en)}</small></td><td>${auditDate(k.carta_en)}</td><td>${auditDate(k.video_en)}<br><small>${auditDuration(k.curso_inicio_en,k.video_en)}</small></td><td>${auditDate(k.examen_en)}<br><small>${auditDuration(k.examen_inicio_en,k.examen_en)}</small></td><td>${auditDate(k.constancia_lista_en)}</td><td><strong>${auditDuration(k.alta_en,k.constancia_lista_en)}</strong></td></tr>`).join('')||'<tr><td colspan="10" class="audit-kpi-empty">Aún no hay recorridos medibles.</td></tr>';
+ document.getElementById('auditCompanyRows').innerHTML=(auditData.companyKpis||[]).map(company=>`<tr><td><strong>${esc(company.nombre)}</strong></td><td>${auditDate(company.token_emitido_en)}</td><td>${auditDate(company.empresa_registrada_en)}</td><td>${auditDate(company.primer_colaborador_en)}</td><td><strong>${auditDuration(company.token_emitido_en,company.primer_colaborador_en)}</strong></td><td>${company.colaboradores||0}</td><td>${company.concluidos||0}</td><td><strong>${company.promedio_constancia_horas==null?'--':Number(company.promedio_constancia_horas).toFixed(1)+' h'}</strong></td></tr>`).join('')||'<tr><td colspan="8" class="audit-kpi-empty">No hay empresas para los filtros seleccionados.</td></tr>';
+ auditTablePager('auditEventPages',pagination.totalEvents,'events','Eventos');
+ auditTablePager('auditKpiPages',pagination.totalKpis,'processes','Procesos');
+ auditTablePager('auditCompanyPages',pagination.totalCompanies,'companies','Empresas');
+ renderSla();
+ auditTablePager('auditResponsibilityPages',pagination.totalResponsibility,'responsibility','Procesos abiertos');
+};
+loadAudit=async function(){
+ const params=new URLSearchParams(),q=document.getElementById('auditSearch')?.value.trim(),event=document.getElementById('auditEvent')?.value,companyId=document.getElementById('auditCompany')?.value,from=document.getElementById('auditFrom')?.value,to=document.getElementById('auditTo')?.value;
+ if(q)params.set('q',q);if(event)params.set('evento',event);if(companyId)params.set('empresaId',companyId);if(from)params.set('desde',from);if(to)params.set('hasta',to);
+ params.set('eventPage',auditTablePages.events);params.set('processPage',auditTablePages.processes);params.set('companyPage',auditTablePages.companies);params.set('responsibilityPage',auditTablePages.responsibility);
+ const response=await fetch('/admin-auditoria?'+params,{headers:{Authorization:'Bearer '+token}}),payload=await response.json().catch(()=>({}));
+ if(!response.ok||!payload.ok)return Swal.fire('Auditoría no disponible',payload.error||'No fue posible cargar la bitácora','error');
+ auditData=payload;
+ const eventSelect=document.getElementById('auditEvent'),companySelect=document.getElementById('auditCompany'),selectedEvent=event||'',selectedCompany=companyId||'';
+ eventSelect.innerHTML='<option value="">Todas las acciones</option>'+payload.eventTypes.map(item=>`<option value="${esc(item.evento)}">${esc(item.evento.replaceAll('_',' '))} (${item.total})</option>`).join('');eventSelect.value=selectedEvent;
+ const companies=(data.companies||[]).filter(company=>company.empresa_id).map(company=>({id:company.empresa_id,nombre:company.nombre||company.empresa_autorizada}));
+ companySelect.innerHTML='<option value="">Todas las empresas</option>'+[...new Map(companies.map(company=>[company.id,company])).values()].map(company=>`<option value="${Number(company.id)}">${esc(company.nombre)}</option>`).join('');companySelect.value=selectedCompany;
+ renderAudit();
+};
+clearAuditFilters=function(){['auditSearch','auditEvent','auditCompany','auditFrom','auditTo'].forEach(id=>document.getElementById(id).value='');resetAuditTablePages();loadAudit()};
+['auditSearch','auditEvent','auditCompany','auditFrom','auditTo'].forEach(id=>{const node=document.getElementById(id);node?.addEventListener(id==='auditSearch'?'input':'change',resetAuditTablePages,true)});
+exportAuditExcel=async function(){
+ const params=new URLSearchParams(),q=document.getElementById('auditSearch').value.trim(),event=document.getElementById('auditEvent').value,companyId=document.getElementById('auditCompany').value,from=document.getElementById('auditFrom').value,to=document.getElementById('auditTo').value;
+ if(q)params.set('q',q);if(event)params.set('evento',event);if(companyId)params.set('empresaId',companyId);if(from)params.set('desde',from);if(to)params.set('hasta',to);params.set('export','1');
+ const response=await fetch('/admin-auditoria?'+params,{headers:{Authorization:'Bearer '+token}}),payload=await response.json().catch(()=>({}));
+ if(!response.ok||!payload.ok)return Swal.fire('Error',payload.error||'No fue posible exportar la auditoría','error');
+ const rows=[...(payload.events||[]).map(item=>({Tipo:'Evento',Empresa:item.empresa||'',Colaborador:item.colaborador||'',Folio:item.folio||'',Fecha:auditDate(item.creado_en),Etapa:item.evento||'',Inicio:'',Fin:'',Tiempo:'',Detalle:item.detalle||''})),...(payload.kpis||[]).map(item=>({Tipo:'Tiempo del proceso',Empresa:item.empresa||'',Colaborador:item.colaborador||'',Folio:item.folio||'',Fecha:auditDate(item.alta_en),Etapa:'Proceso',Inicio:auditDate(item.alta_en),Fin:auditDate(item.constancia_lista_en),Tiempo:auditDuration(item.alta_en,item.constancia_lista_en),Detalle:`Video: ${auditDuration(item.curso_inicio_en,item.video_en)} | Examen: ${auditDuration(item.examen_inicio_en,item.examen_en)}`})),...(payload.companyKpis||[]).map(item=>({Tipo:'Empresa',Empresa:item.nombre||'',Colaborador:'',Folio:item.folio||'',Fecha:auditDate(item.empresa_registrada_en),Etapa:'Promedio a constancia',Inicio:auditDate(item.token_emitido_en),Fin:auditDate(item.primer_colaborador_en),Tiempo:item.promedio_constancia_horas==null?'--':Number(item.promedio_constancia_horas).toFixed(1)+' h',Detalle:`Colaboradores: ${item.colaboradores||0} | Concluidos: ${item.concluidos||0}`})),...(payload.stalledCases||[]).map(item=>({Tipo:'Responsabilidad',Empresa:item.empresa||'',Colaborador:item.colaborador||'',Folio:item.folio||'',Fecha:auditDate(item.inicio_espera),Etapa:item.etapa||'',Inicio:auditDate(item.inicio_espera),Fin:'',Tiempo:slaHours(item.horas_espera),Detalle:`Responsable: ${item.responsable||''} | ${item.esperando||''}`}))];
+ if(!rows.length)return Swal.fire('Sin datos','No hay registros para exportar','info');
+ const headers=Object.keys(rows[0]),csv='\ufeff'+[headers.join(','),...rows.map(row=>headers.map(header=>'"'+String(row[header]??'').replace(/"/g,'""')+'"').join(','))].join('\r\n'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=`TIA-auditoria-completa-${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url);
+};

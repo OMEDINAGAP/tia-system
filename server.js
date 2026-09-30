@@ -501,7 +501,12 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
     const from=String(req.query.desde||"").slice(0,10);
     const to=String(req.query.hasta||"").slice(0,10);
     const empresaId=Number(req.query.empresaId)||0;
-    const page=Math.max(1,Number(req.query.page)||1), exportAll=String(req.query.export||"")==="1", pageSize=exportAll?10000:20, offset=(page-1)*pageSize;
+    const exportAll=String(req.query.export||"")==="1", pageSize=exportAll?10000:20;
+    const eventPage=Math.max(1,Number(req.query.eventPage||req.query.page)||1);
+    const processPage=Math.max(1,Number(req.query.processPage||req.query.page)||1);
+    const companyPage=Math.max(1,Number(req.query.companyPage||1));
+    const responsibilityPage=Math.max(1,Number(req.query.responsibilityPage||1));
+    const eventOffset=(eventPage-1)*pageSize,processOffset=(processPage-1)*pageSize,companyOffset=(companyPage-1)*pageSize,responsibilityOffset=(responsibilityPage-1)*pageSize;
     const where=[],params=[];
     if(search){ where.push("(ae.folio LIKE ? OR ae.actor_nombre LIKE ? OR e.nombre LIKE ? OR CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) LIKE ? OR ae.detalle LIKE ?)"); for(let i=0;i<5;i++)params.push(`%${search}%`); }
     if(event){where.push("ae.evento=?");params.push(event);}
@@ -512,7 +517,7 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
     const [countRows]=await db.query(`SELECT COUNT(*) total FROM auditoria_eventos ae LEFT JOIN empresas e ON e.id=ae.empresa_id LEFT JOIN personas_curso pc ON pc.id=ae.persona_id ${filter}`,params);
     const [events]=await db.query(`SELECT ae.*,e.nombre AS empresa,CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador
       FROM auditoria_eventos ae LEFT JOIN empresas e ON e.id=ae.empresa_id LEFT JOIN personas_curso pc ON pc.id=ae.persona_id
-      ${filter} ORDER BY ae.creado_en DESC,ae.id DESC LIMIT ? OFFSET ?`,[...params,pageSize,offset]);
+      ${filter} ORDER BY ae.creado_en DESC,ae.id DESC LIMIT ? OFFSET ?`,[...params,pageSize,eventOffset]);
     events.forEach(item=>{
       item.actor_nombre=repairMojibake(item.actor_nombre);
       item.empresa=repairMojibake(item.empresa);
@@ -538,18 +543,25 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
       MIN(CASE WHEN ae.evento='FOTOGRAFIA_APROBADA' THEN ae.creado_en END) AS constancia_lista_en,
       MIN(CASE WHEN ae.evento='CONSTANCIA_DESCARGADA' THEN ae.creado_en END) AS constancia_descargada_en
       FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id LEFT JOIN auditoria_eventos ae ON ae.persona_id=pc.id
-      ${kpiWhere} GROUP BY pc.id,e.nombre ORDER BY pc.creado_en DESC LIMIT ? OFFSET ?`,[...kpiParams,pageSize,offset]);
+      ${kpiWhere} GROUP BY pc.id,e.nombre ORDER BY pc.creado_en DESC LIMIT ? OFFSET ?`,[...kpiParams,pageSize,processOffset]);
     const [summaryRows]=await db.query(`SELECT COUNT(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN 1 END) AS concluidos,
       AVG(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN TIMESTAMPDIFF(SECOND,pc.creado_en,u.foto_revisada_en)/3600 END) AS promedio_horas
       FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id LEFT JOIN users u ON u.id=pc.user_id ${kpiWhere}`,kpiParams);
     const completed=Number(summaryRows[0]?.concluidos||0);
     const averageHours=summaryRows[0]?.promedio_horas==null?null:Math.round(Number(summaryRows[0].promedio_horas)*10)/10;
+    const companyClauses=[],companyParams=[];
+    if(empresaId){companyClauses.push("e.id=?");companyParams.push(empresaId);}
+    if(search){companyClauses.push("e.nombre LIKE ?");companyParams.push(`%${search}%`);}
+    if(from){companyClauses.push("e.creado_en>=?");companyParams.push(`${from} 00:00:00`);}
+    if(to){companyClauses.push("e.creado_en<?");companyParams.push(`${to} 23:59:59`);}
+    const companyWhere=companyClauses.length?`WHERE ${companyClauses.join(" AND ")}`:"";
+    const [companyCountRows]=await db.query(`SELECT COUNT(*) total FROM empresas e ${companyWhere}`,companyParams);
     const [companyKpis]=await db.query(`SELECT e.id,e.nombre,fa.folio,fa.fecha_emision AS token_emitido_en,e.creado_en AS empresa_registrada_en,
       MIN(pc.creado_en) AS primer_colaborador_en,COUNT(pc.id) AS colaboradores,
       SUM(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN 1 ELSE 0 END) AS concluidos,
       AVG(CASE WHEN u.aprobado=1 AND u.foto_estatus='APROBADA' THEN TIMESTAMPDIFF(SECOND,pc.creado_en,u.foto_revisada_en)/3600 END) AS promedio_constancia_horas
       FROM empresas e JOIN folios_acceso fa ON fa.id=e.folio_acceso_id LEFT JOIN personas_curso pc ON pc.empresa_id=e.id LEFT JOIN users u ON u.id=pc.user_id
-      ${empresaId?"WHERE e.id=?":""} GROUP BY e.id,fa.id ORDER BY promedio_constancia_horas DESC`,empresaId?[empresaId]:[]);
+      ${companyWhere} GROUP BY e.id,fa.id ORDER BY promedio_constancia_horas DESC LIMIT ? OFFSET ?`,[...companyParams,pageSize,companyOffset]);
     /* Indicadores de responsabilidad: separan el tiempo en espera de la empresa/
        colaborador del tiempo en revisión del módulo TIA. */
     const [photoSlaRows]=await db.query(`SELECT
@@ -604,7 +616,8 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
       atencionFisicaMinutos:physicalTimeRows[0]?.atencion_minutos==null?null:Math.round(Number(physicalTimeRows[0].atencion_minutos)),
       totalFisicaMinutos:physicalTimeRows[0]?.total_minutos==null?null:Math.round(Number(physicalTimeRows[0].total_minutos))
     };
-    return res.json({ok:true,events,eventTypes,kpis,companyKpis,stalledCases:openCases.slice(0,20),responsibility,pagination:{page,pageSize,totalEvents:Number(countRows[0].total),totalKpis:Number(kpiCountRows[0].total)},summary:{eventos:Number(countRows[0].total),procesosConcluidos:completed,tiempoPromedioHoras:averageHours}});
+    const paginatedStalledCases=openCases.slice(responsibilityOffset,responsibilityOffset+pageSize);
+    return res.json({ok:true,events,eventTypes,kpis,companyKpis,stalledCases:paginatedStalledCases,responsibility,pagination:{pageSize,eventPage,processPage,companyPage,responsibilityPage,totalEvents:Number(countRows[0].total),totalKpis:Number(kpiCountRows[0].total),totalCompanies:Number(companyCountRows[0].total),totalResponsibility:openCases.length},summary:{eventos:Number(countRows[0].total),procesosConcluidos:completed,tiempoPromedioHoras:averageHours}});
   } catch(err) { console.error("ADMIN AUDIT ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible cargar la auditoria"}); }
 });
 
