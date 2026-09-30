@@ -685,7 +685,7 @@ app.get("/admin-auditoria/reporte.pdf",auth,async(req,res)=>{
     title("Empresas con mayor tiempo de procedimiento");note("El promedio se calcula únicamente sobre colaboradores con constancia habilitada. Las empresas sin procesos concluidos aparecen sin promedio.");
     table(["Empresa", "Colaboradores", "Concluidos", "Promedio a constancia"],companies.map(item=>[item.empresa,item.total,item.concluidos,duration(item.promedio)]),[255,90,90,101]);
     title("Casos abiertos y siguiente responsable");note("Ordenados por mayor tiempo detenido. Incluye quién no ha cumplido, desde cuándo y la siguiente acción requerida.");
-    table(["Folio", "Colaborador / empresa", "Etapa", "Responsable", "Desde", "Detenido"],open.slice(0,200).map(row=>[row.folio,`${row.colaborador} · ${row.empresa}`,row.stage,row.owner,dateText(row.since),duration(hours(row.since))]),[75,135,100,92,78,56]);
+    table(["Folio", "Colaborador", "Empresa", "Etapa", "Responsable", "Desde", "Detenido"],open.slice(0,200).map(row=>[row.folio,row.colaborador,row.empresa,row.stage,row.owner,dateText(row.since),duration(hours(row.since))]),[65,100,100,82,78,67,44]);
     if(open.length>200)note(`Se muestran los primeros 200 de ${open.length} casos abiertos, ordenados por mayor antigüedad.`);
     footer();doc.end();
   }catch(err){console.error("AUDIT PDF ERROR:",err);if(!res.headersSent)res.status(500).json({ok:false,error:"No fue posible generar el reporte PDF"});}
