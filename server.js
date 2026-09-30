@@ -281,6 +281,27 @@ async function auth(req, res, next) {
   }
 }
 
+/* Roles internos. La autorización se valida siempre en el servidor; ocultar
+   una opción en la interfaz no concede ni revoca permisos por sí mismo. */
+const INTERNAL_ROLES = Object.freeze(["SUPERADMIN","ADMINISTRADOR","AUDITOR","VISOR"]);
+function adminHasPermission(req, permission){
+  if(!req?.isAdmin || !req.admin)return false;
+  const role=req.admin.rol;
+  if(role==="SUPERADMIN" || role==="ADMINISTRADOR")return true;
+  if(role==="AUDITOR")return ["OVERVIEW","AUDIT_VIEW","DOCUMENT_READ"].includes(permission);
+  if(role==="VISOR")return ["OVERVIEW","DOCUMENT_READ"].includes(permission);
+  return false;
+}
+function requireAdminPermission(req,res,permission,message="No tienes permisos para realizar esta acción"){
+  if(adminHasPermission(req,permission))return true;
+  res.status(403).json({ok:false,error:message});
+  return false;
+}
+function canManageInternalRole(actorRole,targetRole){
+  if(actorRole==="SUPERADMIN")return targetRole!=="SUPERADMIN";
+  return actorRole==="ADMINISTRADOR" && ["AUDITOR","VISOR"].includes(targetRole);
+}
+
 
 
 function track() {
@@ -474,7 +495,7 @@ app.get("/admin-overview",auth,async(req,res)=>{
 
 app.get("/admin-auditoria",auth,async(req,res)=>{
   try {
-    if(!req.isAdmin || req.admin.rol!=="SUPERADMIN") return res.status(403).json({ok:false,error:"Solo el administrador principal puede consultar la auditoria"});
+    if(!requireAdminPermission(req,res,"AUDIT_VIEW","Solo administradores y auditores pueden consultar la auditoría")) return;
     const search=String(req.query.q||"").trim();
     const event=String(req.query.evento||"").trim();
     const from=String(req.query.desde||"").slice(0,10);
@@ -590,7 +611,7 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
 app.post("/admin-tokens",auth,async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN") return res.status(403).json({ok:false,error:"Solo el administrador principal puede generar tokens"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede generar tokens")) return;
     const caducidad=String(req.body.caducidad||"").trim();
     const cantidad=Math.min(50,Math.max(1,Number(req.body.cantidad)||1));
     const expiry=new Date(caducidad);
@@ -620,7 +641,7 @@ app.post("/admin-tokens",auth,async(req,res)=>{
 
 app.get("/admin-tokens/:id/detalle",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede consultar cuentas empresariales"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede consultar cuentas empresariales"))return;
     const tokenId=Number(req.params.id);
     if(!Number.isInteger(tokenId)||tokenId<1)return res.status(400).json({ok:false,error:"Token invalido"});
     const [tokens]=await db.query(
@@ -642,7 +663,7 @@ app.get("/admin-tokens/:id/detalle",auth,async(req,res)=>{
 app.post("/admin-tokens/:tokenId/cuentas/:accountId/restablecer-password",auth,async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede restablecer contrasenas"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede restablecer contraseñas"))return;
     const tokenId=Number(req.params.tokenId),accountId=Number(req.params.accountId),password=String(req.body.password||"");
     if(!Number.isInteger(tokenId)||!Number.isInteger(accountId)||tokenId<1||accountId<1)return res.status(400).json({ok:false,error:"Solicitud invalida"});
     if(password.length<8)return res.status(400).json({ok:false,error:"La contrasena debe tener al menos 8 caracteres"});
@@ -669,7 +690,7 @@ app.post("/admin-tokens/:tokenId/cuentas/:accountId/restablecer-password",auth,a
 app.post("/admin-tokens/:tokenId/cuentas",auth,async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede administrar cuentas empresariales"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede administrar cuentas empresariales"))return;
     const tokenId=Number(req.params.tokenId),nombre=String(req.body.nombre||"").trim(),usuario=String(req.body.usuario||"").trim().toLowerCase(),password=String(req.body.password||"");
     if(!Number.isInteger(tokenId)||tokenId<1)return res.status(400).json({ok:false,error:"Token inválido"});
     if(!nombre||nombre.length>120)return res.status(400).json({ok:false,error:"Indica el nombre del administrador"});
@@ -691,7 +712,7 @@ app.post("/admin-tokens/:tokenId/cuentas",auth,async(req,res)=>{
 app.patch("/admin-tokens/:tokenId/cuentas/:accountId/estado",auth,async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede administrar cuentas empresariales"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede administrar cuentas empresariales"))return;
     const tokenId=Number(req.params.tokenId),accountId=Number(req.params.accountId),activo=req.body.activo===true||req.body.activo===1||req.body.activo==="1";
     if(!Number.isInteger(tokenId)||!Number.isInteger(accountId)||tokenId<1||accountId<1)return res.status(400).json({ok:false,error:"Solicitud inválida"});
     connection=await db.getConnection();await connection.beginTransaction();
@@ -709,7 +730,7 @@ app.patch("/admin-tokens/:tokenId/cuentas/:accountId/estado",auth,async(req,res)
 
 app.patch("/admin-tokens/:id/status",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede modificar tokens"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede modificar tokens"))return;
     const status=String(req.body.estatus||"").toUpperCase();
     if(!["ACTIVO","SUSPENDIDO"].includes(status))return res.status(400).json({ok:false,error:"Estado invalido"});
     const [result]=await db.query(
@@ -725,7 +746,7 @@ app.patch("/admin-tokens/:id/status",auth,async(req,res)=>{
 app.patch("/admin-empresas/:id/suspender",auth,async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede suspender folios empresariales"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede suspender folios empresariales"))return;
     const folioId=Number(req.params.id);
     if(!Number.isInteger(folioId)||folioId<1)return res.status(400).json({ok:false,error:"Empresa inválida"});
     connection=await db.getConnection();
@@ -769,7 +790,7 @@ app.patch("/admin-empresas/:id/suspender",auth,async(req,res)=>{
 app.patch("/admin-empresas/:id/reactivar",auth,async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede reactivar folios empresariales"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede reactivar folios empresariales"))return;
     const folioId=Number(req.params.id);
     if(!Number.isInteger(folioId)||folioId<1)return res.status(400).json({ok:false,error:"Empresa invalida"});
     connection=await db.getConnection();
@@ -796,28 +817,33 @@ app.patch("/admin-empresas/:id/reactivar",auth,async(req,res)=>{
 
 app.get("/admin-users",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"No autorizado"});
-    const [users]=await db.query("SELECT id,name,usuario,rol,activo,creado_en FROM admins ORDER BY creado_en DESC");
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede gestionar usuarios internos"))return;
+    const isSuper=req.admin.rol==="SUPERADMIN";
+    const [users]=await db.query(`SELECT id,name,usuario,rol,activo,creado_en FROM admins ${isSuper?"":"WHERE rol<>'SUPERADMIN'"} ORDER BY creado_en DESC`);
     return res.json({ok:true,users});
   }catch(err){console.error("ADMIN USERS ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible cargar los usuarios"})}
 });
 
 app.post("/admin-users",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede crear usuarios internos"))return;
     const name=String(req.body.name||"").trim();
     const usuario=String(req.body.usuario||"").trim().toLowerCase();
     const password=String(req.body.password||"");
+    const rol=String(req.body.rol||"VISOR").trim().toUpperCase();
     if(name.length<3||!/^[-_.a-z0-9]{4,40}$/.test(usuario)||password.length<8){
       return res.status(400).json({ok:false,error:"Captura nombre, usuario de 4 caracteres y contraseña de al menos 8 caracteres"});
+    }
+    if(!["ADMINISTRADOR","AUDITOR","VISOR"].includes(rol)||!canManageInternalRole(req.admin.rol,rol)){
+      return res.status(403).json({ok:false,error:"No tienes permiso para crear ese perfil"});
     }
     const salt=crypto.randomBytes(16).toString("hex");
     const passwordHash=crypto.scryptSync(password,salt,64).toString("hex");
     const [result]=await db.query(
       `INSERT INTO admins(name,usuario,pin,password_hash,password_salt,rol,activo)
-       VALUES(?,?,NULL,?,?,'GESTOR',1)`,[name,usuario,passwordHash,salt]
+       VALUES(?,?,NULL,?,?,?,1)`,[name,usuario,passwordHash,salt,rol]
     );
-    await auditEvent(db,req,"USUARIO_INTERNO_CREADO",{entidad:"ADMIN",entidadId:result.insertId,despues:{nombre:name,usuario,rol:"GESTOR",activo:true}});
+    await auditEvent(db,req,"USUARIO_INTERNO_CREADO",{entidad:"ADMIN",entidadId:result.insertId,despues:{nombre:name,usuario,rol,activo:true}});
     return res.status(201).json({ok:true,id:result.insertId});
   }catch(err){
     if(err.code==="ER_DUP_ENTRY")return res.status(409).json({ok:false,error:"Ese nombre de usuario ya existe"});
@@ -827,10 +853,12 @@ app.post("/admin-users",auth,async(req,res)=>{
 
 app.patch("/admin-users/:id/status",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede modificar usuarios internos"))return;
     const activo=req.body.activo?1:0,id=Number(req.params.id);
     if(id===Number(req.admin.id))return res.status(409).json({ok:false,error:"No puedes desactivar tu propia cuenta"});
-    const [result]=await db.query("UPDATE admins SET activo=? WHERE id=? AND rol='GESTOR'",[activo,id]);
+    const [[target]]=await db.query("SELECT id,rol FROM admins WHERE id=? LIMIT 1",[id]);
+    if(!target||!canManageInternalRole(req.admin.rol,target.rol))return res.status(403).json({ok:false,error:"No tienes permiso para modificar este usuario"});
+    const [result]=await db.query("UPDATE admins SET activo=? WHERE id=?",[activo,id]);
     if(!result.affectedRows)return res.status(404).json({ok:false,error:"Usuario de gestión no encontrado"});
     if(!activo)await db.query("DELETE FROM admin_sessions WHERE admin_id=?",[id]);
     await auditEvent(db,req,activo?"USUARIO_INTERNO_REACTIVADO":"USUARIO_INTERNO_SUSPENDIDO",{entidad:"ADMIN",entidadId:id,despues:{activo:Boolean(activo)}});
@@ -857,11 +885,7 @@ function normalizeExamQuestion(input={}){
   return {question,options,correct};
 }
 function requireQuestionAdmin(req,res){
-  if(!req.isAdmin||req.admin?.rol!=="SUPERADMIN"){
-    res.status(403).json({ok:false,error:"Solo el superadministrador puede gestionar el banco de preguntas"});
-    return false;
-  }
-  return true;
+  return requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede gestionar el banco de preguntas");
 }
 
 app.get("/admin-questions",auth,async(req,res)=>{
@@ -994,7 +1018,7 @@ app.get("/admin-personas/:id/fotografia",auth,async(req,res)=>{
 app.patch("/admin-personas/:id/fotografia",auth,async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede validar fotografías"))return;
     const decision=String(req.body.decision||"").toUpperCase();
     const motivo=String(req.body.motivo||"").trim();
     if(!["ACEPTAR","RECHAZAR"].includes(decision))return res.status(400).json({ok:false,error:"Decisión inválida"});
@@ -2412,6 +2436,9 @@ app.get("/me", auth, async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 async function ensureOperationalTables(){
+  /* Compatibilidad con respaldos anteriores que solo tenían SUPERADMIN/GESTOR. */
+  await db.query("ALTER TABLE admins MODIFY rol ENUM('SUPERADMIN','ADMINISTRADOR','AUDITOR','VISOR','GESTOR') NOT NULL DEFAULT 'VISOR'");
+  await db.query("UPDATE admins SET rol='ADMINISTRADOR' WHERE rol='GESTOR'");
   await db.query(`CREATE TABLE IF NOT EXISTS auditoria_eventos (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2649,7 +2676,7 @@ const upload = multer({
 
 app.get("/admin-toma-fisica",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede consultar la toma física"))return;
     const [queue]=await db.query(`SELECT u.id AS user_id,u.folio,u.name,e.nombre AS empresa,pc.id AS persona_id,tf.solicitado_en,tf.llegada_en,tf.atencion_iniciada_en,tf.atendido_en,
       CASE WHEN tf.atendido_en IS NOT NULL THEN 'CONCLUIDO' WHEN tf.atencion_iniciada_en IS NOT NULL THEN 'EN_ATENCION' WHEN tf.llegada_en IS NOT NULL THEN 'EN_SITIO' ELSE 'PENDIENTE_LLEGADA' END AS estado
       FROM fotografias_toma_fisica tf JOIN users u ON u.id=tf.user_id JOIN personas_curso pc ON pc.user_id=u.id JOIN empresas e ON e.id=pc.empresa_id
@@ -2661,7 +2688,7 @@ app.get("/admin-toma-fisica",auth,async(req,res)=>{
 
 app.post("/admin-toma-fisica/:userId/llegada",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede operar la toma física"))return;
     const userId=Number(req.params.userId),[rows]=await db.query(`SELECT tf.user_id,tf.llegada_en,pc.id persona_id,pc.empresa_id,pc.folio
       FROM fotografias_toma_fisica tf JOIN personas_curso pc ON pc.user_id=tf.user_id WHERE tf.user_id=? LIMIT 1`,[userId]),item=rows[0];
     if(!item)return res.status(404).json({ok:false,error:"Caso de toma física no encontrado"});
@@ -2672,7 +2699,7 @@ app.post("/admin-toma-fisica/:userId/llegada",auth,async(req,res)=>{
 
 app.post("/admin-toma-fisica/:userId/iniciar",auth,async(req,res)=>{
   try{
-    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede operar la toma física"))return;
     const userId=Number(req.params.userId),[rows]=await db.query(`SELECT tf.user_id,tf.llegada_en,tf.atendido_en,pc.id persona_id,pc.empresa_id,pc.folio
       FROM fotografias_toma_fisica tf JOIN personas_curso pc ON pc.user_id=tf.user_id WHERE tf.user_id=? LIMIT 1`,[userId]),item=rows[0];
     if(!item)return res.status(404).json({ok:false,error:"Caso de toma física no encontrado"});
@@ -2687,7 +2714,7 @@ app.post("/admin-toma-fisica/:userId/iniciar",auth,async(req,res)=>{
 app.post("/admin-toma-fisica/:userId/fotografia",auth,upload.single("photo"),async(req,res)=>{
   let connection;
   try{
-    if(!req.isAdmin)return res.status(403).json({ok:false,error:"No autorizado"});
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo un administrador puede operar la toma física"))return;
     if(!req.file)return res.status(400).json({ok:false,error:"Captura una fotografía antes de concluir"});
     const userId=Number(req.params.userId);connection=await db.getConnection();await connection.beginTransaction();
     const [rows]=await connection.query(`SELECT tf.user_id,tf.llegada_en,tf.atendido_en,pc.id persona_id,pc.empresa_id,pc.folio
