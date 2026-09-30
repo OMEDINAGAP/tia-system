@@ -311,6 +311,21 @@ exportAuditExcel=async function(){
   if(!rows.length)return Swal.fire('Sin datos','No hay registros para exportar','info');const headers=Object.keys(rows[0]),csv='\ufeff'+[headers.join(','),...rows.map(row=>headers.map(header=>'"'+String(row[header]??'').replace(/"/g,'""')+'"').join(','))].join('\r\n'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=`TIA-auditoria-${new Date().toISOString().slice(0,10)}.csv`;link.click();URL.revokeObjectURL(url);
 };
 
+function auditFilterParams(){
+ const params=new URLSearchParams(),q=document.getElementById('auditSearch')?.value.trim(),companyId=document.getElementById('auditCompany')?.value,from=document.getElementById('auditFrom')?.value,to=document.getElementById('auditTo')?.value;
+ if(q)params.set('q',q);if(companyId)params.set('empresaId',companyId);if(from)params.set('desde',from);if(to)params.set('hasta',to);return params;
+}
+async function exportAuditPdf(){
+ const button=document.getElementById('auditPdfButton');if(button){button.disabled=true;button.textContent='Generando PDF...'}
+ try{
+  const response=await fetch('/admin-auditoria/reporte.pdf?'+auditFilterParams(),{headers:{Authorization:'Bearer '+token}});
+  if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||'No fue posible generar el reporte PDF')}
+  const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');link.href=url;link.download=`TIA-reporte-ejecutivo-${new Date().toISOString().slice(0,10)}.pdf`;link.click();URL.revokeObjectURL(url);
+ }catch(error){Swal.fire('Reporte no disponible',error.message||'No fue posible generar el PDF','error')}
+ finally{if(button){button.disabled=false;button.textContent='Reporte ejecutivo PDF'}}
+}
+document.querySelector('#audit .audit-toolbar')?.insertAdjacentHTML('beforeend','<button class="secondary" id="auditPdfButton" type="button" onclick="exportAuditPdf()">Reporte ejecutivo PDF</button>');
+
 /* Banco de preguntas: disponible únicamente para SUPERADMIN. */
 let questionBank={questions:[],stats:{},pagination:{page:1,pageSize:20,total:0}},questionPage=1;
 document.querySelector('[data-view="audit"]').insertAdjacentHTML('afterend','<button data-view="questions" style="display:none">☷ <span>Banco de preguntas</span></button>');

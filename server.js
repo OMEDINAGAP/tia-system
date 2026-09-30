@@ -621,6 +621,74 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
   } catch(err) { console.error("ADMIN AUDIT ERROR:",err); return res.status(500).json({ok:false,error:"No fue posible cargar la auditoria"}); }
 });
 
+/* Reporte ejecutivo para reuniones: concentra avance, responsables y cuellos de botella
+   usando los mismos filtros de la pantalla de Auditoría. */
+app.get("/admin-auditoria/reporte.pdf",auth,async(req,res)=>{
+  try{
+    if(!requireAdminPermission(req,res,"AUDIT_VIEW","Solo administradores y auditores pueden generar el reporte"))return;
+    const search=String(req.query.q||"").trim(),from=String(req.query.desde||"").slice(0,10),to=String(req.query.hasta||"").slice(0,10),empresaId=Number(req.query.empresaId)||0;
+    const clauses=[],params=[];
+    if(empresaId){clauses.push("pc.empresa_id=?");params.push(empresaId);}
+    if(search){clauses.push("(pc.folio LIKE ? OR e.nombre LIKE ? OR CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) LIKE ?)");params.push(`%${search}%`,`%${search}%`,`%${search}%`);}
+    if(from){clauses.push("pc.creado_en>=?");params.push(`${from} 00:00:00`);}
+    if(to){clauses.push("pc.creado_en<?");params.push(`${to} 23:59:59`);}
+    const where=clauses.length?`WHERE ${clauses.join(" AND ")}`:"";
+    const [rows]=await db.query(`SELECT pc.folio,pc.creado_en AS alta_en,e.nombre AS empresa,CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador,
+      u.aprobado,u.photo,u.foto_estatus,u.foto_registrada_en,u.foto_revisada_en,tf.solicitado_en AS toma_fisica_en,
+      MIN(CASE WHEN ae.evento='INICIO_SESION_COLABORADOR' THEN ae.creado_en END) AS sesion_en,
+      MIN(CASE WHEN ae.evento='CARTA_ACEPTADA' THEN ae.creado_en END) AS carta_en,
+      MIN(CASE WHEN ae.evento='CURSO_INICIADO' THEN ae.creado_en END) AS curso_inicio_en,
+      MIN(CASE WHEN ae.evento='VIDEO_COMPLETADO' THEN ae.creado_en END) AS video_en,
+      MIN(CASE WHEN ae.evento='EXAMEN_APROBADO' THEN ae.creado_en END) AS examen_en,
+      MIN(CASE WHEN ae.evento='FOTOGRAFIA_ENVIADA' THEN ae.creado_en END) AS foto_en
+      FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id LEFT JOIN users u ON u.id=pc.user_id
+      LEFT JOIN fotografias_toma_fisica tf ON tf.user_id=u.id LEFT JOIN auditoria_eventos ae ON ae.persona_id=pc.id
+      ${where} GROUP BY pc.id,e.nombre,u.id,tf.user_id ORDER BY pc.creado_en ASC`,params);
+    const now=new Date();
+    const hours=(start,end=now)=>{const a=start?new Date(start):null,b=end?new Date(end):null;return a&&b?Math.max(0,(b-a)/3600000):null};
+    const stage=row=>{
+      if(row.foto_estatus==='APROBADA')return {stage:'Concluido',owner:'Sistema',since:row.foto_revisada_en};
+      if(row.toma_fisica_en)return {stage:'Toma física TIA',owner:'Módulo TIA',since:row.toma_fisica_en};
+      if(row.foto_estatus==='PENDIENTE'&&row.photo)return {stage:'Revisión de fotografía',owner:'Módulo TIA',since:row.foto_en||row.foto_registrada_en};
+      if(row.examen_en)return {stage:'Carga de fotografía',owner:'Colaborador',since:row.examen_en};
+      if(row.video_en)return {stage:'Presentación de examen',owner:'Colaborador',since:row.video_en};
+      if(row.carta_en)return {stage:'Finalizar curso',owner:'Colaborador',since:row.curso_inicio_en||row.carta_en};
+      if(row.sesion_en)return {stage:'Carta compromiso',owner:'Colaborador',since:row.sesion_en};
+      return {stage:'Primer inicio de sesión',owner:'Empresa / colaborador',since:row.alta_en};
+    };
+    const records=rows.map(row=>({...row,empresa:repairMojibake(row.empresa),colaborador:repairMojibake(row.colaborador),...stage(row)}));
+    const completed=records.filter(row=>row.stage==='Concluido'),open=records.filter(row=>row.stage!=='Concluido').sort((a,b)=>(hours(b.since)||0)-(hours(a.since)||0));
+    const avg=completed.length?completed.reduce((sum,row)=>sum+(hours(row.alta_en,row.foto_revisada_en)||0),0)/completed.length:null;
+    const owners={"Módulo TIA":0,"Colaborador":0,"Empresa / colaborador":0};open.forEach(row=>{owners[row.owner]=(owners[row.owner]||0)+1});
+    const companyMap=new Map();
+    records.forEach(row=>{const item=companyMap.get(row.empresa)||{empresa:row.empresa,total:0,concluidos:0,hours:[]};item.total++;if(row.stage==='Concluido'){item.concluidos++;const value=hours(row.alta_en,row.foto_revisada_en);if(value!=null)item.hours.push(value)}companyMap.set(row.empresa,item)});
+    const companies=[...companyMap.values()].map(item=>({...item,promedio:item.hours.length?item.hours.reduce((a,b)=>a+b,0)/item.hours.length:null})).sort((a,b)=>(b.promedio??-1)-(a.promedio??-1));
+    res.setHeader("Content-Type","application/pdf");res.setHeader("Content-Disposition",`attachment; filename="reporte-ejecutivo-TIA-${new Date().toISOString().slice(0,10)}.pdf"`);
+    const doc=new PDFDocument({size:"LETTER",margin:38});doc.pipe(res);
+    const navy="#08111f",green="#16a34a",gold="#d6a94f",muted="#52657b",line="#cbd5e1";
+    const dateText=value=>value?new Date(value).toLocaleString("es-MX",{dateStyle:"short",timeStyle:"short"}):"--";
+    const duration=value=>value==null?"--":value<24?`${value.toFixed(1)} h`:`${(value/24).toFixed(1)} días`;
+    const header=()=>{doc.rect(0,0,612,78).fill(navy);doc.fillColor(gold).fontSize(18).font("Helvetica-Bold").text("TIA",38,24);doc.fillColor("#ffffff").fontSize(16).text("REPORTE EJECUTIVO DE TRAZABILIDAD",88,27);doc.fillColor("#b8c7d9").fontSize(8).font("Helvetica").text(`Generado: ${dateText(new Date())}`,38,57);doc.text(`Filtros: ${empresaId?`empresa ${empresaId}`:"todas las empresas"}${from?` · desde ${from}`:""}${to?` · hasta ${to}`:""}${search?` · búsqueda: ${search}`:""}`,250,57,{width:324,align:"right"});doc.y=96};
+    const footer=()=>{doc.fillColor(muted).fontSize(8).text(`Sistema TIA · Reporte auditable · Página ${doc.bufferedPageRange().count}`,38,748,{width:536,align:"center"})};
+    const page=()=>{footer();doc.addPage();header()};
+    const title=value=>{if(doc.y>680)page();doc.fillColor(navy).font("Helvetica-Bold").fontSize(13).text(value);doc.moveDown(.35)};
+    const note=value=>{doc.fillColor(muted).font("Helvetica").fontSize(8.5).text(value,{width:536});doc.moveDown(.7)};
+    const table=(headers,data,widths)=>{const rowHeight=22,total=widths.reduce((sum,value)=>sum+value,0);const drawHeader=()=>{if(doc.y>700)page();let x=38;doc.rect(38,doc.y,total,18).fill(navy);doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(7);headers.forEach((head,i)=>{doc.text(head,x+4,doc.y+5,{width:widths[i]-8});x+=widths[i]});doc.y+=18};drawHeader();data.forEach((row,index)=>{if(doc.y+rowHeight>730){page();drawHeader()}let x=38;doc.rect(38,doc.y,total,rowHeight).fill(index%2?"#f8fafc":"#ffffff");doc.fillColor(navy).font("Helvetica").fontSize(7);row.forEach((cell,i)=>{doc.text(String(cell??"--"),x+4,doc.y+6,{width:widths[i]-8,height:rowHeight-8,ellipsis:true});x+=widths[i]});doc.y+=rowHeight});doc.moveDown(.8)};
+    header();
+    title("Resumen para toma de decisiones");
+    const total=records.length,completion=total?Math.round(completed.length/total*100):0;
+    table(["Colaboradores", "Concluidos", "Pendientes", "Avance", "Promedio a constancia"],[[total,completed.length,open.length,`${completion}%`,duration(avg)]],[105,105,105,105,116]);
+    title("Responsabilidad de procesos pendientes");note("Estos indicadores señalan quién tiene la siguiente acción. Permiten diferenciar una espera atribuible al módulo TIA de una espera de empresa o colaborador.");
+    table(["Responsable", "Casos abiertos", "Lectura para junta"],[["Módulo TIA",owners["Módulo TIA"]||0,"Revisión de fotografía o toma física"],["Empresa / colaborador",owners["Empresa / colaborador"]||0,"Aún no inicia el curso"],["Colaborador",owners.Colaborador||0,"Carta, curso, examen o fotografía pendientes"]],[150,110,276]);
+    title("Empresas con mayor tiempo de procedimiento");note("El promedio se calcula únicamente sobre colaboradores con constancia habilitada. Las empresas sin procesos concluidos aparecen sin promedio.");
+    table(["Empresa", "Colaboradores", "Concluidos", "Promedio a constancia"],companies.map(item=>[item.empresa,item.total,item.concluidos,duration(item.promedio)]),[255,90,90,101]);
+    title("Casos abiertos y siguiente responsable");note("Ordenados por mayor tiempo detenido. Incluye quién no ha cumplido, desde cuándo y la siguiente acción requerida.");
+    table(["Folio", "Colaborador / empresa", "Etapa", "Responsable", "Desde", "Detenido"],open.slice(0,200).map(row=>[row.folio,`${row.colaborador}\n${row.empresa}`,row.stage,row.owner,dateText(row.since),duration(hours(row.since))]),[75,135,100,92,78,56]);
+    if(open.length>200)note(`Se muestran los primeros 200 de ${open.length} casos abiertos, ordenados por mayor antigüedad.`);
+    footer();doc.end();
+  }catch(err){console.error("AUDIT PDF ERROR:",err);if(!res.headersSent)res.status(500).json({ok:false,error:"No fue posible generar el reporte PDF"});}
+});
+
 app.post("/admin-tokens",auth,async(req,res)=>{
   let connection;
   try{
