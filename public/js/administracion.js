@@ -358,3 +358,33 @@ async function openPhysicalCamera(userId,folio,nombre){const start=await fetch(`
 function copyKioskUrl(){const url=`${location.origin}/registro-llegada.html`;navigator.clipboard?.writeText(url);Swal.fire({icon:'success',title:'Enlace copiado',text:url,timer:1800,showConfirmButton:false})}
 physicalNav.onclick=async()=>{document.querySelectorAll('.nav button').forEach(item=>item.classList.remove('active'));physicalNav.classList.add('active');activeView='physical';document.querySelectorAll('.view').forEach(view=>view.classList.toggle('active',view.id==='physical'));document.getElementById('title').textContent='Toma física TIA';document.getElementById('subtitle').textContent='Recepción, atención y cierre auditable de fotografías presenciales';await loadPhysicalQueue()};
 (async()=>{const response=await fetch('/admin-overview',{headers:{Authorization:'Bearer '+token}});if(!response.ok)return;const overview=await response.json();physicalNav.style.display=['SUPERADMIN','ADMINISTRADOR'].includes(overview.admin?.rol)?'':'none'})();
+
+/* Navegación administrativa organizada por flujo de trabajo. Conserva los mismos
+   botones, permisos y controladores; únicamente cambia su presentación. */
+function organizeAdminNavigation(){
+ const nav=document.querySelector('.nav');
+ if(!nav)return;
+ const groups=[
+  {title:'Operación',items:[['dashboard','&#9672;','Resumen'],['people','&#9817;','Colaboradores'],['failed','!','Reprobados'],['physical','&#8857;','Toma física TIA']]},
+  {title:'Gestión empresarial',items:[['tokens','#','Tokens empresariales'],['companies','&#9635;','Empresas']]},
+  {title:'Control y configuración',items:[['audit','&#9711;','Auditoría'],['questions','&#9783;','Banco de preguntas'],['users','&#9817;','Usuarios internos']]}
+ ];
+ const fragment=document.createDocumentFragment();
+ groups.forEach(group=>{
+  const wrapper=document.createElement('div');
+  wrapper.className='nav-group';
+  const title=document.createElement('div');
+  title.className='nav-group-title';
+  title.textContent=group.title;
+  wrapper.appendChild(title);
+  group.items.forEach(([view,icon,label])=>{
+   const button=nav.querySelector(`[data-view="${view}"]`);
+   if(!button)return;
+   button.innerHTML=`<span class="nav-icon" aria-hidden="true">${icon}</span><span>${label}</span>`;
+   wrapper.appendChild(button);
+  });
+  fragment.appendChild(wrapper);
+ });
+ nav.replaceChildren(fragment);
+}
+organizeAdminNavigation();
