@@ -6,6 +6,7 @@ const QRCode = require("qrcode");
 const PDFDocument = require("pdfkit");
 const path = require("path");
 const nodemailer = require("nodemailer");
+const zlib = require("zlib");
 
 
 const db = mysql.createPool({
@@ -128,6 +129,41 @@ function createMailTransport(){
     secure:String(process.env.SMTP_SECURE??"true").toLowerCase()!=="false",
     auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}
   });
+}
+
+function backupEncryptionKey(){
+  const value=String(process.env.BACKUP_ENCRYPTION_KEY||"").trim();
+  if(!value)return null;
+  try{const key=Buffer.from(value,"base64");return key.length===32?key:null;}catch{return null;}
+}
+async function sharePointAccessToken(){
+  const tenant=String(process.env.SHAREPOINT_TENANT_ID||"").trim(),clientId=String(process.env.SHAREPOINT_CLIENT_ID||"").trim(),secret=String(process.env.SHAREPOINT_CLIENT_SECRET||"").trim();
+  if(!tenant||!clientId||!secret)throw new Error("Configuración de SharePoint incompleta");
+  const body=new URLSearchParams({client_id:clientId,client_secret:secret,scope:"https://graph.microsoft.com/.default",grant_type:"client_credentials"});
+  const response=await fetch(`https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.access_token)throw new Error("No fue posible autenticar con SharePoint");
+  return data.access_token;
+}
+async function createEncryptedDatabaseBackup(){
+  const key=backupEncryptionKey(),driveId=String(process.env.SHAREPOINT_DRIVE_ID||"").trim();
+  if(!key||!driveId)throw new Error("Respaldo externo no configurado");
+  const [tableRows]=await db.query("SHOW TABLES");
+  const tableKey=Object.keys(tableRows[0]||{})[0];
+  const tables={};
+  for(const row of tableRows){const name=String(row[tableKey]);const [items]=await db.query(`SELECT * FROM \`${name.replace(/`/g,"")}\``);tables[name]=items;}
+  const plain=Buffer.from(JSON.stringify({format:"TIA_BACKUP_V1",createdAt:new Date().toISOString(),tables},(_,value)=>Buffer.isBuffer(value)?{__tiaBuffer:value.toString("base64")}:value));
+  const compressed=zlib.gzipSync(plain,{level:9}),iv=crypto.randomBytes(12),cipher=crypto.createCipheriv("aes-256-gcm",key,iv),encrypted=Buffer.concat([cipher.update(compressed),cipher.final()]),tag=cipher.getAuthTag();
+  const envelope=Buffer.from(JSON.stringify({format:"TIA_ENCRYPTED_BACKUP_V1",algorithm:"AES-256-GCM",compression:"gzip",iv:iv.toString("base64"),tag:tag.toString("base64"),data:encrypted.toString("base64")}));
+  const decipher=crypto.createDecipheriv("aes-256-gcm",key,iv);decipher.setAuthTag(tag);const verified=zlib.gunzipSync(Buffer.concat([decipher.update(encrypted),decipher.final()]));
+  if(!verified.equals(plain))throw new Error("No se pudo verificar el cifrado del respaldo");
+  const file=`TIA-respaldo-${new Date().toISOString().replace(/[:.]/g,"-")}.tiaenc`;
+  const folder=String(process.env.SHAREPOINT_BACKUP_FOLDER||"Respaldos-TIA").split("/").filter(Boolean).map(encodeURIComponent).join("/");
+  const accessToken=await sharePointAccessToken();
+  const target=`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(driveId)}/root:/${folder?folder+"/":""}${encodeURIComponent(file)}:/content`;
+  const upload=await fetch(target,{method:"PUT",headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":"application/octet-stream"},body:envelope});
+  if(!upload.ok)throw new Error("SharePoint rechazó el respaldo");
+  return {file,sha256:crypto.createHash("sha256").update(envelope).digest("hex"),bytes:envelope.length};
 }
 
 function repairMojibake(value){
@@ -527,6 +563,30 @@ app.get("/admin-overview",auth,async(req,res)=>{
     };
     return res.json({ok:true,admin:req.admin,stats,companies,people});
   }catch(err){console.error("ADMIN OVERVIEW ERROR:",err);return res.status(500).json({ok:false,error:"No fue posible cargar la administracion"});}
+});
+
+app.get("/admin-seguridad",auth,async(req,res)=>{
+  try{
+    if(!requireAdminPermission(req,res,"SYSTEM_CONFIG","Solo administradores pueden consultar seguridad operativa"))return;
+    const [events]=await db.query(`SELECT evento,COUNT(*) total FROM auditoria_eventos WHERE creado_en>=DATE_SUB(NOW(),INTERVAL 30 DAY)
+      AND evento IN ('VERIFICACION_DISPOSITIVO_SOLICITADA','VERIFICACION_DISPOSITIVO_FALLIDA','SESION_COLABORADOR_REEMPLAZADA','DISPOSITIVO_COLABORADOR_REGISTRADO','INICIO_SESION_ADMINISTRATIVO') GROUP BY evento`);
+    const [recent]=await db.query(`SELECT creado_en,actor_nombre,evento,folio,detalle,ip FROM auditoria_eventos
+      WHERE evento IN ('VERIFICACION_DISPOSITIVO_FALLIDA','SESION_COLABORADOR_REEMPLAZADA','TOKEN_SUSPENDIDO','EMPRESA_Y_ACCESOS_SUSPENDIDOS','COLABORADOR_SUSPENDIDO')
+      ORDER BY creado_en DESC LIMIT 20`);
+    const [devices]=await db.query("SELECT COUNT(*) total FROM dispositivos_colaborador WHERE activo=1");
+    const [backups]=await db.query("SELECT creado_en,archivo,sha256,bytes,estado,detalle FROM respaldos_seguridad ORDER BY creado_en DESC LIMIT 20");
+    return res.json({ok:true,events,recent,devices:Number(devices[0]?.total||0),backups,backupConfigured:Boolean(backupEncryptionKey()&&process.env.SHAREPOINT_DRIVE_ID&&process.env.SHAREPOINT_TENANT_ID&&process.env.SHAREPOINT_CLIENT_ID&&process.env.SHAREPOINT_CLIENT_SECRET)});
+  }catch(err){console.error("SECURITY DASHBOARD ERROR:",err.message);return res.status(500).json({ok:false,error:"No fue posible cargar la seguridad operativa"});}
+});
+
+app.post("/admin-seguridad/respaldo",auth,async(req,res)=>{
+  try{
+    if(!req.isAdmin||req.admin.rol!=="SUPERADMIN")return res.status(403).json({ok:false,error:"Solo el administrador principal puede generar respaldos"});
+    const result=await createEncryptedDatabaseBackup();
+    await db.query("INSERT INTO respaldos_seguridad(archivo,sha256,bytes,estado,detalle) VALUES(?,?,?,'VERIFICADO','Cifrado AES-256-GCM y verificado antes de enviar a SharePoint')",[result.file,result.sha256,result.bytes]);
+    await auditEvent(db,req,"RESPALDO_CIFRADO_GENERADO",{entidad:"RESPALDO",detalle:`${result.file} | SHA-256 ${result.sha256}`});
+    return res.json({ok:true,file:result.file,sha256:result.sha256,bytes:result.bytes});
+  }catch(err){console.error("SECURITY BACKUP ERROR:",err.message);try{await db.query("INSERT INTO respaldos_seguridad(archivo,estado,detalle) VALUES('NO_GENERADO','ERROR',?)",[err.message.slice(0,900)])}catch{}return res.status(503).json({ok:false,error:"No fue posible generar el respaldo cifrado. Verifica la configuración de SharePoint."});}
 });
 
 app.get("/admin-auditoria",auth,async(req,res)=>{
@@ -2607,6 +2667,16 @@ app.get("/me", auth, async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 async function ensureOperationalTables(){
+  await db.query(`CREATE TABLE IF NOT EXISTS respaldos_seguridad (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    archivo VARCHAR(255) NOT NULL,
+    sha256 CHAR(64) NULL,
+    bytes BIGINT UNSIGNED NULL,
+    estado ENUM('VERIFICADO','ERROR') NOT NULL,
+    detalle VARCHAR(1000) NULL,
+    PRIMARY KEY(id), KEY idx_respaldos_fecha(creado_en)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   for(const definition of [
     "ADD COLUMN device_hash CHAR(64) NULL AFTER expires",
     "ADD COLUMN creado_en DATETIME NULL AFTER device_hash",
