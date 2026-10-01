@@ -665,13 +665,13 @@ app.get("/admin-auditoria",auth,async(req,res)=>{
       SUM(CASE WHEN u.foto_registrada_en IS NOT NULL AND u.foto_revisada_en IS NOT NULL AND TIMESTAMPDIFF(SECOND,u.foto_registrada_en,u.foto_revisada_en)<=86400 THEN 1 ELSE 0 END) AS dentro_sla,
       AVG(CASE WHEN u.foto_registrada_en IS NOT NULL AND u.foto_revisada_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,u.foto_registrada_en,u.foto_revisada_en)/3600 END) AS promedio_revision_horas,
       SUM(CASE WHEN u.foto_estatus='PENDIENTE' THEN 1 ELSE 0 END) AS pendientes
-      FROM personas_curso pc JOIN users u ON u.id=pc.user_id ${kpiWhere}`,kpiParams);
+      FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id JOIN users u ON u.id=pc.user_id ${kpiWhere}`,kpiParams);
     const [physicalTimeRows]=await db.query(`SELECT
       COUNT(CASE WHEN tf.atendido_en IS NOT NULL THEN 1 END) AS atendidas,
       AVG(CASE WHEN tf.llegada_en IS NOT NULL AND tf.atencion_iniciada_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,tf.llegada_en,tf.atencion_iniciada_en)/60 END) AS espera_minutos,
       AVG(CASE WHEN tf.atencion_iniciada_en IS NOT NULL AND tf.atendido_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,tf.atencion_iniciada_en,tf.atendido_en)/60 END) AS atencion_minutos,
       AVG(CASE WHEN tf.llegada_en IS NOT NULL AND tf.atendido_en IS NOT NULL THEN TIMESTAMPDIFF(SECOND,tf.llegada_en,tf.atendido_en)/60 END) AS total_minutos
-      FROM personas_curso pc JOIN users u ON u.id=pc.user_id LEFT JOIN fotografias_toma_fisica tf ON tf.user_id=u.id ${kpiWhere}`,kpiParams);
+      FROM personas_curso pc JOIN empresas e ON e.id=pc.empresa_id JOIN users u ON u.id=pc.user_id LEFT JOIN fotografias_toma_fisica tf ON tf.user_id=u.id ${kpiWhere}`,kpiParams);
     const [processRows]=await db.query(`SELECT pc.id,pc.folio,pc.creado_en AS alta_en,e.nombre AS empresa,
       CONCAT_WS(' ',pc.nombres,pc.apellido_paterno,pc.apellido_materno) AS colaborador,
       u.aprobado,u.photo,u.foto_estatus,u.foto_registrada_en,u.foto_revisada_en,tf.solicitado_en AS toma_fisica_en,tf.llegada_en,tf.atencion_iniciada_en,tf.atendido_en,
