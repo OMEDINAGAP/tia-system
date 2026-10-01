@@ -7,6 +7,7 @@
 
   <!-- SweetAlert -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/device-session.js"></script>
 
   <style>
     body {
@@ -343,8 +344,24 @@
       if (!folio) { Swal.fire("Aviso", "Ingresa tu folio", "warning"); return; }
       beginLoginFlight();
       try {
-        const res = await fetch("/folio-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folio }) });
+        const res = await fetch("/folio-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folio, deviceId: window.TIADevice.id }) });
         const data = await res.json();
+        if (data.requiresVerification) {
+          cancelLoginFlight();
+          const { value: codigo } = await Swal.fire({
+            icon: "info", title: "Verifica tu acceso", input: "text", inputLabel: `Enviamos un código de 6 dígitos a ${data.correo}.`,
+            inputPlaceholder: "Código de verificación", inputAttributes: { inputmode: "numeric", maxlength: "6", autocapitalize: "off" },
+            confirmButtonText: "Verificar", showCancelButton: true, cancelButtonText: "Cancelar", background: "#0f172a", color: "#fff",
+            preConfirm: value => /^\d{6}$/.test(String(value || "").trim()) ? String(value).trim() : Swal.showValidationMessage("Ingresa los 6 dígitos del código.")
+          });
+          if (!codigo) return;
+          beginLoginFlight();
+          const verification = await fetch("/verificar-acceso-colaborador", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ folio, codigo, deviceId: window.TIADevice.id }) });
+          const verified = await verification.json();
+          if (!verification.ok || !verified.ok) { cancelLoginFlight(); Swal.fire("Error", verified.message || "No fue posible verificar el acceso", "error"); return; }
+          sessionStorage.clear(); sessionStorage.setItem("token", verified.token); sessionStorage.setItem("userId", String(verified.userId));
+          departTo(verified.pendingPhoto ? "/foto-final.html" : "/carta-compromiso.html"); return;
+        }
         if (!res.ok || !data.ok) { cancelLoginFlight(); Swal.fire("Error", data.message || "Folio no encontrado", "error"); return; }
         if (data.persona) {
           sessionStorage.clear();

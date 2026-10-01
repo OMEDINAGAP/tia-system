@@ -34,7 +34,7 @@ app.use(cors({
     return callback(new Error("Origen no permitido"));
   },
   methods: ["GET", "POST", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-TIA-Device"]
 }));
 app.use((err, req, res, next) => {
   if (err?.message === "Origen no permitido") {
@@ -177,7 +177,18 @@ async function auditPersonContext(executor,userId) {
 
 // arriba
 const sessions = new Map(); // token -> userId
-const COLLABORATOR_SESSION_EXPIRES = 253402300799000; // 31-12-9999; la sesión personal no vence por tiempo.
+const COLLABORATOR_SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
+const COLLABORATOR_SESSION_REFRESH_WINDOW_MS = 4 * 60 * 60 * 1000;
+const MAX_COLLABORATOR_DEVICES = 3;
+
+function deviceHash(value){ return crypto.createHash("sha256").update(String(value || "")).digest("hex"); }
+function validDeviceId(value){ return /^[a-f0-9-]{20,80}$/i.test(String(value || "")); }
+function newAccessCode(){ return String(crypto.randomInt(100000,1000000)); }
+function accessCodeHash(code){ return crypto.createHash("sha256").update(`${String(code)}:${SECRET || "tia-access"}`).digest("hex"); }
+function maskedEmail(email){
+  const [local,domain] = String(email || "").split("@");
+  return local && domain ? `${local.slice(0,1)}${"•".repeat(Math.min(5,Math.max(1,local.length-1)))}@${domain}` : "correo registrado";
+}
 
 let lastSent = 0;
 const videoProgressRate = new Map();
@@ -250,8 +261,8 @@ async function auth(req, res, next) {
        FROM sessions s
        LEFT JOIN personas_curso pc ON pc.user_id=s.userId
        LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
-       WHERE s.token=? LIMIT 1`,
-      [token]
+       WHERE s.token=? AND s.expires>? LIMIT 1`,
+      [token, Date.now()]
     );
 
     if (!rows.length) {
@@ -263,6 +274,12 @@ async function auth(req, res, next) {
     }
 
     const session = rows[0];
+
+    const suppliedDevice = String(req.get("X-TIA-Device") || "");
+    if (session.device_hash && (!validDeviceId(suppliedDevice) || deviceHash(suppliedDevice) !== session.device_hash)) {
+      await db.query("DELETE FROM sessions WHERE token=?", [token]);
+      return res.status(403).json({ error:"Esta sesión pertenece a otro dispositivo. Ingresa nuevamente con tu folio." });
+    }
 
     if (session.suspendida) {
       await db.query("DELETE FROM sessions WHERE userId=?", [session.userId]);
@@ -281,6 +298,11 @@ async function auth(req, res, next) {
     }
 
     req.token = token;
+
+    const now = Date.now();
+    if (Number(session.expires) - now < COLLABORATOR_SESSION_REFRESH_WINDOW_MS) {
+      await db.query("UPDATE sessions SET expires=?, ultimo_acceso_en=NOW() WHERE token=?", [now + COLLABORATOR_SESSION_IDLE_MS, token]);
+    }
 
     next();
 
@@ -1232,6 +1254,29 @@ app.post("/toma-fisica/llegada",accessLoginLimiter,async(req,res)=>{
 });
 
 
+async function createCollaboratorSession(req, user, hashedDevice, wasNewDevice=false){
+  const token=crypto.randomBytes(32).toString("hex");
+  const expires=Date.now()+COLLABORATOR_SESSION_IDLE_MS;
+  const [activeSessions]=await db.query("SELECT COUNT(*) AS total FROM sessions WHERE userId=?",[user.id]);
+  await db.query("DELETE FROM sessions WHERE userId=?",[user.id]);
+  await db.query(`INSERT INTO sessions (token,userId,expires,device_hash,creado_en,ultimo_acceso_en)
+    VALUES (?,?,?,?,NOW(),NOW())`,[token,user.id,expires,hashedDevice]);
+  await db.query(`UPDATE dispositivos_colaborador SET ultimo_acceso_en=NOW(),ultimo_ip=?,user_agent=?
+    WHERE user_id=? AND device_hash=?`,[String(req.ip||"").slice(0,64),String(req.get("user-agent")||"").slice(0,500),user.id,hashedDevice]);
+  if(wasNewDevice) await auditEvent(db,req,"DISPOSITIVO_COLABORADOR_REGISTRADO",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"DISPOSITIVO",entidadId:user.id,detalle:"Dispositivo autorizado mediante código de verificación"});
+  if(Number(activeSessions[0]?.total||0)>0) await auditEvent(db,req,"SESION_COLABORADOR_REEMPLAZADA",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"SESION",entidadId:user.id,detalle:"Un inicio en dispositivo autorizado cerró la sesión previa"});
+  await auditEvent(db,req,"INICIO_SESION_COLABORADOR",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"COLABORADOR",entidadId:user.persona_id,detalle:"Sesión personal iniciada en dispositivo autorizado"});
+  return token;
+}
+
+async function findCollaboratorByFolio(folio){
+  const [rows]=await db.query(`SELECT u.id,u.name,u.correo,pc.id AS persona_id,pc.empresa_id,pc.folio,u.aprobado,u.photo,u.foto_estatus
+    FROM personas_curso pc JOIN users u ON u.id=pc.user_id
+    LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
+    WHERE UPPER(pc.folio)=? AND sc.persona_id IS NULL LIMIT 1`,[folio]);
+  return rows[0] || null;
+}
+
 // ACCESO DE USUARIO MEDIANTE FOLIO PREVIAMENTE REGISTRADO
 app.post("/folio-login", accessLoginLimiter, async (req, res) => {
   try {
@@ -1257,22 +1302,28 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
       });
     }
 
-    // Los folios personales activos entran directamente al curso.
-    const [people] = await db.query(
-      `SELECT u.id,u.name,pc.id AS persona_id,pc.empresa_id,pc.folio,u.aprobado,u.photo,u.foto_estatus
-       FROM personas_curso pc JOIN users u ON u.id=pc.user_id
-       LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
-       WHERE UPPER(pc.folio)=? AND sc.persona_id IS NULL LIMIT 1`,
-      [folio]
-    );
-    if (people.length) {
-      const user = people[0];
-      const token = crypto.randomBytes(32).toString("hex");
-      await db.query(
-        "INSERT INTO sessions (token, userId, expires) VALUES (?, ?, ?)",
-        [token, user.id, COLLABORATOR_SESSION_EXPIRES]
-      );
-      await auditEvent(db,req,"INICIO_SESION_COLABORADOR",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"COLABORADOR",entidadId:user.persona_id});
+    // El folio identifica; un dispositivo nuevo debe demostrar acceso al correo registrado.
+    const user = await findCollaboratorByFolio(folio);
+    if (user) {
+      const deviceId=String(req.body.deviceId||"");
+      if(!validDeviceId(deviceId)) return res.status(400).json({ok:false,message:"No fue posible identificar este dispositivo. Actualiza la página e intenta nuevamente."});
+      const hashedDevice=deviceHash(deviceId);
+      const [devices]=await db.query("SELECT id FROM dispositivos_colaborador WHERE user_id=? AND device_hash=? AND activo=1 LIMIT 1",[user.id,hashedDevice]);
+      if(!devices.length){
+        if(!String(user.correo||"").match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/)) return res.status(403).json({ok:false,message:"Este folio requiere validación adicional, pero no tiene correo registrado. Solicita apoyo a la empresa o al módulo TIA."});
+        const [countRows]=await db.query("SELECT COUNT(*) AS total FROM dispositivos_colaborador WHERE user_id=? AND activo=1",[user.id]);
+        if(Number(countRows[0]?.total||0)>=MAX_COLLABORATOR_DEVICES) return res.status(403).json({ok:false,deviceLimit:true,message:"Este colaborador ya tiene el máximo de 3 dispositivos autorizados. Solicita la liberación de un dispositivo al módulo TIA."});
+        const code=newAccessCode();
+        await db.query(`INSERT INTO verificaciones_acceso_colaborador(user_id,device_hash,codigo_hash,expira_en,intentos,solicitado_en)
+          VALUES(?,?,?,DATE_ADD(NOW(),INTERVAL 10 MINUTE),0,NOW())
+          ON DUPLICATE KEY UPDATE codigo_hash=VALUES(codigo_hash),expira_en=VALUES(expira_en),intentos=0,usado_en=NULL,solicitado_en=NOW()`,[user.id,hashedDevice,accessCodeHash(code)]);
+        const transporter=createMailTransport();
+        if(!transporter) return res.status(503).json({ok:false,message:"La verificación por correo no está disponible. Contacta al módulo TIA."});
+        await transporter.sendMail({from:process.env.MAIL_FROM||process.env.SMTP_USER,to:user.correo,subject:"Código de acceso al curso TIA",text:`Tu código de verificación TIA es: ${code}. Vence en 10 minutos. No lo compartas.`});
+        await auditEvent(db,req,"VERIFICACION_DISPOSITIVO_SOLICITADA",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"DISPOSITIVO",entidadId:user.id,detalle:"Código enviado al correo registrado"});
+        return res.json({ok:true,requiresVerification:true,persona:true,folio:user.folio,correo:maskedEmail(user.correo)});
+      }
+      const token=await createCollaboratorSession(req,user,hashedDevice);
       return res.json({ ok: true, persona: true, pendingPhoto:!!user.aprobado&&user.foto_estatus!=="APROBADA", token, userId: user.id, folio: user.folio });
     }
 
@@ -1326,6 +1377,33 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
     console.error("ERROR folio-login:", err);
     return res.status(500).json({ ok: false, message: "No fue posible iniciar sesion" });
   }
+});
+
+app.post("/verificar-acceso-colaborador", accessLoginLimiter, async (req,res)=>{
+  try{
+    const folio=String(req.body.folio||"").trim().toUpperCase();
+    const code=String(req.body.codigo||"").trim();
+    const deviceId=String(req.body.deviceId||"");
+    if(!folio||!/^\d{6}$/.test(code)||!validDeviceId(deviceId)) return res.status(400).json({ok:false,message:"Captura el código de 6 dígitos."});
+    const user=await findCollaboratorByFolio(folio);
+    if(!user) return res.status(401).json({ok:false,message:"Folio no disponible."});
+    const hashedDevice=deviceHash(deviceId);
+    const [checks]=await db.query(`SELECT id,intentos FROM verificaciones_acceso_colaborador
+      WHERE user_id=? AND device_hash=? AND usado_en IS NULL AND expira_en>NOW() LIMIT 1`,[user.id,hashedDevice]);
+    const check=checks[0];
+    if(!check || Number(check.intentos)>=5) return res.status(401).json({ok:false,message:"El código venció o ya no es válido. Solicita uno nuevo ingresando nuevamente tu folio."});
+    const [validRows]=await db.query("SELECT id FROM verificaciones_acceso_colaborador WHERE id=? AND codigo_hash=?",[check.id,accessCodeHash(code)]);
+    if(!validRows.length){
+      await db.query("UPDATE verificaciones_acceso_colaborador SET intentos=intentos+1 WHERE id=?",[check.id]);
+      await auditEvent(db,req,"VERIFICACION_DISPOSITIVO_FALLIDA",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"DISPOSITIVO",entidadId:user.id,detalle:"Código de acceso inválido"});
+      return res.status(401).json({ok:false,message:"Código incorrecto."});
+    }
+    await db.query("UPDATE verificaciones_acceso_colaborador SET usado_en=NOW() WHERE id=?",[check.id]);
+    await db.query(`INSERT INTO dispositivos_colaborador(user_id,device_hash,ultimo_ip,user_agent,registrado_en,ultimo_acceso_en,activo)
+      VALUES(?,?,?,?,NOW(),NOW(),1)`,[user.id,hashedDevice,String(req.ip||"").slice(0,64),String(req.get("user-agent")||"").slice(0,500)]);
+    const token=await createCollaboratorSession(req,user,hashedDevice,true);
+    return res.json({ok:true,persona:true,pendingPhoto:!!user.aprobado&&user.foto_estatus!=="APROBADA",token,userId:user.id,folio:user.folio});
+  }catch(err){console.error("COLLABORATOR ACCESS VERIFY ERROR:",err.message);return res.status(500).json({ok:false,message:"No fue posible verificar el acceso."});}
 });
 
 app.post("/registro-empresa", async (req, res) => {
@@ -2529,6 +2607,39 @@ app.get("/me", auth, async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 async function ensureOperationalTables(){
+  for(const definition of [
+    "ADD COLUMN device_hash CHAR(64) NULL AFTER expires",
+    "ADD COLUMN creado_en DATETIME NULL AFTER device_hash",
+    "ADD COLUMN ultimo_acceso_en DATETIME NULL AFTER creado_en"
+  ]){
+    try{await db.query(`ALTER TABLE sessions ${definition}`)}catch(err){if(err.code!=="ER_DUP_FIELDNAME")throw err;}
+  }
+  await db.query(`CREATE TABLE IF NOT EXISTS dispositivos_colaborador (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    device_hash CHAR(64) NOT NULL,
+    ultimo_ip VARCHAR(64) NULL,
+    user_agent VARCHAR(500) NULL,
+    registrado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ultimo_acceso_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY(id), UNIQUE KEY uq_dispositivo_colaborador(user_id,device_hash),
+    KEY idx_dispositivo_activo(user_id,activo),
+    CONSTRAINT fk_dispositivo_colaborador_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await db.query(`CREATE TABLE IF NOT EXISTS verificaciones_acceso_colaborador (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    device_hash CHAR(64) NOT NULL,
+    codigo_hash CHAR(64) NOT NULL,
+    solicitado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expira_en DATETIME NOT NULL,
+    intentos TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    usado_en DATETIME NULL,
+    PRIMARY KEY(id), UNIQUE KEY uq_verificacion_dispositivo(user_id,device_hash),
+    KEY idx_verificacion_expira(expira_en),
+    CONSTRAINT fk_verificacion_colaborador_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   /* Compatibilidad con respaldos anteriores que solo tenían SUPERADMIN/GESTOR. */
   await db.query("ALTER TABLE admins MODIFY rol ENUM('SUPERADMIN','ADMINISTRADOR','AUDITOR','VISOR','GESTOR') NOT NULL DEFAULT 'VISOR'");
   await db.query("UPDATE admins SET rol='ADMINISTRADOR' WHERE rol='GESTOR'");
