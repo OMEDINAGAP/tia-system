@@ -1330,8 +1330,10 @@ async function createCollaboratorSession(req, user, hashedDevice, wasNewDevice=f
 }
 
 async function findCollaboratorByFolio(folio){
-  const [rows]=await db.query(`SELECT u.id,u.name,u.correo,pc.id AS persona_id,pc.empresa_id,pc.folio,u.aprobado,u.photo,u.foto_estatus
-    FROM personas_curso pc JOIN users u ON u.id=pc.user_id
+  const [rows]=await db.query(`SELECT u.id,u.name,
+    COALESCE(NULLIF(TRIM(u.correo),''),NULLIF(TRIM(pc.correo),''),NULLIF(TRIM(e.correo_1),''),NULLIF(TRIM(e.correo_2),'')) AS correo,
+    pc.id AS persona_id,pc.empresa_id,pc.folio,u.aprobado,u.photo,u.foto_estatus
+    FROM personas_curso pc JOIN users u ON u.id=pc.user_id JOIN empresas e ON e.id=pc.empresa_id
     LEFT JOIN suspensiones_colaborador sc ON sc.persona_id=pc.id
     WHERE UPPER(pc.folio)=? AND sc.persona_id IS NULL LIMIT 1`,[folio]);
   return rows[0] || null;
