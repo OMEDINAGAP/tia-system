@@ -1364,13 +1364,28 @@ app.post("/folio-login", accessLoginLimiter, async (req, res) => {
       });
     }
 
-    // El folio identifica; un dispositivo nuevo debe demostrar acceso al correo registrado.
+    // El folio permite el acceso al curso; el dispositivo se registra para trazabilidad.
     const user = await findCollaboratorByFolio(folio);
     if (user) {
       const deviceId=String(req.body.deviceId||"");
       if(!validDeviceId(deviceId)) return res.status(400).json({ok:false,message:"No fue posible identificar este dispositivo. Actualiza la página e intenta nuevamente."});
       const hashedDevice=deviceHash(deviceId);
       const [devices]=await db.query("SELECT id FROM dispositivos_colaborador WHERE user_id=? AND device_hash=? AND activo=1 LIMIT 1",[user.id,hashedDevice]);
+      if(!devices.length){
+        const [countRows]=await db.query("SELECT COUNT(*) AS total FROM dispositivos_colaborador WHERE user_id=? AND activo=1",[user.id]);
+        if(Number(countRows[0]?.total||0)>=MAX_COLLABORATOR_DEVICES){
+          const [oldest]=await db.query("SELECT id FROM dispositivos_colaborador WHERE user_id=? AND activo=1 ORDER BY ultimo_acceso_en ASC,id ASC LIMIT 1",[user.id]);
+          if(oldest[0]){
+            await db.query("UPDATE dispositivos_colaborador SET activo=0 WHERE id=?",[oldest[0].id]);
+            await auditEvent(db,req,"DISPOSITIVO_COLABORADOR_REEMPLAZADO",{actor:{tipo:"COLABORADOR",id:user.id,nombre:user.name},empresaId:user.empresa_id,personaId:user.persona_id,folio:user.folio,entidad:"DISPOSITIVO",entidadId:user.id,detalle:"Se reemplazó el dispositivo con menor actividad para conservar máximo tres dispositivos"});
+          }
+        }
+        await db.query(`INSERT INTO dispositivos_colaborador(user_id,device_hash,ultimo_ip,user_agent,registrado_en,ultimo_acceso_en,activo)
+          VALUES(?,?,?,?,NOW(),NOW(),1)
+          ON DUPLICATE KEY UPDATE activo=1,ultimo_ip=VALUES(ultimo_ip),user_agent=VALUES(user_agent),ultimo_acceso_en=NOW()`,[user.id,hashedDevice,String(req.ip||"").slice(0,64),String(req.get("user-agent")||"").slice(0,500)]);
+        const token=await createCollaboratorSession(req,user,hashedDevice,true);
+        return res.json({ ok: true, persona: true, pendingPhoto:!!user.aprobado&&user.foto_estatus!=="APROBADA", token, userId: user.id, folio: user.folio });
+      }
       if(!devices.length){
         if(!String(user.correo||"").match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/)) return res.status(403).json({ok:false,message:"Este folio requiere validación adicional, pero no tiene correo registrado. Solicita apoyo a la empresa o al módulo TIA."});
         const [countRows]=await db.query("SELECT COUNT(*) AS total FROM dispositivos_colaborador WHERE user_id=? AND activo=1",[user.id]);
